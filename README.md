@@ -22,20 +22,23 @@ Human decisions: spec approval and branch review. Everything else is automated.
 npx skills add Olunuga/ralph-loop
 ```
 
-Installs `/ralph-init`, `/spec`, `/ralph`, and `/ralph-update` into Claude Code globally.
+Installs `/ralph-init`, `/ralph-install`, `/ralph-update`, `/spec`, and `/ralph` into Claude Code globally.
 
-### 2. Copy pipeline into your project
+### 2. Install pipeline into your project
 
-Copy this repo's contents into a `ralph/` directory at your project root:
+From your project root:
 
 ```
-your-project/
-└── ralph/
-    ├── loop.sh
-    ├── PROMPT_*.md
-    ├── scripts/
-    └── skills/
+/ralph-install
 ```
+
+This pulls ralph-loop into `ralph/` automatically. Pass a tag or branch to pin a version:
+
+```
+/ralph-install v1.2.0
+```
+
+Or copy the directory manually if you prefer.
 
 ### 3. Run setup
 
