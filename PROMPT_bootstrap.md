@@ -1,0 +1,84 @@
+You are bootstrapping the autonomous build pipeline for this project.
+
+TASK: Explore the codebase and write AGENTS.md from what you discover.
+Do NOT implement anything. Discovery and documentation only.
+
+---
+
+STEP 1 — Identify the build system (use subagents for all reads)
+
+- Check for Package.swift (SPM) vs *.xcodeproj (Xcode)
+- If Xcode: read the xcodeproj to find the scheme name and targets
+- List available simulators: `xcrun simctl list devices available | grep "iPhone" | head -5`
+- Find .swiftlint.yml if present
+
+STEP 2 — Discover architecture by reading source
+
+- List all top-level directories in the main app folder
+- Read 1-2 files from each layer to understand naming and import patterns
+- Find all protocol definitions: `grep -r "^protocol " [AppFolder]/ --include="*.swift" -l`
+- Find reference implementations (the most complete existing feature module)
+- Identify the dependency direction: which layers import which
+
+STEP 3 — Verify build and test commands
+
+- Run the build command (derive from scheme/target you found): capture output, note if it passes
+- Run unit tests: capture output, note targets and how to filter
+- Note: do not run UI tests during bootstrap (requires booted simulator, takes too long)
+
+STEP 4 — Write ralph/AGENTS.md with what you discovered
+
+Use this structure — fill in discovered values, do not invent:
+
+```markdown
+## Build & Run
+- Build: `[xcodebuild command with scheme and simulator destination]`
+- Test unit: `[xcodebuild test command targeting unit test scheme]`
+- Test UI: `[xcodebuild test command targeting UI test scheme]`
+- Lint: `swiftlint lint --strict [AppFolder]/` (if .swiftlint.yml present, else: not configured)
+- Snapshots: `[snapshot test command if snapshot tests found, else: not configured]`
+
+## Architecture
+- App folder: [main app directory]/
+- Layers (dependency order, innermost first):
+  - [Layer]: [folder path] — [one line on what it contains]
+  - [Layer]: [folder path] — [one line on what it contains]
+  ... (list all layers you found)
+- Protocols: [path to protocols] ([list protocol file names])
+- Reference implementation: [most complete module] — use as pattern for new features
+- New features: add [implementation file] in [layer folder], conform to protocol in [protocols folder]
+
+## Code Quality — Hard Failures (block commit)
+- No force unwraps: `try!`, `!.`, `as!`
+- No implicitly unwrapped optionals in public API
+- No missing access control modifiers on public types
+
+## Code Quality — Lint (agent fixes in place)
+- [swiftlint status — configured / not configured]
+- If configured: swiftlint --strict must pass before any commit
+
+## Guardrails
+- Never modify [project file path] directly — file references managed separately
+- [Layer] must not import [higher layer] — dependency direction is strictly [direction]
+- No UI types (UIView, UIViewController, View) in [Manager/Service/Repository] layer
+- [any other architectural rules you observed]
+
+## UI Test Routing
+- View-level: changes in [AppFolder]/Views/ or [AppFolder]/Components/
+- Flow-level: changes touching navigation, coordinators, or spanning multiple layers
+- No UI: models, repositories, services, view models, utilities, tests
+```
+
+STEP 5 — Commit:
+git add ralph/AGENTS.md && git commit -m "ralph: bootstrap AGENTS.md from codebase scan"
+
+---
+
+CONSTRAINTS
+
+- Discovered values only — do not invent commands or paths
+- If a command fails to run, document it as "unverified — [reason]" rather than guessing
+- Do not modify any source files
+- Do not modify the project file
+- Human will review and extend AGENTS.md after this runs
+
