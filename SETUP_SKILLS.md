@@ -16,7 +16,7 @@ Install all three skills at once via [skills.sh](https://skills.sh/):
 npx skills add <owner>/ralph
 ```
 
-This installs `/ralph-init`, `/spec`, and `/ralph` globally.
+This installs `/ralph-init`, `/spec`, `/ralph`, and `/ralph-update` globally.
 
 Or manually copy each from `ralph/skills/<name>/SKILL.md` to `~/.claude/skills/<name>/SKILL.md`.
 
@@ -38,6 +38,8 @@ your-project/
     │   ├── ralph-init/
     │   │   └── SKILL.md
     │   ├── ralph/
+    │   │   └── SKILL.md
+    │   ├── ralph-update/
     │   │   └── SKILL.md
     │   └── spec/
     │       └── SKILL.md
@@ -62,7 +64,7 @@ This will:
 - Auto-discover your app's scheme, simulator, and test targets
 - Write `ralph/config.sh`
 - Write `.claude/settings.json` (workspace boundary hook + pre-approved commands)
-- Install `/spec` and `/ralph` as global skills
+- Install `/spec`, `/ralph`, and `/ralph-update` as global skills
 - Run bootstrap to generate `ralph/AGENTS.md`
 
 ---
@@ -97,6 +99,18 @@ git checkout ralph/TICKET-001
 # review the diff
 git checkout main && git merge ralph/TICKET-001
 ```
+
+---
+
+## Updating ralph in a project
+
+When the ralph repo has updates you want to pull into an existing project:
+
+```
+/ralph-update ~/path/to/ralph ~/my-project/ralph
+```
+
+Shows a diff of what changed, asks for confirmation, then copies only the generic files. `config.sh`, `AGENTS.md`, and `specs/` are never touched.
 
 ---
 
