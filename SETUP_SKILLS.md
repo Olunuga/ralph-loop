@@ -13,7 +13,7 @@ npm install -g @anthropic-ai/claude-code
 Install all three skills at once via [skills.sh](https://skills.sh/):
 
 ```bash
-npx skills add <owner>/ralph
+npx skills add Olunuga/ralph-loop
 ```
 
 This installs `/ralph-init`, `/spec`, `/ralph`, and `/ralph-update` globally.
@@ -44,6 +44,7 @@ your-project/
     │   └── spec/
     │       └── SKILL.md
     └── scripts/
+        ├── check_architecture.sh
         ├── consensus_judge.sh
         └── hooks/
             └── workspace_boundary.sh
@@ -104,10 +105,12 @@ git checkout main && git merge ralph/TICKET-001
 
 ## Updating ralph in a project
 
-When the ralph repo has updates you want to pull into an existing project:
+When ralph-loop has updates you want to pull into an existing project:
 
 ```
-/ralph-update ~/path/to/ralph ~/my-project/ralph
+/ralph-update ralph/                  # latest from main
+/ralph-update ralph/ v1.2.0           # specific tag
+/ralph-update ralph/ feature/branch   # specific branch
 ```
 
 Shows a diff of what changed, asks for confirmation, then copies only the generic files. `config.sh`, `AGENTS.md`, and `specs/` are never touched.
