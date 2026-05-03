@@ -7,7 +7,7 @@ An autonomous development pipeline for iOS projects, powered by Claude Code. You
 1. `/spec` — structured JTBD conversation produces a spec committed to a `spec/<slug>` branch
 2. `/ralph` — orchestrates the pipeline: creates a worktree, plans the work, runs the build loop, gates the output
 3. Build loop runs Claude (Haiku for iterations, Sonnet for gates) autonomously: build → unit tests → force-unwrap check → architecture check → lint → commit
-4. Post-loop gates: LLM consensus judge → UI tests → draft PR → worktree cleanup
+4. Post-loop gates: LLM consensus judge → UI tests → opens a draft PR via `gh` (fails gracefully if `gh` is not installed) → worktree cleanup
 5. You review the branch and merge
 
 Human decisions: spec approval and branch review. Everything else is automated.
@@ -59,7 +59,7 @@ This auto-discovers your Xcode scheme, simulator, and test targets, then writes 
 /ralph my-feature       # run the pipeline autonomously
 ```
 
-Review the `ralph/my-feature` branch, then open a PR to main.
+A draft PR is opened automatically when all gates pass. Review the `ralph/my-feature` branch and mark it ready when satisfied.
 
 ---
 
@@ -86,13 +86,17 @@ Only generic pipeline files are updated. `config.sh`, `AGENTS.md`, and `specs/` 
 
 ## Workspace isolation
 
-`/ralph-init` writes a `PreToolUse` hook into `.claude/settings.json` that blocks any agent from reading or writing files outside the project directory. This prevents the build agent from accidentally touching files elsewhere on your machine.
+Each feature runs in its own **git worktree** (`.worktrees/<slug>`) branched off the spec, keeping all in-progress changes isolated from the main working tree. The worktree is removed automatically after the post-loop gates pass.
+
+`/ralph-init` also writes a `PreToolUse` hook into `.claude/settings.json` that blocks any agent from reading or writing files outside the project directory. This prevents the build agent from accidentally touching files elsewhere on your machine.
 
 It also pre-approves a set of read-only commands (git status, git diff, git log, find, ls, etc.) so the orchestrator can run without prompting you for every command. These are in the `permissions.allow` array in `.claude/settings.json`.
 
 **To tighten permissions** — remove entries from `permissions.allow` in `.claude/settings.json`. You will be prompted to approve those commands manually each time they run.
 
 **To disable the workspace boundary hook entirely** — remove the `hooks` block from `.claude/settings.json`. Not recommended for autonomous runs.
+
+> **Future improvement:** for stronger sandboxing, running the build loop inside a Docker container (with the worktree mounted as a volume) would fully isolate filesystem and network access from the host. Contributions welcome.
 
 ---
 
