@@ -105,12 +105,17 @@ git checkout main && git merge ralph/TICKET-001
 
 ## Updating ralph in a project
 
-When ralph-loop has updates you want to pull into an existing project:
+When ralph-loop has updates you want to pull into an existing project, open a Claude Code session in the project root and run:
 
 ```
-/ralph-update ralph/                  # latest from main
-/ralph-update ralph/ v1.2.0           # specific tag
-/ralph-update ralph/ feature/branch   # specific branch
+/ralph-update
+```
+
+The skill reads `RALPH_VERSION` from `ralph/config.sh` as the default. You can also pass a specific version:
+
+```
+/ralph-update v1.2.0
+/ralph-update some-branch
 ```
 
 Shows a diff of what changed, asks for confirmation, then copies only the generic files. `config.sh`, `AGENTS.md`, and `specs/` are never touched.

@@ -65,10 +65,17 @@ Review the `ralph/my-feature` branch, then open a PR to main.
 
 ## Updating ralph-loop in a project
 
+Open a Claude Code session in your project root and run:
+
 ```
-/ralph-update ralph/              # pull latest from main
-/ralph-update ralph/ v1.2.0       # specific tag
-/ralph-update ralph/ some-branch  # specific branch
+/ralph-update
+```
+
+The skill reads `RALPH_VERSION` from `ralph/config.sh` as the default, shows you a diff of what changed, and asks for confirmation before copying anything. You can also specify a version:
+
+```
+/ralph-update v1.2.0
+/ralph-update some-branch
 ```
 
 Only generic pipeline files are updated. `config.sh`, `AGENTS.md`, and `specs/` are never touched.
