@@ -135,7 +135,7 @@ rm -rf "$TMPDIR"
 ## Step 6 — Update version lock
 
 ```bash
-sed -i '' "s/^RALPH_VERSION=.*/RALPH_VERSION=\"$REF\"/" "ralph/config.sh"
+sed -i '' "s|^RALPH_VERSION=.*|RALPH_VERSION=\"$REF\"|" "ralph/config.sh"
 ```
 
 ## Step 7 — Report
