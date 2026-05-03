@@ -26,7 +26,7 @@ Installs `/ralph-init`, `/ralph-install`, `/ralph-update`, `/spec`, and `/ralph`
 
 ### 2. Install pipeline into your project
 
-From your project root:
+Open a Claude Code session in your project root, then run:
 
 ```
 /ralph-install
