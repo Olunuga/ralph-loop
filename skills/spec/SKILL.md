@@ -64,7 +64,12 @@ When [trigger], [action], so [outcome].
 
 ## Step 4 — Approval loop
 
-Use AskUserQuestion to show the full spec and ask: "Does this spec look correct? Reply 'yes' to save, or give feedback to revise."
+Use AskUserQuestion with the full spec pasted into the question text, followed by the prompt. Format it exactly like this:
+
+"---
+<full spec markdown here>
+---
+Does this spec look correct? Reply 'yes' to save, or give feedback to revise."
 
 Revise and repeat until the user approves.
 
