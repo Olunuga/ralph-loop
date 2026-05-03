@@ -68,7 +68,7 @@ check_paths() {
         fi
     done < <(echo "$text" | python3 -c "
 import re, sys
-for m in re.finditer(r'(?<!\w)/[a-zA-Z0-9_.][^\s|&;\"\'> ]*', sys.stdin.read()):
+for m in re.finditer(r'(?<![\w:])/[a-zA-Z0-9_.][^\s|&;\"\'> ]*', sys.stdin.read()):
     print(m.group())
 " 2>/dev/null || true)
 }
