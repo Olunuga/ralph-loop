@@ -71,7 +71,9 @@ Open a Claude Code session in your project root and run:
 /ralph-update
 ```
 
-The skill reads `RALPH_VERSION` from `ralph/config.sh` as the default, shows you a diff of what changed, and asks for confirmation before copying anything. You can also specify a version:
+The skill fetches available tags and branches from the repo, shows your current version, and asks you to choose. It then shows a diff of what changed and asks for confirmation before copying anything.
+
+If you already know the version, pass it upfront to skip the selection step:
 
 ```
 /ralph-update v1.2.0
