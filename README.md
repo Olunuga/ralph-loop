@@ -84,6 +84,18 @@ Only generic pipeline files are updated. `config.sh`, `AGENTS.md`, and `specs/` 
 
 ---
 
+## Workspace isolation
+
+`/ralph-init` writes a `PreToolUse` hook into `.claude/settings.json` that blocks any agent from reading or writing files outside the project directory. This prevents the build agent from accidentally touching files elsewhere on your machine.
+
+It also pre-approves a set of read-only commands (git status, git diff, git log, find, ls, etc.) so the orchestrator can run without prompting you for every command. These are in the `permissions.allow` array in `.claude/settings.json`.
+
+**To tighten permissions** — remove entries from `permissions.allow` in `.claude/settings.json`. You will be prompted to approve those commands manually each time they run.
+
+**To disable the workspace boundary hook entirely** — remove the `hooks` block from `.claude/settings.json`. Not recommended for autonomous runs.
+
+---
+
 ## Project-specific files (not in this repo)
 
 These are generated per-project and live in your project's `ralph/` directory:
