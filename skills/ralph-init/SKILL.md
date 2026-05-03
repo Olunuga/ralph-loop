@@ -51,12 +51,13 @@ From the output, infer:
 - `SIMULATOR` — the newest iPhone simulator available (prefer iPhone 16, fallback to highest number)
 - `SOURCE_DIR` — the directory matching the scheme name (or xcodeproj name without extension)
 
-If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty.
+If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty. Read `RALPH_VERSION` from it if present.
 
 Present everything you discovered to the user in a single AskUserQuestion:
 
 "Here's what I found — please confirm or correct:
 
+  Ralph version:   <from config.sh or 'main'>
   App name:        <inferred or 'unknown'>
   Description:     <from config.sh or 'unknown'>
   .xcodeproj:      <discovered>
@@ -79,6 +80,8 @@ Apply any corrections the user gives, then write `ralph/config.sh`.
 #!/bin/bash
 # ralph/config.sh — Project build configuration for the Ralph loop.
 # Sourced by ralph/loop.sh on every run.
+
+RALPH_VERSION="<ralph_version>"
 
 APP_NAME="<app_name>"
 APP_DESCRIPTION="<description>"

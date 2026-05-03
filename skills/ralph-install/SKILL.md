@@ -56,6 +56,15 @@ chmod +x ralph/loop.sh ralph/scripts/check_architecture.sh \
 rm -rf "$TMPDIR"
 ```
 
-## Step 4 — Report
+## Step 4 — Record version
 
-Confirm: "ralph-loop@${ref:-main} installed into ralph/. Run /ralph-init to configure for this project."
+Write the installed version into `ralph/config.sh` so the project tracks which version it is pinned to:
+
+```bash
+REF="${ref:-main}"
+echo "RALPH_VERSION=\"$REF\"" > ralph/config.sh
+```
+
+## Step 5 — Report
+
+Confirm: "ralph-loop@${ref:-main} installed into ralph/. RALPH_VERSION recorded in ralph/config.sh. Run /ralph-init to complete setup."

@@ -29,7 +29,7 @@ Generic files to sync (never touches config.sh, AGENTS.md, or specs/):
 - skills/ralph-update/SKILL.md
 - skills/spec/SKILL.md
 
-## Step 1 — Validate target
+## Step 1 — Validate target and resolve ref
 
 Check the target is an active ralph project directory:
 ```bash
@@ -37,6 +37,13 @@ ls "$target/config.sh" 2>/dev/null && echo "has config" || echo "no config"
 ```
 
 If no config.sh found, warn the user and ask if they want to continue.
+
+If no ref argument was given, read `RALPH_VERSION` from `$target/config.sh` as the default:
+```bash
+LOCKED_REF=$(grep '^RALPH_VERSION=' "$target/config.sh" 2>/dev/null | cut -d'"' -f2)
+REF="${ref:-${LOCKED_REF:-main}}"
+echo "Updating to: $REF"
+```
 
 ## Step 2 — Clone ref into a temp directory
 
@@ -103,6 +110,13 @@ chmod +x "$target/loop.sh" "$target/scripts/check_architecture.sh" \
 rm -rf "$TMPDIR"
 ```
 
-## Step 5 — Report
+## Step 5 — Update version lock
 
-Confirm: "Ralph updated in '$target' from ralph-loop@${ref:-main}. config.sh, AGENTS.md, and specs/ were not touched."
+Write the new version back to `config.sh`:
+```bash
+sed -i '' "s/^RALPH_VERSION=.*/RALPH_VERSION=\"$REF\"/" "$target/config.sh"
+```
+
+## Step 6 — Report
+
+Confirm: "Ralph updated in '$target' to ralph-loop@$REF. RALPH_VERSION updated in config.sh."
