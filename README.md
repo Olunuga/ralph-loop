@@ -12,6 +12,12 @@ An autonomous development pipeline for iOS projects, powered by Claude Code. You
 
 Human decisions: spec approval and branch review. Everything else is automated.
 
+### Model usage
+
+The Claude Code session you run `/ralph` from acts as the **orchestrator** — it plans the work, monitors the build loop, runs post-loop gates, and makes the high-level decisions. Use a capable model here (Sonnet or Opus recommended).
+
+The build loop itself spawns subagents for each iteration. These use **Haiku** by default (fast and cheap for the repetitive write-build-fix cycle). Planning, bootstrap, and post-loop gates stay on the orchestrator's model.
+
 ---
 
 ## Setup
