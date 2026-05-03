@@ -41,6 +41,7 @@ is_outside_workspace() {
     local path="$1"
     [[ -z "$path" ]] && return 1          # empty path — allow
     [[ "$path" != /* ]] && return 1       # relative path — allow
+    [[ "$path" == /dev/* ]] && return 1   # standard devices (/dev/null etc) — allow
     local resolved
     resolved=$(python3 -c "
 import os, sys
