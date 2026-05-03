@@ -9,7 +9,7 @@ disable-model-invocation: true
 Update the Ralph pipeline files in a project from the ralph-loop repo.
 
 Target project ralph directory: $target
-Ref (tag or branch, default: main): $ref
+Ref (tag or branch — optional, will ask if not provided): $ref
 
 Default repo: https://github.com/Olunuga/ralph-loop
 
@@ -29,7 +29,7 @@ Generic files to sync (never touches config.sh, AGENTS.md, or specs/):
 - skills/ralph-update/SKILL.md
 - skills/spec/SKILL.md
 
-## Step 1 — Validate target and resolve ref
+## Step 1 — Validate target
 
 Check the target is an active ralph project directory:
 ```bash
@@ -38,30 +38,49 @@ ls "$target/config.sh" 2>/dev/null && echo "has config" || echo "no config"
 
 If no config.sh found, warn the user and ask if they want to continue.
 
-If no ref argument was given, read `RALPH_VERSION` from `$target/config.sh` as the default:
+Read the current locked version:
 ```bash
 LOCKED_REF=$(grep '^RALPH_VERSION=' "$target/config.sh" 2>/dev/null | cut -d'"' -f2)
-REF="${ref:-${LOCKED_REF:-main}}"
-echo "Updating to: $REF"
+echo "Current: ${LOCKED_REF:-unknown}"
 ```
 
-## Step 2 — Clone ref into a temp directory
+## Step 2 — Resolve ref
+
+If `$ref` was provided as an argument, use it directly and skip to Step 3.
+
+If no ref was given, fetch available tags and branches from the repo:
+```bash
+git ls-remote --tags --heads https://github.com/Olunuga/ralph-loop 2>/dev/null \
+  | awk '{print $2}' \
+  | sed 's|refs/tags/||; s|refs/heads/||' \
+  | grep -v '\^{}' \
+  | sort -rV
+```
+
+Use AskUserQuestion to present the list and ask:
+"Current version: ${LOCKED_REF:-unknown}
+
+Available versions:
+<list tags and branches>
+
+Which version do you want to update to? Enter a tag, branch name, or 'cancel'."
+
+If the user replies 'cancel', stop.
+
+Use the user's reply as REF.
+
+## Step 3 — Clone ref into a temp directory
 
 ```bash
-REF="${ref:-main}"
 TMPDIR=$(mktemp -d)
 git clone --depth 1 --branch "$REF" https://github.com/Olunuga/ralph-loop "$TMPDIR" 2>&1
 ```
 
 If the clone fails (bad ref or no network), stop and report the error.
 
-## Step 3 — Show diff
+## Step 4 — Show diff
 
 ```bash
-TMPDIR=$(mktemp -d)
-REF="${ref:-main}"
-git clone --depth 1 --branch "$REF" https://github.com/Olunuga/ralph-loop "$TMPDIR" 2>/dev/null
-
 for f in loop.sh PROMPT_bootstrap.md PROMPT_build.md PROMPT_plan.md PROMPT_plan_work.md SETUP.md SETUP_SKILLS.md \
           scripts/check_architecture.sh scripts/consensus_judge.sh scripts/hooks/workspace_boundary.sh \
           skills/ralph-init/SKILL.md skills/ralph/SKILL.md skills/ralph-update/SKILL.md skills/spec/SKILL.md; do
@@ -80,14 +99,17 @@ done
 ```
 
 Use AskUserQuestion to show the diff summary and ask:
-"These files will be updated in '$target' from ralph-loop@${ref:-main}. config.sh, AGENTS.md, and specs/ will not be touched. Proceed? Reply 'yes' to copy or 'no' to cancel."
+"Updating '$target' from ralph-loop@$REF (currently ${LOCKED_REF:-unknown}).
+config.sh, AGENTS.md, and specs/ will not be touched.
 
-If the user replies anything other than yes, clean up and stop:
+Proceed? Reply 'yes' or 'no'."
+
+If the user replies no, clean up and stop:
 ```bash
 rm -rf "$TMPDIR"
 ```
 
-## Step 4 — Copy
+## Step 5 — Copy
 
 ```bash
 for f in loop.sh PROMPT_bootstrap.md PROMPT_build.md PROMPT_plan.md PROMPT_plan_work.md SETUP.md SETUP_SKILLS.md; do
@@ -110,13 +132,12 @@ chmod +x "$target/loop.sh" "$target/scripts/check_architecture.sh" \
 rm -rf "$TMPDIR"
 ```
 
-## Step 5 — Update version lock
+## Step 6 — Update version lock
 
-Write the new version back to `config.sh`:
 ```bash
 sed -i '' "s/^RALPH_VERSION=.*/RALPH_VERSION=\"$REF\"/" "$target/config.sh"
 ```
 
-## Step 6 — Report
+## Step 7 — Report
 
 Confirm: "Ralph updated in '$target' to ralph-loop@$REF. RALPH_VERSION updated in config.sh."
