@@ -6,6 +6,7 @@ set -euo pipefail
 # ./ralph/loop.sh 15                       # build loop, max 15 iterations
 # ./ralph/loop.sh bootstrap                # one-time: discover codebase → ralph/AGENTS.md
 # ./ralph/loop.sh plan                     # gap analysis: all specs vs codebase
+# ./ralph/loop.sh plan-slc [N]            # SLC-aware plan: reads AUDIENCE_JTBD.md, recommends slice
 # ./ralph/loop.sh plan-work "desc" [N]     # scoped plan for one feature
 # ./ralph/loop.sh post-loop                # re-run post-loop gates after manual fix
 
@@ -22,14 +23,15 @@ MAX_FIX_ITERATIONS=4
 
 case "${1:-}" in
     bootstrap)  MODE="bootstrap" ;;
-    plan)       MODE="plan";      MAX_ITERATIONS="${2:-0}" ;;
+    plan)       MODE="plan";     MAX_ITERATIONS="${2:-0}" ;;
+    plan-slc)   MODE="plan-slc"; MAX_ITERATIONS="${2:-0}" ;;
     plan-work)
         [[ -z "${2:-}" ]] && { echo "Usage: ./ralph/loop.sh plan-work \"description\" [N]"; exit 1; }
         MODE="plan-work"; WORK_DESCRIPTION="$2"; MAX_ITERATIONS="${3:-3}"
         ;;
     post-loop)  MODE="post-loop" ;;
     "" | [0-9]*) MODE="build"; [[ "${1:-}" =~ ^[0-9]+$ ]] && MAX_ITERATIONS="$1" ;;
-    *) echo "Usage: ./ralph/loop.sh [bootstrap|plan|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
+    *) echo "Usage: ./ralph/loop.sh [bootstrap|plan|plan-slc|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
 esac
 
 # ── Config (not needed for bootstrap) ─────────────────────────────────────────
@@ -200,6 +202,22 @@ if [[ "$MODE" == "plan" ]]; then
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
         echo "=== Plan iteration $((ITER + 1)) ==="
         cat ralph/PROMPT_plan.md | claude_run
+        ITER=$((ITER + 1))
+    done
+    exit 0
+fi
+
+if [[ "$MODE" == "plan-slc" ]]; then
+    [[ ! -f "ralph/AUDIENCE_JTBD.md" ]] && {
+        echo "ERROR: ralph/AUDIENCE_JTBD.md not found."
+        echo "Run /req-slc first to define audience, JTBDs, and activities."
+        exit 1
+    }
+    ITER=0
+    while true; do
+        [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
+        echo "=== Plan-SLC iteration $((ITER + 1)) ==="
+        cat ralph/PROMPT_plan_slc.md | claude_run
         ITER=$((ITER + 1))
     done
     exit 0
@@ -419,7 +437,9 @@ ${UI_LINE}
 - [ ] Run on simulator or device
 - [ ] Dark mode
 - [ ] API surface matches ralph/specs/
-- [ ] Build log has no unexpected rollbacks"
+- [ ] Build log has no unexpected rollbacks
+
+After merging, run \`bash ralph/scripts/cleanup_specs.sh\` to archive completed specs."
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

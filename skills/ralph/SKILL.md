@@ -10,28 +10,40 @@ You are running the Ralph autonomous development pipeline.
 
 Reference: $ref
 
-## Step 1 — Find and show the spec
+## Step 1 — Find and show specs
 
-The spec lives on a `spec/<ref>` branch. Find it:
+The spec(s) live on a `spec/<ref>` branch. List all specs on the branch:
 ```bash
-git show spec/$ref:ralph/specs/$ref*.md 2>/dev/null | head -200
+git show spec/$ref:ralph/specs/ 2>/dev/null | grep '\.md$' | grep -v '^done/'
 ```
 
-If that fails, also try finding it in the current working tree (in case spec was committed to main):
-```bash
-find ralph/specs -name "$ref*.md" | head -1
-```
+Count and read them:
+- If **0 specs found** on the branch, try the current working tree:
+  ```bash
+  find ralph/specs -name "*.md" ! -path "*/done/*" 2>/dev/null
+  ```
+  If still none found, stop: "No spec found for '$ref'. Run /spec $ref, /req-prd $ref, or /req-slc $ref first."
 
-If no spec is found either way, tell the user: "No spec found for '$ref'. Run /spec $ref first." and stop.
+- If **1 spec**: read the full content. Use AskUserQuestion to show it and ask:
+  "Proceed with this spec? This will run the full autonomous pipeline (plan → build → test → gates). Reply 'yes' to proceed or 'no' to cancel."
 
-Read the spec content and use AskUserQuestion to show it and ask:
-"Proceed with this spec? This will run the full autonomous pipeline (plan → build → test → gates). Reply 'yes' to proceed or 'no' to cancel."
+- If **2+ specs**: read the title line (`# ...`) from each. Check for AUDIENCE_JTBD.md:
+  ```bash
+  git show spec/$ref:ralph/AUDIENCE_JTBD.md 2>/dev/null | head -5
+  ```
+  Use AskUserQuestion to show the spec titles and ask:
+  "Found N specs on spec/$ref:
+  - [title 1]
+  - [title 2]
+  ...
+  [If AUDIENCE_JTBD.md exists: 'SLC project detected — planning will recommend the first release slice.']
+  Proceed with the full pipeline across all specs? Reply 'yes' to proceed or 'no' to cancel."
 
 If the user replies anything other than yes, stop.
 
 ## Step 2 — Create worktree from spec branch
 
-Branch the worktree off `spec/$ref` so the spec file is available inside the worktree:
+Branch the worktree off `spec/$ref` so all spec files are available inside the worktree:
 ```bash
 git worktree add .worktrees/$ref -b ralph/$ref spec/$ref 2>&1
 ```
@@ -45,15 +57,34 @@ If the branch `ralph/$ref` already exists, inform the user and continue using th
 
 ## Step 3 — Plan
 
+Detect spec count and AUDIENCE_JTBD.md presence inside the worktree, then choose the planning mode:
+
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
-SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "$ref*.md" 2>/dev/null | head -1)
+
+SPEC_COUNT=$(find "$WORKTREE/ralph/specs" -name "*.md" ! -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
+HAS_AUDIENCE=$([[ -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" ]] && echo "yes" || echo "no")
+```
+
+**Single spec** (`SPEC_COUNT == 1`) — scoped plan for one feature:
+```bash
+SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "*.md" ! -path "*/done/*" | head -1)
 SPEC_TITLE=$(head -1 "$SPEC_FILE" | sed 's/^# //')
 cd "$WORKTREE" && bash ralph/loop.sh plan-work "$SPEC_TITLE" 3 2>&1
 ```
 
-Wait for it to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to the user (informational — no approval needed, pipeline continues automatically).
+**Multi-spec SLC project** (`SPEC_COUNT > 1` and `HAS_AUDIENCE == yes`) — SLC-aware planning:
+```bash
+cd "$WORKTREE" && bash ralph/loop.sh plan-slc 3 2>&1
+```
+
+**Multi-spec PRD project** (`SPEC_COUNT > 1` and `HAS_AUDIENCE == no`) — full gap analysis:
+```bash
+cd "$WORKTREE" && bash ralph/loop.sh plan 3 2>&1
+```
+
+Wait for planning to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to the user (informational — no approval needed, pipeline continues automatically).
 
 ## Step 4 — Build loop
 
@@ -70,7 +101,7 @@ After all tasks are done, post-loop gates run automatically: LLM consensus judge
 
 ## Step 5 — Worktree cleanup
 
-After the loop exits, verify the worktree was removed. Check:
+After the loop exits, verify the worktree was removed:
 ```bash
 git worktree list
 ```
@@ -89,4 +120,4 @@ When the loop completes, report:
 - Branch: `ralph/$ref` (contains spec + implementation — open one PR to main)
 - Gates: list which passed
 - What was built: summarise from the Done section of IMPLEMENTATION_PLAN.md
-- Next step: "Review `ralph/$ref`, then open a PR to main when satisfied."
+- Next step: "Review `ralph/$ref`, then open a PR to main when satisfied. After merging, run `bash ralph/scripts/cleanup_specs.sh` to archive completed specs."
