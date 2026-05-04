@@ -1,16 +1,31 @@
 # ralph-loop
 
-An autonomous development pipeline for iOS projects, powered by Claude Code. You describe a feature, the pipeline builds it — writing code, running tests, and enforcing architecture guardrails in a git worktree, iteration by iteration.
+An autonomous development pipeline for iOS projects, powered by Claude Code. You describe what to build, the pipeline builds it — writing code, running tests, and enforcing architecture guardrails in a git worktree, iteration by iteration.
 
 ## How it works
 
-1. `/spec` — structured JTBD conversation produces a spec committed to a `spec/<slug>` branch
+1. **Requirements** — choose the right skill based on your context (see table below), run an interview, get specs committed to a `spec/<slug>` branch
 2. `/ralph` — orchestrates the pipeline: creates a worktree, plans the work, runs the build loop, gates the output
 3. Build loop runs Claude (Haiku for iterations, Sonnet for gates) autonomously: build → unit tests → force-unwrap check → architecture check → lint → commit
 4. Post-loop gates: LLM consensus judge → UI tests → opens a draft PR via `gh` (fails gracefully if `gh` is not installed) → worktree cleanup
 5. You review the branch and merge
 
 Human decisions: spec approval and branch review. Everything else is automated.
+
+### Which requirements skill to use
+
+| Skill | When to use | Output |
+|---|---|---|
+| `/spec` | Single scoped feature on an existing codebase | One `specs/<slug>.md` |
+| `/req-prd` | Greenfield project, no release discipline needed | Multiple `specs/<topic>.md` |
+| `/req-slc` | Greenfield project with SLC release boundaries | `AUDIENCE_JTBD.md` + multiple `specs/<activity>.md` |
+
+**`/req-slc`** follows the JTBD → Story Map → SLC approach: it captures the full activity space (all activities × all capability depths), and the planning prompt recommends the narrowest Simple/Lovable/Complete slice to build first. Re-run `/ralph` after each release — the planner picks the next slice from what's still unbuilt.
+
+`/ralph` detects which mode to use automatically from the branch contents:
+- 1 spec file → scoped `plan-work`
+- multiple specs + `AUDIENCE_JTBD.md` → SLC-aware `plan-slc`
+- multiple specs, no `AUDIENCE_JTBD.md` → full gap analysis `plan`
 
 ### Model usage
 
@@ -28,7 +43,7 @@ The build loop spawns subagents for each iteration using **Haiku** by default �
 npx skills add Olunuga/ralph-loop
 ```
 
-Installs `/ralph-init`, `/ralph-install`, `/ralph-update`, `/spec`, and `/ralph` into Claude Code globally.
+Installs `/ralph-init`, `/ralph-install`, `/ralph-update`, `/spec`, `/req-prd`, `/req-slc`, and `/ralph` into Claude Code globally.
 
 ### 2. Install pipeline into your project
 
@@ -41,7 +56,7 @@ Open a Claude Code session in your project root, then run:
 This pulls ralph-loop into `ralph/` automatically. Pass a tag or branch to pin a version:
 
 ```
-/ralph-install v1.2.0
+/ralph-install 0.0.2
 ```
 
 Or copy the directory manually if you prefer.
@@ -60,12 +75,44 @@ This auto-discovers your Xcode scheme, simulator, and test targets, then writes 
 
 ## Daily workflow
 
+### Single feature (existing codebase)
+
 ```
-/spec my-feature        # describe what to build, get a spec
-/ralph my-feature       # run the pipeline autonomously
+/spec my-feature        # interview → one spec
+/ralph my-feature       # plan → build → gates → draft PR
 ```
 
-A draft PR is opened automatically when all gates pass. Review the `ralph/my-feature` branch and mark it ready when satisfied.
+### Greenfield project
+
+```
+/req-prd my-app         # interview → multiple specs by topic of concern
+/ralph my-app           # full gap analysis → build → gates → draft PR
+```
+
+### Greenfield with SLC releases
+
+```
+/req-slc my-app         # interview → AUDIENCE_JTBD.md + all activity specs
+/ralph my-app           # SLC plan → build first slice → gates → draft PR
+
+# After merging release 1:
+bash ralph/scripts/cleanup_specs.sh   # archive completed specs
+/ralph my-app           # planner picks next SLC slice automatically
+```
+
+A draft PR is opened automatically when all gates pass. Review the `ralph/<slug>` branch and mark it ready when satisfied.
+
+---
+
+## Spec cleanup
+
+After merging a PR, run:
+
+```bash
+bash ralph/scripts/cleanup_specs.sh
+```
+
+This moves completed specs (referenced in `IMPLEMENTATION_PLAN.md`) to `ralph/specs/done/`, keeping the active specs directory lean for future loop iterations. `AUDIENCE_JTBD.md` is never archived — it spans releases.
 
 ---
 
@@ -82,7 +129,7 @@ The skill fetches available tags and branches from the repo, shows your current 
 If you already know the version, pass it upfront to skip the selection step:
 
 ```
-/ralph-update v1.2.0
+/ralph-update 0.0.2
 /ralph-update some-branch
 ```
 
@@ -114,7 +161,9 @@ These are generated per-project and live in your project's `ralph/` directory:
 |---|---|
 | `ralph/config.sh` | `/ralph-init` |
 | `ralph/AGENTS.md` | `loop.sh bootstrap` |
-| `ralph/specs/` | `/spec` |
+| `ralph/AUDIENCE_JTBD.md` | `/req-slc` |
+| `ralph/specs/` | `/spec`, `/req-prd`, or `/req-slc` |
+| `ralph/specs/done/` | `cleanup_specs.sh` |
 
 ---
 
