@@ -17,8 +17,8 @@ Human decisions: spec approval and branch review. Everything else is automated.
 | Skill | When to use | Output |
 |---|---|---|
 | `/spec` | Single scoped feature on an existing codebase | One `specs/<slug>.md` |
-| `/req-prd` | Greenfield project, no release discipline needed | Multiple `specs/<topic>.md` |
-| `/req-slc` | Greenfield project with SLC release boundaries | `AUDIENCE_JTBD.md` + multiple `specs/<activity>.md` |
+| `/req-prd` | Larger-scoped JTBD spanning multiple topics of concern | Multiple `specs/<topic>.md` |
+| `/req-slc` | Full product planning with SLC release boundaries | `AUDIENCE_JTBD.md` + multiple `specs/<activity>.md` |
 
 **`/req-slc`** follows the JTBD → Story Map → SLC approach: it captures the full activity space (all activities × all capability depths), and the planning prompt recommends the narrowest Simple/Lovable/Complete slice to build first. Re-run `/ralph` after each release — the planner picks the next slice from what's still unbuilt.
 
@@ -82,14 +82,14 @@ This auto-discovers your Xcode scheme, simulator, and test targets, then writes 
 /ralph my-feature       # plan → build → gates → draft PR
 ```
 
-### Greenfield project
+### Multi-topic JTBD
 
 ```
-/req-prd my-app         # interview → multiple specs by topic of concern
-/ralph my-app           # full gap analysis → build → gates → draft PR
+/req-prd my-feature     # interview → multiple specs by topic of concern
+/ralph my-feature       # full gap analysis → build → gates → draft PR
 ```
 
-### Greenfield with SLC releases
+### Full product with SLC releases
 
 ```
 /req-slc my-app         # interview → AUDIENCE_JTBD.md + all activity specs
