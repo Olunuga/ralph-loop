@@ -78,26 +78,29 @@ This auto-discovers your Xcode scheme, simulator, and test targets, then writes 
 ### Single feature (existing codebase)
 
 ```
-/spec my-feature        # interview → one spec
-/ralph my-feature       # plan → build → gates → draft PR
+/spec my-feature                        # interview → one spec
+/ralph my-feature                       # plan → build → gates → draft PR
+# after merging:
+bash ralph/scripts/cleanup_specs.sh     # archive completed spec
 ```
 
 ### Multi-topic JTBD
 
 ```
-/req-prd my-feature     # interview → multiple specs by topic of concern
-/ralph my-feature       # full gap analysis → build → gates → draft PR
+/req-prd my-feature                     # interview → multiple specs by topic of concern
+/ralph my-feature                       # full gap analysis → build → gates → draft PR
+# after merging:
+bash ralph/scripts/cleanup_specs.sh     # archive completed specs
 ```
 
 ### Full product with SLC releases
 
 ```
-/req-slc my-app         # interview → AUDIENCE_JTBD.md + all activity specs
-/ralph my-app           # SLC plan → build first slice → gates → draft PR
-
-# After merging release 1:
-bash ralph/scripts/cleanup_specs.sh   # archive completed specs
-/ralph my-app           # planner picks next SLC slice automatically
+/req-slc my-app                         # interview → AUDIENCE_JTBD.md + all activity specs
+/ralph my-app                           # SLC plan → build first slice → gates → draft PR
+# after merging release 1:
+bash ralph/scripts/cleanup_specs.sh     # archive completed specs (AUDIENCE_JTBD.md kept)
+/ralph my-app                           # planner picks next SLC slice automatically
 ```
 
 A draft PR is opened automatically when all gates pass. Review the `ralph/<slug>` branch and mark it ready when satisfied.
