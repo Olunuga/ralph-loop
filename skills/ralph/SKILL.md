@@ -41,19 +41,53 @@ Count and read them:
 
 If the user replies anything other than yes, stop.
 
-## Step 2 — Create worktree from spec branch
+## Step 2 — Create or resume worktree
 
-Branch the worktree off `spec/$ref` so all spec files are available inside the worktree:
+Check if `ralph/$ref` branch already exists:
+```bash
+git rev-parse --verify "ralph/$ref" 2>/dev/null && echo "exists" || echo "new"
+```
+
+**If "new"**: create worktree from spec branch (normal flow):
 ```bash
 git worktree add .worktrees/$ref -b ralph/$ref spec/$ref 2>&1
 ```
-
 If `spec/$ref` doesn't exist (spec was committed to main instead), fall back to branching from main:
 ```bash
 git worktree add .worktrees/$ref -b ralph/$ref 2>&1
 ```
 
-If the branch `ralph/$ref` already exists, inform the user and continue using the existing worktree.
+**If "exists"** (ralph branch already exists — resuming after a bug fix or interrupted run):
+
+Check if a worktree is already there:
+```bash
+git worktree list | grep "worktrees/$ref" || echo "no worktree"
+```
+
+If no worktree, recreate it from the existing branch:
+```bash
+git worktree add ".worktrees/$ref" "ralph/$ref" 2>&1
+```
+
+Read the current plan state:
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+cat "$PROJECT_ROOT/.worktrees/$ref/IMPLEMENTATION_PLAN.md" 2>/dev/null || echo "(no plan found)"
+```
+
+Use AskUserQuestion:
+"Branch ralph/$ref already exists. Here's the current plan:
+
+[IMPLEMENTATION_PLAN.md content]
+
+Choose how to proceed:
+- 'continue' — re-run the build loop to finish any remaining tasks
+- 'update' — re-plan from the updated spec (picks up new fix tasks), then re-run the loop
+- 'cancel' — stop here"
+
+- If 'cancel': stop.
+- If 'continue': skip to Step 4 (Build loop).
+- If 'update': proceed to Step 3 to re-plan.
 
 ## Step 3 — Plan
 
@@ -120,4 +154,4 @@ When the loop completes, report:
 - Branch: `ralph/$ref` (contains spec + implementation — open one PR to main)
 - Gates: list which passed
 - What was built: summarise from the Done section of IMPLEMENTATION_PLAN.md
-- Next step: "Review `ralph/$ref`, then open a PR to main when satisfied. After merging, run `bash ralph/scripts/cleanup_specs.sh` to archive completed specs."
+- Next step: "Review `ralph/$ref`, then open a PR to main when satisfied. After merging, run `/cleanup $ref` to archive completed specs and delete the spec branch."

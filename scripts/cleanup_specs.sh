@@ -1,12 +1,16 @@
 #!/bin/bash
 # Move completed specs to ralph/specs/done/ after a PR is merged.
-# Run manually from the project root: bash ralph/scripts/cleanup_specs.sh
+# Run manually from the project root: bash ralph/scripts/cleanup_specs.sh [slug]
 #
 # Reads IMPLEMENTATION_PLAN.md to find which specs were used in the build,
 # then archives them. AUDIENCE_JTBD.md is never archived — it spans releases.
+#
+# Optional: pass the slug (ref) to also delete the spec/<slug> branch locally
+# and on the remote.
 
 set -euo pipefail
 
+SLUG="${1:-}"
 PLAN="IMPLEMENTATION_PLAN.md"
 SPECS_DIR="ralph/specs"
 DONE_DIR="ralph/specs/done"
@@ -63,3 +67,19 @@ fi
 echo ""
 echo "Done. $MOVED archived, $MISSING not found."
 echo "Note: AUDIENCE_JTBD.md is kept — it spans releases."
+
+# Delete spec branch if slug provided
+if [[ -n "$SLUG" ]]; then
+    SPEC_BRANCH="spec/$SLUG"
+    echo ""
+    if git rev-parse --verify "$SPEC_BRANCH" &>/dev/null 2>&1; then
+        git branch -d "$SPEC_BRANCH" 2>/dev/null || git branch -D "$SPEC_BRANCH"
+        echo "deleted local branch: $SPEC_BRANCH"
+    else
+        echo "local branch not found: $SPEC_BRANCH (skip)"
+    fi
+    if git ls-remote --exit-code origin "$SPEC_BRANCH" &>/dev/null 2>&1; then
+        git push origin --delete "$SPEC_BRANCH"
+        echo "deleted remote branch: $SPEC_BRANCH"
+    fi
+fi

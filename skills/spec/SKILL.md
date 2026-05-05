@@ -1,17 +1,76 @@
 ---
 name: spec
-description: Create a ralph spec for a new feature through a structured JTBD conversation
+description: Create or update a ralph spec for a feature or bug fix through a structured JTBD conversation
 arguments: [ref]
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
 
-You are helping define a Job to Be Done for the Ralph autonomous development pipeline.
+You are helping define or update a Job to Be Done for the Ralph autonomous development pipeline.
 
 Reference: $ref
 
 If $ref is a short slug or ticket ID (e.g. GYM-001, auth-flow), use it as the spec filename prefix.
 If $ref is a longer description (e.g. "add workout summary screen"), derive a kebab-case slug from it.
+
+## Step 0 — Detect mode
+
+Check whether a spec branch already exists:
+```bash
+git rev-parse --verify "spec/$ref" 2>/dev/null && echo "exists" || echo "new"
+```
+
+- If **"new"**: proceed to Step 1 (new spec flow).
+- If **"exists"**: proceed to **Update mode** below.
+
+---
+
+## Update mode
+
+An existing spec was found. Enter update mode to add a bug fix or change.
+
+Find the spec file(s) on the branch:
+```bash
+git show "spec/$ref:ralph/specs/" 2>/dev/null | grep '\.md$' | grep -v '^done/'
+```
+
+Read the spec file(s). If there are multiple, read each one's title line.
+
+Show the current spec content to the user and use AskUserQuestion:
+"Found existing spec for '$ref'. Here's what it currently says:
+
+---
+[full current spec content]
+---
+
+What needs to change? Describe the bug, regression, or update you want to address."
+
+Ask follow-up questions as needed to understand the change fully. Then update the spec — revising affected sections, adding new acceptance criteria, or extending the scope list as appropriate.
+
+Use AskUserQuestion with the updated spec:
+"---
+[updated spec content]
+---
+Does this look right? Reply 'yes' to save, or give feedback to revise."
+
+Revise and repeat until approved.
+
+Check out the existing spec branch and commit the update:
+```bash
+git checkout "spec/$ref"
+```
+
+Write the updated spec file to its existing path (`ralph/specs/<slug>.md`).
+
+```bash
+git add ralph/specs/
+git commit -m "spec: update $ref"
+git checkout -
+```
+
+Confirm: "Spec updated on branch spec/$ref. Run /ralph $ref to resume the pipeline with the fix."
+
+---
 
 ## Step 1 — Load context
 
@@ -81,7 +140,7 @@ Derive the filename slug from $ref:
 
 Create a spec branch and commit the spec there — do not write directly to main:
 ```bash
-git checkout -b spec/<slug>
+git checkout -b "spec/<slug>"
 ```
 
 Write the approved spec to `ralph/specs/<slug>.md`.

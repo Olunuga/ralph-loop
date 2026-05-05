@@ -43,7 +43,7 @@ The build loop spawns subagents for each iteration using **Haiku** by default �
 npx skills add Olunuga/ralph-loop
 ```
 
-Installs `/ralph-init`, `/ralph-install`, `/ralph-update`, `/spec`, `/req-prd`, `/req-slc`, and `/ralph` into Claude Code globally.
+Installs `/ralph-init`, `/ralph-install`, `/ralph-update`, `/spec`, `/req-prd`, `/req-slc`, `/ralph`, and `/cleanup` into Claude Code globally.
 
 ### 2. Install pipeline into your project
 
@@ -81,7 +81,7 @@ This auto-discovers your Xcode scheme, simulator, and test targets, then writes 
 /spec my-feature                        # interview → one spec
 /ralph my-feature                       # plan → build → gates → draft PR
 # after merging:
-bash ralph/scripts/cleanup_specs.sh     # archive completed spec
+/cleanup my-feature                     # archive spec files + delete spec branch
 ```
 
 ### Multi-topic JTBD
@@ -90,7 +90,7 @@ bash ralph/scripts/cleanup_specs.sh     # archive completed spec
 /req-prd my-feature                     # interview → multiple specs by topic of concern
 /ralph my-feature                       # full gap analysis → build → gates → draft PR
 # after merging:
-bash ralph/scripts/cleanup_specs.sh     # archive completed specs
+/cleanup my-feature                     # archive spec files + delete spec branch
 ```
 
 ### Full product with SLC releases
@@ -99,7 +99,7 @@ bash ralph/scripts/cleanup_specs.sh     # archive completed specs
 /req-slc my-app                         # interview → AUDIENCE_JTBD.md + all activity specs
 /ralph my-app                           # SLC plan → build first slice → gates → draft PR
 # after merging release 1:
-bash ralph/scripts/cleanup_specs.sh     # archive completed specs (AUDIENCE_JTBD.md kept)
+/cleanup my-app                         # archive completed specs (AUDIENCE_JTBD.md kept)
 /ralph my-app                           # planner picks next SLC slice automatically
 ```
 
@@ -107,15 +107,36 @@ A draft PR is opened automatically when all gates pass. Review the `ralph/<slug>
 
 ---
 
-## Spec cleanup
+## Bug fix workflow
 
-After merging a PR, run:
+When you find a bug after merging or need to re-run ralph on an existing branch:
 
-```bash
-bash ralph/scripts/cleanup_specs.sh
+```
+/spec my-feature                        # detects existing spec → enters update mode
+                                        # interview about the bug → commits updated spec
+/ralph my-feature                       # detects existing ralph branch → offers resume or update
+                                        # re-plans from updated spec → builds fix → gates
 ```
 
-This moves completed specs (referenced in `IMPLEMENTATION_PLAN.md`) to `ralph/specs/done/`, keeping the active specs directory lean for future loop iterations. `AUDIENCE_JTBD.md` is never archived — it spans releases.
+`/spec` detects whether `spec/<slug>` already exists and enters update mode automatically. `/ralph` detects whether `ralph/<slug>` already exists and offers to continue from where it left off or re-plan from the updated spec.
+
+---
+
+## Spec cleanup
+
+After merging a PR, run `/cleanup <slug>` to archive completed specs and delete the spec branch:
+
+```
+/cleanup my-feature
+```
+
+This moves spec files (referenced in `IMPLEMENTATION_PLAN.md`) to `ralph/specs/done/` and deletes the `spec/<slug>` branch locally and on the remote. `AUDIENCE_JTBD.md` is never archived — it spans releases.
+
+You can also run the script directly if preferred:
+
+```bash
+bash ralph/scripts/cleanup_specs.sh my-feature
+```
 
 ---
 
@@ -166,7 +187,7 @@ These are generated per-project and live in your project's `ralph/` directory:
 | `ralph/AGENTS.md` | `loop.sh bootstrap` |
 | `ralph/AUDIENCE_JTBD.md` | `/req-slc` |
 | `ralph/specs/` | `/spec`, `/req-prd`, or `/req-slc` |
-| `ralph/specs/done/` | `cleanup_specs.sh` |
+| `ralph/specs/done/` | `/cleanup` |
 
 ---
 
