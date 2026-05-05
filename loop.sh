@@ -351,7 +351,14 @@ if [[ "$MODE" == "build" ]]; then
             ITER=$((ITER + 1)) && continue
         fi
 
-        # ── Commit & push ─────────────────────────────────────────────────────────
+        # ── Commit plan update & push ─────────────────────────────────────────────
+        # The agent leaves IMPLEMENTATION_PLAN.md unstaged (per PROMPT_build.md).
+        # Commit it here now that all checks have cleared, so a rollback on the
+        # next iteration cannot stash-drop the [x] state.
+        if git diff --name-only 2>/dev/null | grep -q '^IMPLEMENTATION_PLAN\.md$'; then
+            git add IMPLEMENTATION_PLAN.md
+            git commit -m "ralph: plan update [iter $((ITER+1))]" 2>/dev/null || true
+        fi
         git push origin "$BRANCH" 2>/dev/null || true
         echo "- Iter $((ITER+1)): green" >> progress.txt
         ITER=$((ITER + 1))
