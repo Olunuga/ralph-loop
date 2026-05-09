@@ -331,6 +331,26 @@ if [[ "$MODE" == "build" ]]; then
         export XCODE_CLI_AVAILABLE=true
     fi
 
+    # Validate simulator exists
+    SIM_NAME=$(echo "$BUILD_CMD" | sed -n "s/.*name=\([^'\"]*\).*/\1/p")
+    if [[ -n "$SIM_NAME" ]] && ! xcrun simctl list devices available 2>/dev/null | grep -q "$SIM_NAME"; then
+        BASE_MODEL=$(echo "$SIM_NAME" | grep -oE 'iPhone [0-9]+|iPad [A-Za-z]+')
+        CLOSEST=$(xcrun simctl list devices available 2>/dev/null \
+            | grep -oE 'iPhone [0-9]+ ?[A-Za-z ]*|iPad [A-Za-z ]+' \
+            | sed 's/ *$//' | sort -u \
+            | grep -i "$BASE_MODEL" | head -1 || true)
+        if [[ -n "$CLOSEST" ]]; then
+            echo "WARNING: Simulator '$SIM_NAME' not found. Using '$CLOSEST'."
+            BUILD_CMD="${BUILD_CMD//$SIM_NAME/$CLOSEST}"
+            UNIT_TEST_CMD="${UNIT_TEST_CMD//$SIM_NAME/$CLOSEST}"
+            UI_TEST_CMD="${UI_TEST_CMD//$SIM_NAME/$CLOSEST}"
+        else
+            echo "ERROR: Simulator '$SIM_NAME' not found. Available:"
+            xcrun simctl list devices available 2>/dev/null | grep -E 'iPhone|iPad' | head -10
+            exit 1
+        fi
+    fi
+
     echo "Checking baseline build..."
     run_quietly "$BUILD_CMD" || {
         echo "ERROR: Baseline build is failing. Fix before running the loop."
@@ -357,10 +377,17 @@ if [[ "$MODE" == "build" ]]; then
         echo ""
         echo "=== Build iteration $((ITER + 1)) ==="
 
-        # Build the prompt, prepending iteration context if available
+        # Build the prompt, prepending context if available
         PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" ralph/PROMPT_build.md)
         if [[ -f iteration_context.md ]]; then
             PROMPT="$(cat iteration_context.md)
+---
+$PROMPT"
+        fi
+        # Load persistent lessons when struggling
+        if [[ "$CONSEC_FAIL" -ge 2 && -f "ralph/lessons.md" ]]; then
+            PROMPT="Lessons from previous sessions (follow these):
+$(cat ralph/lessons.md)
 ---
 $PROMPT"
         fi
