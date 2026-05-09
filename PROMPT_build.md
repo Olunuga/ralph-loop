@@ -1,7 +1,10 @@
-0a. Read ralph/specs/* with subagents (up to 10 parallel).
-0b. Read ralph/AGENTS.md — understand build commands, architecture rules, guardrails.
-0c. Read IMPLEMENTATION_PLAN.md — pick the single most important unchecked [ ] item.
-0d. Search Geyns/ for existing code related to the chosen task before assuming anything is missing.
+0a. If iteration context is provided above the --- separator, read it carefully.
+    Do NOT repeat approaches that already failed. If the same task has failed 2+ times,
+    consider a fundamentally different approach (different file structure, different pattern).
+0b. Read ralph/specs/* with subagents (up to 10 parallel).
+0c. Read ralph/AGENTS.md — understand build commands, architecture rules, guardrails.
+0d. Read IMPLEMENTATION_PLAN.md — pick the single most important unchecked [ ] item.
+0e. Search Geyns/ for existing code related to the chosen task before assuming anything is missing.
 
 ---
 
