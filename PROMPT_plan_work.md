@@ -47,6 +47,10 @@ Rules:
 - Order by dependency
 - Tests after implementation tasks
 - Include target file path and reference pattern per task
+- For test tasks: find an existing test file in the project and reference it as the pattern.
+  Search for *Tests.swift files. Note the testing framework used (XCTest vs Swift Testing),
+  how @MainActor ViewModels are tested, and how ModelContext/ModelContainer is set up.
+  The build agent will follow this pattern exactly.
 
 STEP 4 — Commit:
 git add IMPLEMENTATION_PLAN.md && git commit -m "ralph: plan — ${WORK_DESCRIPTION}"

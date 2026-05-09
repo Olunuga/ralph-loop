@@ -213,4 +213,5 @@ These are generated per-project and live in your project's `ralph/` directory:
 
 - macOS with Xcode
 - [Claude Code](https://claude.ai/code) (`npm install -g @anthropic-ai/claude-code`)
+- `python3` (ships with Xcode Command Line Tools — used for path resolution and JSON parsing in hooks)
 - `gh` CLI (for draft PR creation)
