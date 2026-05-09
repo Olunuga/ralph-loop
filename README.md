@@ -6,8 +6,8 @@ An autonomous development pipeline for iOS projects, powered by Claude Code. You
 
 1. `/spec` — structured JTBD conversation produces a spec committed to a `spec/<slug>` branch
 2. `/ralph` — orchestrates the pipeline: creates a worktree, plans the work, runs the build loop, gates the output
-3. Build loop runs Claude (Haiku for iterations, Sonnet for gates) autonomously: build → unit tests → force-unwrap check → architecture check → lint → commit
-4. Post-loop gates: LLM consensus judge → UI tests → opens a draft PR via `gh` (fails gracefully if `gh` is not installed) → worktree cleanup
+3. Build loop runs Claude (Haiku for iterations, Sonnet on escalation) autonomously: build → unit tests → static gates (code quality, architecture, security, accessibility) → lint → commit
+4. Post-loop gates: precise static gates → LLM gates (semantic review) → UI tests → opens a draft PR via `gh` (fails gracefully if `gh` is not installed) → worktree cleanup
 5. You review the branch and merge
 
 Human decisions: spec approval and branch review. Everything else is automated.
@@ -103,6 +103,97 @@ It also pre-approves a set of read-only commands (git status, git diff, git log,
 **To disable the workspace boundary hook entirely** — remove the `hooks` block from `.claude/settings.json`. Not recommended for autonomous runs.
 
 > **Future improvement:** for stronger sandboxing, running the build loop inside a Docker container (with the worktree mounted as a volume) would fully isolate filesystem and network access from the host. Contributions welcome.
+
+---
+
+## Gates
+
+The pipeline enforces quality through **gates** — checks that code must pass before it can be committed or merged. Gates are organized into categories (code quality, architecture, security, accessibility) and come in two types:
+
+### Static gates (`scripts/gates/static/`)
+
+Deterministic checks (grep, awk, lint, AST analysis) that run automatically. Fast-tier checks run every iteration; precise-tier checks run once post-loop.
+
+```
+scripts/gates/static/
+├── code_quality/          # force unwraps, @Observable, stubs, access control, print(), etc.
+├── architecture/          # layer boundaries, dependency direction, modelContext ownership
+├── security/              # hardcoded secrets, insecure HTTP, NSLog, UserDefaults credentials
+├── accessibility/         # missing labels, hardcoded fonts, color-only differentiation
+└── org/                   # org-specific checks (optional)
+```
+
+### LLM gates (`scripts/gates/llm/`)
+
+Semantic checks that require LLM judgment — things static analysis can't catch. One Sonnet call per category, post-loop only.
+
+```
+scripts/gates/llm/
+├── code_quality.md        # naming clarity, SRP, feature envy, error handling, test quality
+├── architecture.md        # DI compliance, god objects, pattern consistency
+├── security.md            # data sensitivity, auth flow correctness, input validation
+└── accessibility.md       # label quality, nav order, custom component a11y
+```
+
+### Creating a new static gate check
+
+Drop a `.sh` file into the appropriate `scripts/gates/static/<category>/` directory. Each script must export 4 functions:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+gate_name()     { echo "My check name"; }
+gate_category() { echo "code_quality"; }   # code_quality | architecture | security | accessibility
+gate_tier()     { echo "fast"; }           # fast (per-iteration) | precise (post-loop only)
+
+gate_check() {
+    # Your check logic here.
+    # $SOURCE_DIR and $LAYER_MAP are available from config.sh.
+    # Use git diff to check only new/changed lines.
+    # Exit 0 = pass. Exit 1 = fail. Print details + offending filenames to stdout.
+
+    BASE_REF=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+    HITS=$(git diff "$BASE_REF"..HEAD -- "${SOURCE_DIR:-.}/" \
+        | grep '^+' | grep -v '^+++' \
+        | grep 'your_pattern' || true)
+
+    [[ -z "$HITS" ]] && return 0
+    echo "Found violations:"
+    echo "$HITS"
+    return 1
+}
+```
+
+No changes to `loop.sh` or any other file required. The dispatcher discovers checks by scanning the directory.
+
+### Creating a new LLM gate check
+
+Drop a `.md` file into `scripts/gates/llm/`. Use this format:
+
+```markdown
+---
+category: security
+---
+
+You are reviewing Swift code changes for [description].
+
+[Structured questions — only things static analysis cannot catch]
+
+Respond with exactly:
+1: PASS|FAIL — [reason]
+...
+OVERALL: PASS|FAIL
+[One sentence summary]
+```
+
+### Adding a new gate category
+
+To add an entirely new category (e.g., `performance`):
+
+1. Create `scripts/gates/static/performance/` with `.sh` check files
+2. Optionally create `scripts/gates/llm/performance.md`
+3. No changes to the loop or dispatchers needed
 
 ---
 

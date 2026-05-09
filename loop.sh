@@ -112,8 +112,56 @@ notify_failure() {
     exit 1
 }
 
+# Rollback all changes (build/test failures — can't attribute to single files).
+rollback_all() {
+    git stash && git stash drop 2>/dev/null || true
+}
+
+# Rollback specific files (gate failures that identify offending files).
+# Falls back to full rollback if no files specified.
+rollback_files() {
+    local files="$1"
+    if [[ -z "$files" ]]; then
+        rollback_all
+        return
+    fi
+    while IFS= read -r f; do
+        [[ -n "$f" && -f "$f" ]] && git checkout HEAD -- "$f" 2>/dev/null || true
+    done <<< "$files"
+}
+
+# Append failure context for next iteration (Cluster 1: iteration intelligence).
+append_failure_context() {
+    local gate="$1"
+    local details="$2"
+    local iter="$3"
+    local ctx_file="iteration_context.md"
+
+    # Append structured failure block
+    {
+        echo ""
+        echo "## Iteration $iter — FAILED ($gate)"
+        echo "- Error: $(echo "$details" | head -15)"
+        echo "- Rolled back: yes"
+    } >> "$ctx_file"
+
+    # Cap to last 5 entries
+    local count
+    count=$(grep -c "^## Iteration" "$ctx_file" 2>/dev/null || echo 0)
+    if [[ "$count" -gt 5 ]]; then
+        # Keep only the last 5 blocks
+        python3 -c "
+import re, sys
+text = open('$ctx_file').read()
+blocks = re.split(r'(?=\n## Iteration)', text)
+blocks = [b for b in blocks if b.strip()]
+open('$ctx_file', 'w').write('\n'.join(blocks[-5:]))
+" 2>/dev/null || true
+    fi
+}
+
 # Run a post-loop gate, giving the agent up to MAX_FIX_ITERATIONS to fix it.
-# Validates that fixes don't break hard guardrails before committing.
+# Validates that fixes don't break hard gates before committing.
 run_gate_with_fix() {
     local GATE="$1"
     local GATE_CMD="$2"
@@ -132,14 +180,9 @@ run_gate_with_fix() {
             "$GATE" "$OUTPUT" \
         | claude_run 2>/dev/null
 
-        # Ensure the fix didn't break hard guardrails (check only branch diff)
-        local BASE_REF
-        BASE_REF=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
-        local FU
-        FU=$(git diff "$BASE_REF"..HEAD -- "$SOURCE_DIR/" | grep '^+' | grep -v '^+++' \
-            | grep -E 'try!|!\.|as!' | grep -v '#Preview\|isStoredInMemoryOnly' || true)
-        if [[ -n "$FU" ]]; then
-            echo "Fix introduced force unwrap — reverting."
+        # Ensure the fix didn't break hard gates
+        if ! bash ralph/scripts/run_static_gates.sh fast > /dev/null 2>&1; then
+            echo "Fix broke gates — reverting."
             git stash && git stash drop 2>/dev/null || true
             continue
         fi
@@ -207,11 +250,37 @@ fi
 
 if [[ "$MODE" == "plan-work" ]]; then
     ITER=0
+    PREV_HASH="none"
     while true; do
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
         echo "=== Plan-work iteration $((ITER + 1)) ==="
-        sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" ralph/PROMPT_plan_work.md \
-            | claude_run
+
+        if [[ "$ITER" -eq 0 ]]; then
+            # First iteration: generate from scratch
+            sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" ralph/PROMPT_plan_work.md \
+                | claude_run
+        else
+            # Subsequent iterations: refine, don't rewrite
+            PREV_PLAN=$(cat IMPLEMENTATION_PLAN.md 2>/dev/null || true)
+            {
+                echo "Previous plan iteration:"
+                echo "$PREV_PLAN"
+                echo "---"
+                echo "Refine the plan above. Do not restart from scratch."
+                echo "Preserve tasks that are already well-specified. Focus on gaps and improvements."
+                echo "---"
+                sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" ralph/PROMPT_plan_work.md
+            } | claude_run
+        fi
+
+        # Convergence detection: exit early if plan stopped changing
+        NEW_HASH=$(file_hash IMPLEMENTATION_PLAN.md 2>/dev/null || echo "none")
+        if [[ "$ITER" -ge 1 && "$NEW_HASH" == "$PREV_HASH" ]]; then
+            echo "Plan converged after $((ITER + 1)) iterations."
+            break
+        fi
+        PREV_HASH="$NEW_HASH"
+
         ITER=$((ITER + 1))
     done
     exit 0
@@ -255,6 +324,9 @@ fi
 # ── Build loop ─────────────────────────────────────────────────────────────────
 if [[ "$MODE" == "build" ]]; then
     ITER=0
+    CONSEC_FAIL=0
+    LAST_FAIL_GATE=""
+
     while true; do
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
 
@@ -267,35 +339,62 @@ if [[ "$MODE" == "build" ]]; then
         echo ""
         echo "=== Build iteration $((ITER + 1)) ==="
 
-        sed "s|\${XCODEPROJ}|$XCODEPROJ|g" ralph/PROMPT_build.md | claude_run_fast
+        # Build the prompt, prepending iteration context if available
+        PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" ralph/PROMPT_build.md)
+        if [[ -f iteration_context.md ]]; then
+            PROMPT="$(cat iteration_context.md)
+---
+$PROMPT"
+        fi
+
+        # Sonnet escalation: after 2 consecutive failures on same gate, use Sonnet
+        if [[ "$CONSEC_FAIL" -ge 2 ]]; then
+            echo "  (escalating to Sonnet after $CONSEC_FAIL consecutive failures on $LAST_FAIL_GATE)"
+            echo "$PROMPT" | claude_run
+        else
+            echo "$PROMPT" | claude_run_fast
+        fi
 
         # ── 1. Build ─────────────────────────────────────────────────────────────
-        if ! run_quietly "$BUILD_CMD"; then
+        BUILD_OUTPUT=""
+        if ! BUILD_OUTPUT=$(eval "$BUILD_CMD" 2>&1); then
             echo "HARD: Build failed — rolling back."
-            git stash && git stash drop 2>/dev/null || true
+            append_failure_context "build" "$(echo "$BUILD_OUTPUT" | grep -E 'error:|FAILED|failed' | head -15)" "$((ITER+1))"
+            rollback_all
             echo "- Iter $((ITER+1)): build failed" >> progress.txt
+            [[ "$LAST_FAIL_GATE" == "build" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="build"; }
             ITER=$((ITER + 1)) && continue
         fi
 
         # ── 2. Unit tests ─────────────────────────────────────────────────────────
-        if ! run_quietly "$UNIT_TEST_CMD"; then
+        TEST_OUTPUT=""
+        if ! TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
             echo "HARD: Unit tests failed — rolling back."
-            git stash && git stash drop 2>/dev/null || true
+            append_failure_context "tests" "$(echo "$TEST_OUTPUT" | grep -E 'error:|FAILED|failed' | head -15)" "$((ITER+1))"
+            rollback_all
             echo "- Iter $((ITER+1)): tests failed" >> progress.txt
+            [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
             ITER=$((ITER + 1)) && continue
         fi
 
-        # ── 3. Force unwrap — check only lines introduced on this branch ─────────
-        BASE_REF=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
-        FU_HITS=$(git diff "$BASE_REF"..HEAD -- "$SOURCE_DIR/" \
-            | grep '^+' | grep -v '^+++' \
-            | grep -E 'try!|!\.|as!' \
-            | grep -v '#Preview\|isStoredInMemoryOnly' || true)
-        if [[ -n "$FU_HITS" ]]; then
-            echo "HARD: Force unwrap/cast introduced on this branch — rolling back."
-            echo "$FU_HITS"
-            git stash && git stash drop 2>/dev/null || true
-            echo "- Iter $((ITER+1)): force unwrap" >> progress.txt
+        # ── 3. Code quality + architecture gates (fast tier) ────────────────────
+        GATE_OUTPUT=""
+        if ! GATE_OUTPUT=$(bash ralph/scripts/run_static_gates.sh fast 2>&1); then
+            echo "GATES: Violation detected."
+            echo "$GATE_OUTPUT"
+
+            # Try file-granular rollback — extract offending filenames from output
+            OFFENDING_FILES=$(echo "$GATE_OUTPUT" | grep -oE '[A-Za-z0-9_./]+\.swift' | sort -u || true)
+            if [[ -n "$OFFENDING_FILES" ]]; then
+                echo "Rolling back offending files only."
+                rollback_files "$OFFENDING_FILES"
+            else
+                rollback_all
+            fi
+
+            append_failure_context "gates" "$GATE_OUTPUT" "$((ITER+1))"
+            echo "- Iter $((ITER+1)): gate violation" >> progress.txt
+            [[ "$LAST_FAIL_GATE" == "gates" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="gates"; }
             ITER=$((ITER + 1)) && continue
         fi
 
@@ -310,32 +409,29 @@ if [[ "$MODE" == "build" ]]; then
                 | claude_run_fast 2>/dev/null
 
                 run_quietly "$BUILD_CMD" || {
-                    git stash && git stash drop 2>/dev/null || true; break
+                    rollback_all; break
                 }
                 run_quietly "$UNIT_TEST_CMD" || {
-                    git stash && git stash drop 2>/dev/null || true; break
+                    rollback_all; break
                 }
             done
 
             if [[ "$LINT_PASS" == false ]]; then
                 echo "LINT: Could not fix in 4 attempts — rolling back."
-                git stash && git stash drop 2>/dev/null || true
+                append_failure_context "lint" "$LINT_OUTPUT" "$((ITER+1))"
+                rollback_all
                 echo "- Iter $((ITER+1)): lint unfixable" >> progress.txt
+                [[ "$LAST_FAIL_GATE" == "lint" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="lint"; }
                 ITER=$((ITER + 1)) && continue
             fi
-        fi
-
-        # ── 5. Architecture check ─────────────────────────────────────────────────
-        if ! bash ralph/scripts/check_architecture.sh > /dev/null 2>&1; then
-            echo "ARCH: Violation detected — rolling back."
-            git stash && git stash drop 2>/dev/null || true
-            echo "- Iter $((ITER+1)): arch violation" >> progress.txt
-            ITER=$((ITER + 1)) && continue
         fi
 
         # ── Commit & push ─────────────────────────────────────────────────────────
         git push origin "$BRANCH" 2>/dev/null || true
         echo "- Iter $((ITER+1)): green" >> progress.txt
+        CONSEC_FAIL=0
+        LAST_FAIL_GATE=""
+        rm -f iteration_context.md
         ITER=$((ITER + 1))
     done
 fi
@@ -348,10 +444,13 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     echo "Post-loop gates"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    # Gate 1: LLM consensus judge
-    run_gate_with_fix "LLM_JUDGE" "bash ralph/scripts/consensus_judge.sh"
+    # Gate 1: Precise-tier static gates
+    run_gate_with_fix "GATES_PRECISE" "bash ralph/scripts/run_static_gates.sh precise"
 
-    # Gate 2: UI routing decision (agent classifies the full branch diff)
+    # Gate 2: LLM gates — semantic review (1 Sonnet call per category)
+    run_gate_with_fix "LLM_GATES" "bash ralph/scripts/run_llm_gates.sh"
+
+    # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""
     echo "=== UI routing ==="
     BASE=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
@@ -389,7 +488,7 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
             ;;
     esac
 
-    # Gate 3: Open draft PR
+    # Gate 4: Open draft PR
     SNAPSHOT_LINE=""
     UI_LINE=""
     [[ "$UI_ROUTE" == "VIEW_LEVEL" && -n "${SNAPSHOT_TEST_CMD:-}" ]] && SNAPSHOT_LINE="- Snapshot tests: PASS"
@@ -408,9 +507,9 @@ $(cat progress.txt 2>/dev/null || echo "(no progress log)")
 
 ### Gates passed
 - Build + unit tests: PASS (per-iteration)
-- Force unwrap check: PASS (per-iteration)
-- Architecture check: PASS (per-iteration)
-- LLM consensus judge: PASS
+- Static gates (code quality + architecture + security + accessibility): PASS (per-iteration)
+- Static gates precise: PASS (post-loop)
+- LLM gates (semantic review): PASS (post-loop)
 - UI route: $UI_ROUTE
 ${SNAPSHOT_LINE}
 ${UI_LINE}
