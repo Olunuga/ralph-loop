@@ -109,9 +109,21 @@ cd "$WORKTREE" && bash ralph/loop.sh post-loop 2>&1
 
 Report each gate outcome to the user.
 
-## Step 5 — Worktree cleanup
+## Step 5 — Verify branch content
 
-After the loop exits, verify the worktree was removed. Check:
+Before cleaning up, verify the branch actually has implementation commits (not just the spec):
+
+```bash
+git log ralph/$ref --oneline | head -10
+```
+
+If the only commit is the spec commit (no "ralph:" prefixed commits), STOP and alert the user:
+"WARNING: Branch ralph/$ref has no implementation commits. The build agent may have failed to commit. Check .worktrees/$ref for uncommitted changes before cleanup."
+
+Only proceed to cleanup after confirming implementation commits exist.
+
+## Step 5b — Worktree cleanup
+
 ```bash
 git worktree list
 ```

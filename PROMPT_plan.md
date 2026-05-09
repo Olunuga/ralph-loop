@@ -8,7 +8,7 @@ Do NOT implement anything. Analysis and planning only.
 STEP 1 — Read inputs (use subagents for all file reads)
 
 - Read every file in ralph/specs/ — these are the source of truth
-- Read ralph/AGENTS.md — understand build system, architecture, and guardrails
+- Read ralph/AGENTS.md — understand build system, architecture, and gates
 - Survey the source directory structure (list files, do not read every file)
 - Read the protocols/interfaces layer — these define what must be conformed to
 

@@ -11,7 +11,7 @@ Do NOT implement anything. Analysis and planning only.
 STEP 1 — Read inputs (use subagents for all file reads)
 
 - Read every file in ralph/specs/ — look for specs related to the work scope
-- Read ralph/AGENTS.md — understand build system, architecture, and guardrails
+- Read ralph/AGENTS.md — understand build system, architecture, and gates
 - Survey source files relevant to the work scope only
 - Read protocols/interfaces in the relevant layer
 

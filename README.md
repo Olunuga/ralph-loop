@@ -1,6 +1,6 @@
 # ralph-loop
 
-An autonomous development pipeline for iOS projects, powered by Claude Code. You describe a feature, the pipeline builds it — writing code, running tests, and enforcing architecture guardrails in a git worktree, iteration by iteration.
+An autonomous development pipeline for iOS projects, powered by Claude Code. You describe a feature, the pipeline builds it — writing code, running tests, and enforcing quality gates in a git worktree, iteration by iteration.
 
 ## How it works
 

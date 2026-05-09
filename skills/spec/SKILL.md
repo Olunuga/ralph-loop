@@ -15,7 +15,7 @@ If $ref is a longer description (e.g. "add workout summary screen"), derive a ke
 
 ## Step 1 — Load context
 
-Read `ralph/AGENTS.md` to understand the project architecture, layers, and guardrails.
+Read `ralph/AGENTS.md` to understand the project architecture, layers, and gates.
 Read any existing files in `ralph/specs/` to understand the spec format and what's already been defined.
 
 ## Step 2 — JTBD conversation
@@ -52,7 +52,7 @@ When [trigger], [action], so [outcome].
 ## Acceptance Criteria — Automated
 - [ ] xcodebuild build passes, zero errors
 - [ ] Unit tests pass unaffected
-- [ ] No force unwraps (try!, !., as!) in new or modified code
+- [ ] All static and LLM gates pass
 - [ ] [feature-specific checks]
 
 ## Acceptance Criteria — Human

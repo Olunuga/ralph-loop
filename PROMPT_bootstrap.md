@@ -57,7 +57,7 @@ Use this structure — fill in discovered values, do not invent:
 - [swiftlint status — configured / not configured]
 - If configured: swiftlint --strict must pass before any commit
 
-## Guardrails
+## Gates
 - Never modify [project file path] directly — file references managed separately
 - [Layer] must not import [higher layer] — dependency direction is strictly [direction]
 - No UI types (UIView, UIViewController, View) in [Manager/Service/Repository] layer
