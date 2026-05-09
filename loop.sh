@@ -173,6 +173,58 @@ open('$ctx_file', 'w').write('\n'.join(blocks[-5:]))
     fi
 }
 
+# Capture a lesson when the agent breaks through a struggle (CONSEC_FAIL >= 2 → green).
+# Appends the error pattern and fix diff to ralph/lessons.md for future sessions.
+capture_lesson() {
+    local gate="$1"
+    local consec="$2"
+    local lessons_file="ralph/lessons.md"
+
+    # Extract last failure block from iteration context
+    local last_error
+    last_error=$(awk '/^## Iteration.*FAILED/{found=1; block=""} found{block=block"\n"$0} END{print block}' iteration_context.md 2>/dev/null || true)
+    [[ -z "$last_error" ]] && return 0
+
+    # Get the fix diff (last commit)
+    local fix_diff
+    fix_diff=$(git diff HEAD~1..HEAD -- "${SOURCE_DIR:-.}/" 2>/dev/null | head -30)
+
+    # Generate one-line summary via Haiku (cheap)
+    local summary
+    summary=$(printf "Summarise this fix in one sentence. Gate: %s\nError:\n%s\nFix:\n%s" \
+        "$gate" "$last_error" "$fix_diff" \
+        | claude -p --model claude-haiku-4-5-20251001 --output-format text 2>/dev/null | head -1 || echo "fix for $gate")
+
+    # Append to lessons file
+    {
+        echo ""
+        echo "## [$gate] $summary"
+        echo "Failures before fix: $consec"
+        echo "Error pattern:"
+        echo '```'
+        echo "$last_error" | grep -E "Error output:|error:|FAIL" | head -5
+        echo '```'
+        echo "Fix:"
+        echo '```'
+        echo "$fix_diff"
+        echo '```'
+    } >> "$lessons_file"
+
+    echo "LESSON: Captured to $lessons_file"
+}
+
+# Write structured status for orchestrator to poll.
+write_loop_status() {
+    local iter="$1"
+    cat > ralph/.loop_status <<STAT
+iteration=$iter
+result=$(tail -1 progress.txt 2>/dev/null | sed 's/^- Iter [0-9]*: //')
+consec_fail=$CONSEC_FAIL
+last_fail_gate=$LAST_FAIL_GATE
+tasks_remaining=$(grep -c '^\- \[ \]' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
+STAT
+}
+
 # Run a post-loop gate, giving the agent up to MAX_FIX_ITERATIONS to fix it.
 # Validates that fixes don't break hard gates before committing.
 # For LLM gates, applies fixes one issue at a time to prevent cascading breakage.
@@ -331,6 +383,37 @@ if [[ "$MODE" == "build" ]]; then
         export XCODE_CLI_AVAILABLE=true
     fi
 
+    # Validate simulator exists
+    SIM_NAME=$(echo "$BUILD_CMD" | sed -n "s/.*name=\([^'\"]*\).*/\1/p")
+    if [[ -n "$SIM_NAME" ]] && ! xcrun simctl list devices available 2>/dev/null | grep -q "$SIM_NAME"; then
+        BASE_MODEL=$(echo "$SIM_NAME" | grep -oE 'iPhone [0-9]+|iPad [A-Za-z]+')
+        CLOSEST=$(xcrun simctl list devices available 2>/dev/null \
+            | grep -oE 'iPhone [0-9]+ ?[A-Za-z ]*|iPad [A-Za-z ]+' \
+            | sed 's/ *$//' | sort -u \
+            | grep -i "$BASE_MODEL" | head -1 || true)
+        if [[ -n "$CLOSEST" ]]; then
+            echo "WARNING: Simulator '$SIM_NAME' not found. Using '$CLOSEST'."
+            BUILD_CMD="${BUILD_CMD//$SIM_NAME/$CLOSEST}"
+            UNIT_TEST_CMD="${UNIT_TEST_CMD//$SIM_NAME/$CLOSEST}"
+            UI_TEST_CMD="${UI_TEST_CMD//$SIM_NAME/$CLOSEST}"
+        else
+            echo "ERROR: Simulator '$SIM_NAME' not found. Available:"
+            xcrun simctl list devices available 2>/dev/null | grep -E 'iPhone|iPad' | head -10
+            exit 1
+        fi
+    fi
+
+    # Detect new gates not yet calibrated in gate_context.md
+    if [[ -f "ralph/gate_context.md" ]]; then
+        for GATE_FILE in ralph/scripts/gates/static/*/*.sh; do
+            [[ -f "$GATE_FILE" ]] || continue
+            GATE_NAME=$(basename "$GATE_FILE" .sh)
+            if ! grep -q "$GATE_NAME" ralph/gate_context.md 2>/dev/null; then
+                echo "WARNING: New gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
+            fi
+        done
+    fi
+
     echo "Checking baseline build..."
     run_quietly "$BUILD_CMD" || {
         echo "ERROR: Baseline build is failing. Fix before running the loop."
@@ -357,10 +440,17 @@ if [[ "$MODE" == "build" ]]; then
         echo ""
         echo "=== Build iteration $((ITER + 1)) ==="
 
-        # Build the prompt, prepending iteration context if available
+        # Build the prompt, prepending context if available
         PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" ralph/PROMPT_build.md)
         if [[ -f iteration_context.md ]]; then
             PROMPT="$(cat iteration_context.md)
+---
+$PROMPT"
+        fi
+        # Load persistent lessons when struggling
+        if [[ "$CONSEC_FAIL" -ge 2 && -f "ralph/lessons.md" ]]; then
+            PROMPT="Lessons from previous sessions (follow these):
+$(cat ralph/lessons.md)
 ---
 $PROMPT"
         fi
@@ -384,6 +474,7 @@ $PROMPT"
             rollback_all
             echo "- Iter $((ITER+1)): build failed" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "build" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="build"; }
+            write_loop_status "$((ITER+1))"
             ITER=$((ITER + 1)) && continue
         fi
 
@@ -403,6 +494,7 @@ $PROMPT"
             fi
             echo "- Iter $((ITER+1)): tests failed" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
+            write_loop_status "$((ITER+1))"
             ITER=$((ITER + 1)) && continue
         fi
 
@@ -424,6 +516,7 @@ $PROMPT"
             append_failure_context "gates" "$GATE_OUTPUT" "$((ITER+1))"
             echo "- Iter $((ITER+1)): gate violation" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "gates" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="gates"; }
+            write_loop_status "$((ITER+1))"
             ITER=$((ITER + 1)) && continue
         fi
 
@@ -451,16 +544,22 @@ $PROMPT"
                 rollback_all
                 echo "- Iter $((ITER+1)): lint unfixable" >> progress.txt
                 [[ "$LAST_FAIL_GATE" == "lint" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="lint"; }
-                ITER=$((ITER + 1)) && continue
+                write_loop_status "$((ITER+1))"
+            ITER=$((ITER + 1)) && continue
             fi
         fi
 
         # ── Commit & push ─────────────────────────────────────────────────────────
         git push origin "$BRANCH" 2>/dev/null || true
         echo "- Iter $((ITER+1)): green" >> progress.txt
+        # Capture lesson if we broke through a struggle
+        if [[ "$CONSEC_FAIL" -ge 2 ]]; then
+            capture_lesson "$LAST_FAIL_GATE" "$CONSEC_FAIL"
+        fi
         CONSEC_FAIL=0
         LAST_FAIL_GATE=""
         rm -f iteration_context.md
+        write_loop_status "$((ITER+1))"
         ITER=$((ITER + 1))
     done
 fi

@@ -4,7 +4,13 @@
 0b. Read ralph/specs/* with subagents (up to 10 parallel).
 0c. Read ralph/AGENTS.md — understand build commands, architecture rules, guardrails.
 0d. Read IMPLEMENTATION_PLAN.md — pick the single most important unchecked [ ] item.
-0e. Search Geyns/ for existing code related to the chosen task before assuming anything is missing.
+0e. Search the source directory for existing code related to the chosen task before assuming anything is missing.
+0f. If ralph/gate_context.md exists, read it. If any gate scripts in
+    ralph/scripts/gates/static/ are not listed under "Known gates",
+    read those new gate scripts, assess whether they conflict with
+    this project's patterns, and update gate_context.md with the
+    appropriate SKIP/ENFORCE decision and LLM gate notes.
+    Commit the update separately before implementing the task.
 
 ---
 
@@ -12,11 +18,11 @@
   - Follow the reference pattern noted in the task (check IMPLEMENTATION_PLAN.md).
   - Use subagents for all reads. Use only 1 subagent for build/test runs.
   - If the task requires a new Swift file:
-  a. Create the file in the correct Geyns/ subdirectory.
+  a. Create the file in the correct source subdirectory.
   b. Add it to the Xcode target — use whichever method is available:
      • If XCODE_CLI_AVAILABLE=true: use the xcode MCP tool (add_file_to_target).
-     • Otherwise: run `xcodeproj add Geyns/Views/NewFile.swift Geyns` via Bash
-   (xcodeproj gem is installed; adds the file to the first target matching "Geyns").
+     • Otherwise: run `xcodeproj add <path/to/NewFile.swift> <TargetName>` via Bash
+   (xcodeproj gem is installed; adds the file to the named target).
      Do NOT edit ${XCODEPROJ}/project.pbxproj directly.
 2. Validate per AGENTS.md. Fix failures before committing.
   - Run build command from AGENTS.md.

@@ -56,6 +56,6 @@ CONSTRAINTS
 
 - Do not implement anything
 - Do not modify any source files
-- Do not modify the project file (Geyns.xcodeproj)
+- Do not modify the project file (.xcodeproj)
 - Update ralph/AGENTS.md only if you discover something operationally important about the build/test setup
 

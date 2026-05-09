@@ -35,6 +35,13 @@ PROJECT_ROOT="$(CDPATH= cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=/dev/null
 [[ -f "$PROJECT_ROOT/ralph/config.sh" ]] && source "$PROJECT_ROOT/ralph/config.sh"
 
+# Load gate overrides from gate_context.md (SKIP entries)
+GATE_SKIPS=""
+if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+    GATE_SKIPS=$(grep -E "^- [a-z_]+: SKIP" "$PROJECT_ROOT/ralph/gate_context.md" \
+        | sed 's/^- \([a-z_]*\): SKIP.*/\1/' || true)
+fi
+
 FAIL=0
 CHECKED=0
 FAILED_NAMES=""
@@ -42,6 +49,13 @@ FAILED_NAMES=""
 # Find all check scripts across gate subdirectories
 for CHECK_FILE in "$GATES_DIR"/*/*.sh; do
     [[ -f "$CHECK_FILE" ]] || continue
+
+    # Check for SKIP override
+    CHECK_BASENAME=$(basename "$CHECK_FILE" .sh)
+    if [[ -n "$GATE_SKIPS" ]] && echo "$GATE_SKIPS" | grep -qx "$CHECK_BASENAME"; then
+        echo "SKIP: $CHECK_BASENAME (gate_context.md override)"
+        continue
+    fi
 
     # Source the check to load its functions
     (

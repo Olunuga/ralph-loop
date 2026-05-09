@@ -60,18 +60,54 @@ cd "$WORKTREE" && bash ralph/loop.sh plan-work "$SPEC_TITLE" 3 2>&1
 
 Wait for it to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to the user (informational — no approval needed, pipeline continues automatically).
 
-## Step 4 — Build loop
+## Step 4 — Build loop (monitored)
+
+Run the full build loop in the background. The loop runs autonomously — do not interrupt it unless it's struggling.
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
-cd "$PROJECT_ROOT/.worktrees/$ref" && bash ralph/loop.sh 10 2>&1
+WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
+cd "$WORKTREE" && bash ralph/loop.sh 10 > ralph/.loop_output 2>&1 &
+LOOP_PID=$!
 ```
 
-This runs autonomously. Monitor the output for progress. Report each completed iteration and any gate results to the user.
+While the loop is running, poll `ralph/.loop_status` every 30 seconds:
 
-The loop handles: build validation → unit tests → force-unwrap check → architecture check → lint → per-iteration commit.
+```bash
+while kill -0 $LOOP_PID 2>/dev/null; do
+    sleep 30
+    cat "$WORKTREE/ralph/.loop_status" 2>/dev/null || continue
+done
+wait $LOOP_PID
+```
 
-After all tasks are done, post-loop gates run automatically: LLM consensus judge → UI tests → worktree cleanup.
+After each poll, read the status file and act:
+
+- If `result` changed to `green`: report to user — "Iteration N complete. M tasks remaining."
+- If `consec_fail` reaches 3 or higher: read `$WORKTREE/iteration_context.md` for error details.
+  Alert the user via AskUserQuestion: "Loop is stuck on [last_fail_gate] for [consec_fail] consecutive iterations. Error: [summary from iteration_context.md]. Continue or intervene?"
+  - If user says continue: let the loop keep running (it will escalate models automatically)
+  - If user wants to intervene: `kill $LOOP_PID 2>/dev/null` and let the user fix manually
+- If `tasks_remaining` reaches 0: the loop will exit on its own. Wait for it.
+- When the loop process exits: read final output and proceed to Step 4b.
+
+```bash
+cat "$WORKTREE/ralph/.loop_output"
+```
+
+## Step 4b — Post-loop
+
+The loop runs post-loop gates automatically after all tasks complete. Check if they ran:
+```bash
+tail -20 "$WORKTREE/progress.txt"
+```
+
+If the loop was killed before post-loop, run it manually:
+```bash
+cd "$WORKTREE" && bash ralph/loop.sh post-loop 2>&1
+```
+
+Report each gate outcome to the user.
 
 ## Step 5 — Worktree cleanup
 

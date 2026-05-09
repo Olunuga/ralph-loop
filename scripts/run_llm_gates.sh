@@ -37,7 +37,7 @@ if [[ -z "$PREPARED_DIFF" ]]; then
 fi
 
 # Read protocols for context (if available)
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(CDPATH= cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=/dev/null
 [[ -f "$PROJECT_ROOT/ralph/config.sh" ]] && source "$PROJECT_ROOT/ralph/config.sh"
 
@@ -45,6 +45,12 @@ PROTOCOLS=""
 if [[ -n "${PROTOCOLS_DIR:-}" && -d "$PROTOCOLS_DIR" ]]; then
     PROTOCOLS=$(find "$PROTOCOLS_DIR" -name "*.swift" 2>/dev/null \
         | xargs cat 2>/dev/null || true)
+fi
+
+# Read project-specific gate calibration (if available)
+GATE_CONTEXT=""
+if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+    GATE_CONTEXT=$(cat "$PROJECT_ROOT/ralph/gate_context.md")
 fi
 
 FAIL=0
@@ -67,7 +73,17 @@ for PROMPT_FILE in "$LLM_GATES_DIR"/*.md; do
     # Build the full prompt: template body + diff + protocols
     PROMPT_BODY=$(awk 'BEGIN{c=0} /^---$/{c++;next} c>=2{print}' "$PROMPT_FILE")
 
-    FULL_PROMPT="$PROMPT_BODY
+    # Prepend project context if available
+    CONTEXT_HEADER=""
+    if [[ -n "$GATE_CONTEXT" || -n "${APP_NAME:-}" ]]; then
+        CONTEXT_HEADER="PROJECT CONTEXT:
+App: ${APP_NAME:-unknown} — ${APP_DESCRIPTION:-}
+${GATE_CONTEXT}
+---
+"
+    fi
+
+    FULL_PROMPT="${CONTEXT_HEADER}${PROMPT_BODY}
 
 CODE CHANGES:
 $PREPARED_DIFF"
