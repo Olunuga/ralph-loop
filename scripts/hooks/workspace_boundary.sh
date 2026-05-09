@@ -15,6 +15,11 @@ set -euo pipefail
 INPUT=$(cat)
 WORKSPACE=$(realpath "$(pwd)")
 
+# Resolve the main project root (handles both main worktree and git worktrees).
+# If we're inside a worktree, PROJECT_WORKSPACE is the main repo root.
+# This allows the orchestrator in the main repo to reference .worktrees/ paths.
+PROJECT_WORKSPACE=$(git -C "$WORKSPACE" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||' || echo "$WORKSPACE")
+
 # Extract field from the JSON input
 json_get() {
     local field="$1"
@@ -47,7 +52,12 @@ is_outside_workspace() {
 import os, sys
 print(os.path.realpath('$path'))
 " 2>/dev/null || echo "$path")
-    [[ "$resolved" != "$WORKSPACE"* ]]
+    # Allow paths within the workspace itself
+    [[ "$resolved" == "$WORKSPACE"* ]] && return 1
+    # Allow paths within worktrees of the same project (sibling .worktrees/)
+    [[ "$resolved" == "$PROJECT_WORKSPACE"/.worktrees/* ]] && return 1
+    # Outside workspace
+    return 0
 }
 
 block() {

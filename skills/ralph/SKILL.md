@@ -31,7 +31,12 @@ If the user replies anything other than yes, stop.
 
 ## Step 2 — Create worktree from spec branch
 
-Branch the worktree off `spec/$ref` so the spec file is available inside the worktree:
+Branch the worktree off `spec/$ref` so the spec file is available inside the worktree.
+
+Note: `git worktree add` writes files (e.g. `.mcp.json`) into the new worktree directory.
+If the Claude Code sandbox blocks this with "Operation not permitted", retry with
+`dangerouslyDisableSandbox: true` — the sandbox write allowlist does not cover `.worktrees/`.
+
 ```bash
 git worktree add .worktrees/$ref -b ralph/$ref spec/$ref 2>&1
 ```

@@ -10,8 +10,8 @@ set -euo pipefail
 # ./ralph/loop.sh post-loop                # re-run post-loop gates after manual fix
 
 # ── Resolve paths ──────────────────────────────────────────────────────────────
-RALPH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$RALPH_DIR/.." && pwd)"
+RALPH_DIR="$(python3 -c "import os; print(os.path.dirname(os.path.realpath('${BASH_SOURCE[0]}')))")"
+PROJECT_ROOT="$(python3 -c "import os; print(os.path.dirname('$RALPH_DIR'))")"
 cd "$PROJECT_ROOT"
 
 # ── Mode ───────────────────────────────────────────────────────────────────────
