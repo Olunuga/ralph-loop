@@ -61,6 +61,6 @@ CONSTRAINTS
 
 - Do not implement anything
 - Do not modify any source files
-- Do not modify the project file (Geyns.xcodeproj)
+- Do not modify the project file (.xcodeproj)
 - Scope is strictly: ${WORK_DESCRIPTION} — ignore anything outside it
 
