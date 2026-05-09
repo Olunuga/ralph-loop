@@ -26,45 +26,78 @@ If the user replies no, stop.
 
 ```bash
 REF="${ref:-main}"
-TMPDIR=$(mktemp -d)
-git clone --depth 1 --branch "$REF" https://github.com/Olunuga/ralph-loop "$TMPDIR" 2>&1 \
-  && echo "cloned ok" || echo "clone failed"
+TMPDIR_RALPH="$TMPDIR/ralph_install_$$"
+mkdir -p "$TMPDIR_RALPH"
+git clone --depth 1 --branch "$REF" https://github.com/Olunuga/ralph-loop "$TMPDIR_RALPH" 2>&1 \
+  && echo "TMPDIR=$TMPDIR_RALPH" && echo "cloned ok" || echo "clone failed"
 ```
 
 If clone failed, stop and report the error.
 
 ## Step 3 — Copy into ralph/
 
+Copy the pipeline files. Do NOT touch config.sh, AGENTS.md, specs/, lessons.md, or gate_context.md — those are project-specific.
+
 ```bash
-mkdir -p ralph/scripts/hooks ralph/skills/ralph-init ralph/skills/ralph ralph/skills/ralph-update ralph/skills/spec
+TMPDIR_RALPH="$TMPDIR/ralph_install_$$"
 
+# Create directory structure
+mkdir -p ralph/scripts/hooks \
+         ralph/scripts/gates/static/code_quality \
+         ralph/scripts/gates/static/architecture \
+         ralph/scripts/gates/static/security \
+         ralph/scripts/gates/static/accessibility \
+         ralph/scripts/gates/llm
+
+# Core pipeline files
 for f in loop.sh PROMPT_bootstrap.md PROMPT_build.md PROMPT_plan.md PROMPT_plan_work.md SETUP.md SETUP_SKILLS.md; do
-    cp "$TMPDIR/$f" ralph/$f && echo "copied: $f"
+    cp "$TMPDIR_RALPH/$f" ralph/$f && echo "copied: $f"
 done
 
-for f in scripts/check_architecture.sh scripts/consensus_judge.sh scripts/hooks/workspace_boundary.sh; do
-    cp "$TMPDIR/$f" ralph/$f && echo "copied: $f"
+# Gate dispatchers and utilities
+for f in scripts/run_static_gates.sh scripts/run_llm_gates.sh scripts/prepare_diff.sh scripts/hooks/workspace_boundary.sh; do
+    cp "$TMPDIR_RALPH/$f" ralph/$f && echo "copied: $f"
 done
 
-for f in skills/ralph-init/SKILL.md skills/ralph/SKILL.md skills/ralph-update/SKILL.md skills/spec/SKILL.md; do
-    cp "$TMPDIR/$f" ralph/$f && echo "copied: $f"
+# Static gate checks
+for f in "$TMPDIR_RALPH"/scripts/gates/static/*/*.sh; do
+    [ -f "$f" ] || continue
+    REL="${f#$TMPDIR_RALPH/}"
+    cp "$f" "ralph/$REL" && echo "copied: $REL"
 done
 
-chmod +x ralph/loop.sh ralph/scripts/check_architecture.sh \
-         ralph/scripts/consensus_judge.sh ralph/scripts/hooks/workspace_boundary.sh
+# LLM gate prompts
+for f in "$TMPDIR_RALPH"/scripts/gates/llm/*.md; do
+    [ -f "$f" ] || continue
+    REL="${f#$TMPDIR_RALPH/}"
+    cp "$f" "ralph/$REL" && echo "copied: $REL"
+done
 
-rm -rf "$TMPDIR"
+# Make scripts executable
+find ralph/scripts -name "*.sh" -exec chmod +x {} \;
+chmod +x ralph/loop.sh
+
+rm -rf "$TMPDIR_RALPH"
 ```
 
 ## Step 4 — Record version
 
-Write the installed version into `ralph/config.sh` so the project tracks which version it is pinned to:
+Write the installed version into `ralph/config.sh`. If config.sh already exists, only update the RALPH_VERSION line. If it doesn't exist, create a minimal one:
 
 ```bash
 REF="${ref:-main}"
-echo "RALPH_VERSION=\"$REF\"" > ralph/config.sh
+if [ -f ralph/config.sh ]; then
+    if grep -q "^RALPH_VERSION=" ralph/config.sh; then
+        sed -i '' "s|^RALPH_VERSION=.*|RALPH_VERSION=\"$REF\"|" ralph/config.sh
+    else
+        echo "RALPH_VERSION=\"$REF\"" >> ralph/config.sh
+    fi
+else
+    echo "RALPH_VERSION=\"$REF\"" > ralph/config.sh
+fi
+echo "RALPH_VERSION set to $REF"
 ```
 
 ## Step 5 — Report
 
-Confirm: "ralph-loop@${ref:-main} installed into ralph/. RALPH_VERSION recorded in ralph/config.sh. Run /ralph-init to complete setup."
+Confirm: "ralph-loop@${ref:-main} installed into ralph/. Run /ralph-init to complete setup."
