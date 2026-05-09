@@ -5,6 +5,12 @@
 0c. Read ralph/AGENTS.md — understand build commands, architecture rules, guardrails.
 0d. Read IMPLEMENTATION_PLAN.md — pick the single most important unchecked [ ] item.
 0e. Search Geyns/ for existing code related to the chosen task before assuming anything is missing.
+0f. If ralph/gate_context.md exists, read it. If any gate scripts in
+    ralph/scripts/gates/static/ are not listed under "Known gates",
+    read those new gate scripts, assess whether they conflict with
+    this project's patterns, and update gate_context.md with the
+    appropriate SKIP/ENFORCE decision and LLM gate notes.
+    Commit the update separately before implementing the task.
 
 ---
 
