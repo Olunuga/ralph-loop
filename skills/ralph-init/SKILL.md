@@ -19,8 +19,7 @@ Check that `ralph/loop.sh` exists. If not, stop and tell the user:
 Make scripts executable:
 ```bash
 chmod +x ralph/loop.sh
-chmod +x ralph/scripts/consensus_judge.sh
-chmod +x ralph/scripts/hooks/workspace_boundary.sh
+find ralph/scripts -name "*.sh" -exec chmod +x {} \;
 ```
 
 ---

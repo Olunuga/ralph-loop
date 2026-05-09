@@ -13,7 +13,7 @@ Ref (tag or branch — optional, will ask if not provided): $ref
 
 Default repo: https://github.com/Olunuga/ralph-loop
 
-Generic files to sync (never touches config.sh, AGENTS.md, or specs/):
+Generic files to sync (never touches config.sh, AGENTS.md, specs/, lessons.md, or gate_context.md):
 - loop.sh
 - PROMPT_bootstrap.md
 - PROMPT_build.md
@@ -21,13 +21,12 @@ Generic files to sync (never touches config.sh, AGENTS.md, or specs/):
 - PROMPT_plan_work.md
 - SETUP.md
 - SETUP_SKILLS.md
-- scripts/check_architecture.sh
-- scripts/consensus_judge.sh
+- scripts/run_static_gates.sh
+- scripts/run_llm_gates.sh
+- scripts/prepare_diff.sh
 - scripts/hooks/workspace_boundary.sh
-- skills/ralph-init/SKILL.md
-- skills/ralph/SKILL.md
-- skills/ralph-update/SKILL.md
-- skills/spec/SKILL.md
+- scripts/gates/static/**/*.sh
+- scripts/gates/llm/*.md
 
 ## Step 1 — Validate target
 
@@ -72,70 +71,132 @@ Use the user's reply as REF.
 ## Step 3 — Clone ref into a temp directory
 
 ```bash
-TMPDIR=$(mktemp -d)
-git clone --depth 1 --branch "$REF" https://github.com/Olunuga/ralph-loop "$TMPDIR" 2>&1
+TMPDIR_RALPH="$TMPDIR/ralph_update_$$"
+mkdir -p "$TMPDIR_RALPH"
+git clone --depth 1 --branch "$REF" https://github.com/Olunuga/ralph-loop "$TMPDIR_RALPH" 2>&1
 ```
 
 If the clone fails (bad ref or no network), stop and report the error.
 
 ## Step 4 — Show diff
 
+Compare all generic pipeline files between the cloned repo and the local ralph/:
+
 ```bash
-for f in loop.sh PROMPT_bootstrap.md PROMPT_build.md PROMPT_plan.md PROMPT_plan_work.md SETUP.md SETUP_SKILLS.md \
-          scripts/check_architecture.sh scripts/consensus_judge.sh scripts/hooks/workspace_boundary.sh \
-          skills/ralph-init/SKILL.md skills/ralph/SKILL.md skills/ralph-update/SKILL.md skills/spec/SKILL.md; do
-    src="$TMPDIR/$f"
-    tgt="ralph/$f"
-    if [[ ! -f "$src" ]]; then
-        echo "SKIP (not in source): $f"
-    elif [[ ! -f "$tgt" ]]; then
-        echo "NEW: $f"
-    elif diff -q "$src" "$tgt" > /dev/null 2>&1; then
-        echo "unchanged: $f"
-    else
-        echo "CHANGED: $f"
+TMPDIR_RALPH="$TMPDIR/ralph_update_$$"
+
+echo "=== Core files ==="
+for f in loop.sh PROMPT_bootstrap.md PROMPT_build.md PROMPT_plan.md PROMPT_plan_work.md SETUP.md SETUP_SKILLS.md; do
+    src="$TMPDIR_RALPH/$f"; tgt="ralph/$f"
+    if [[ ! -f "$src" ]]; then echo "REMOVED: $f"
+    elif [[ ! -f "$tgt" ]]; then echo "NEW: $f"
+    elif diff -q "$src" "$tgt" > /dev/null 2>&1; then echo "unchanged: $f"
+    else echo "CHANGED: $f"
     fi
+done
+
+echo "=== Scripts ==="
+for f in scripts/run_static_gates.sh scripts/run_llm_gates.sh scripts/prepare_diff.sh scripts/hooks/workspace_boundary.sh; do
+    src="$TMPDIR_RALPH/$f"; tgt="ralph/$f"
+    if [[ ! -f "$src" ]]; then echo "REMOVED: $f"
+    elif [[ ! -f "$tgt" ]]; then echo "NEW: $f"
+    elif diff -q "$src" "$tgt" > /dev/null 2>&1; then echo "unchanged: $f"
+    else echo "CHANGED: $f"
+    fi
+done
+
+echo "=== Static gates ==="
+for f in "$TMPDIR_RALPH"/scripts/gates/static/*/*.sh; do
+    [ -f "$f" ] || continue
+    REL="${f#$TMPDIR_RALPH/}"
+    tgt="ralph/$REL"
+    if [[ ! -f "$tgt" ]]; then echo "NEW: $REL"
+    elif diff -q "$f" "$tgt" > /dev/null 2>&1; then echo "unchanged: $REL"
+    else echo "CHANGED: $REL"
+    fi
+done
+
+echo "=== LLM gates ==="
+for f in "$TMPDIR_RALPH"/scripts/gates/llm/*.md; do
+    [ -f "$f" ] || continue
+    REL="${f#$TMPDIR_RALPH/}"
+    tgt="ralph/$REL"
+    if [[ ! -f "$tgt" ]]; then echo "NEW: $REL"
+    elif diff -q "$f" "$tgt" > /dev/null 2>&1; then echo "unchanged: $REL"
+    else echo "CHANGED: $REL"
+    fi
+done
+
+# Check for files in local ralph/ that were removed from repo
+for f in ralph/scripts/check_architecture.sh ralph/scripts/consensus_judge.sh; do
+    [[ -f "$f" ]] && echo "OBSOLETE (will be removed): $f"
 done
 ```
 
 Use AskUserQuestion to show the diff summary and ask:
 "Updating 'ralph/' from ralph-loop@$REF (currently ${LOCKED_REF:-unknown}).
-config.sh, AGENTS.md, and specs/ will not be touched.
+config.sh, AGENTS.md, specs/, lessons.md, and gate_context.md will not be touched.
 
 Proceed? Reply 'yes' or 'no'."
 
 If the user replies no, clean up and stop:
 ```bash
-rm -rf "$TMPDIR"
+rm -rf "$TMPDIR_RALPH"
 ```
 
 ## Step 5 — Copy
 
 ```bash
+TMPDIR_RALPH="$TMPDIR/ralph_update_$$"
+
+# Core files
 for f in loop.sh PROMPT_bootstrap.md PROMPT_build.md PROMPT_plan.md PROMPT_plan_work.md SETUP.md SETUP_SKILLS.md; do
-    [[ -f "$TMPDIR/$f" ]] && cp "$TMPDIR/$f" "ralph/$f" && echo "copied: $f"
+    [[ -f "$TMPDIR_RALPH/$f" ]] && cp "$TMPDIR_RALPH/$f" "ralph/$f" && echo "copied: $f"
 done
 
+# Scripts and hooks
 mkdir -p "ralph/scripts/hooks"
-for f in scripts/check_architecture.sh scripts/consensus_judge.sh scripts/hooks/workspace_boundary.sh; do
-    [[ -f "$TMPDIR/$f" ]] && cp "$TMPDIR/$f" "ralph/$f" && echo "copied: $f"
+for f in scripts/run_static_gates.sh scripts/run_llm_gates.sh scripts/prepare_diff.sh scripts/hooks/workspace_boundary.sh; do
+    [[ -f "$TMPDIR_RALPH/$f" ]] && cp "$TMPDIR_RALPH/$f" "ralph/$f" && echo "copied: $f"
 done
 
-mkdir -p "ralph/skills/ralph-init" "ralph/skills/ralph" "ralph/skills/ralph-update" "ralph/skills/spec"
-for f in skills/ralph-init/SKILL.md skills/ralph/SKILL.md skills/ralph-update/SKILL.md skills/spec/SKILL.md; do
-    [[ -f "$TMPDIR/$f" ]] && cp "$TMPDIR/$f" "ralph/$f" && echo "copied: $f"
+# Static gates
+for f in "$TMPDIR_RALPH"/scripts/gates/static/*/*.sh; do
+    [ -f "$f" ] || continue
+    REL="${f#$TMPDIR_RALPH/}"
+    mkdir -p "ralph/$(dirname "$REL")"
+    cp "$f" "ralph/$REL" && echo "copied: $REL"
 done
 
-chmod +x "ralph/loop.sh" "ralph/scripts/check_architecture.sh" \
-         "ralph/scripts/consensus_judge.sh" "ralph/scripts/hooks/workspace_boundary.sh"
+# LLM gates
+mkdir -p "ralph/scripts/gates/llm"
+for f in "$TMPDIR_RALPH"/scripts/gates/llm/*.md; do
+    [ -f "$f" ] || continue
+    REL="${f#$TMPDIR_RALPH/}"
+    cp "$f" "ralph/$REL" && echo "copied: $REL"
+done
 
-rm -rf "$TMPDIR"
+# Remove obsolete files from old versions
+for f in ralph/scripts/check_architecture.sh ralph/scripts/consensus_judge.sh; do
+    [[ -f "$f" ]] && rm "$f" && echo "removed obsolete: $f"
+done
+
+# Make scripts executable
+find ralph/scripts -name "*.sh" -exec chmod +x {} \;
+chmod +x ralph/loop.sh
+
+rm -rf "$TMPDIR_RALPH"
 ```
 
 ## Step 6 — Update version lock
 
 ```bash
-sed -i '' "s|^RALPH_VERSION=.*|RALPH_VERSION=\"$REF\"|" "ralph/config.sh"
+REF="${ref:-main}"
+if grep -q "^RALPH_VERSION=" "ralph/config.sh" 2>/dev/null; then
+    sed -i '' "s|^RALPH_VERSION=.*|RALPH_VERSION=\"$REF\"|" "ralph/config.sh"
+else
+    echo "RALPH_VERSION=\"$REF\"" >> "ralph/config.sh"
+fi
 ```
 
 ## Step 7 — Report
