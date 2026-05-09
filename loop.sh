@@ -10,8 +10,8 @@ set -euo pipefail
 # ./ralph/loop.sh post-loop                # re-run post-loop gates after manual fix
 
 # ── Resolve paths ──────────────────────────────────────────────────────────────
-RALPH_DIR="$(python3 -c "import os; print(os.path.dirname(os.path.realpath('${BASH_SOURCE[0]}')))")"
-PROJECT_ROOT="$(python3 -c "import os; print(os.path.dirname('$RALPH_DIR'))")"
+RALPH_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(CDPATH= cd "$RALPH_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 # ── Mode ───────────────────────────────────────────────────────────────────────
@@ -90,6 +90,15 @@ claude_run_fast() {
         "$@"
 }
 
+# Run a Claude agent instance (Opus — hard problems that Sonnet can't solve).
+claude_run_deep() {
+    claude -p \
+        --dangerously-skip-permissions \
+        --output-format text \
+        --model claude-opus-4-6 \
+        "$@"
+}
+
 notify_failure() {
     local GATE="$1"
     local DETAILS="$2"
@@ -114,7 +123,8 @@ notify_failure() {
 
 # Rollback all changes (build/test failures — can't attribute to single files).
 rollback_all() {
-    git stash && git stash drop 2>/dev/null || true
+    git checkout -- . 2>/dev/null || true
+    git clean -fd 2>/dev/null || true
 }
 
 # Rollback specific files (gate failures that identify offending files).
@@ -137,11 +147,14 @@ append_failure_context() {
     local iter="$3"
     local ctx_file="iteration_context.md"
 
-    # Append structured failure block
+    # Append structured failure block with verbatim error output (last 30 lines)
     {
         echo ""
         echo "## Iteration $iter — FAILED ($gate)"
-        echo "- Error: $(echo "$details" | head -15)"
+        echo "Error output:"
+        echo '```'
+        echo "$details" | tail -30
+        echo '```'
         echo "- Rolled back: yes"
     } >> "$ctx_file"
 
@@ -162,6 +175,7 @@ open('$ctx_file', 'w').write('\n'.join(blocks[-5:]))
 
 # Run a post-loop gate, giving the agent up to MAX_FIX_ITERATIONS to fix it.
 # Validates that fixes don't break hard gates before committing.
+# For LLM gates, applies fixes one issue at a time to prevent cascading breakage.
 run_gate_with_fix() {
     local GATE="$1"
     local GATE_CMD="$2"
@@ -176,29 +190,33 @@ run_gate_with_fix() {
         ATTEMPT=$((ATTEMPT + 1))
         echo "GATE $GATE: FAIL (attempt $ATTEMPT/$MAX_FIX_ITERATIONS)"
 
-        printf "Fix this gate failure.\n\nGate: %s\nOutput:\n%s" \
-            "$GATE" "$OUTPUT" \
+        # Extract the first individual failure for focused fixing.
+        # LLM gates output "N: FAIL — reason" lines; pick the first one.
+        FIRST_FAIL=$(echo "$OUTPUT" | grep -m1 "FAIL" || echo "$OUTPUT" | tail -10)
+
+        printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
+            "$GATE" "$FIRST_FAIL" "$OUTPUT" \
         | claude_run 2>/dev/null
 
         # Ensure the fix didn't break hard gates
         if ! bash ralph/scripts/run_static_gates.sh fast > /dev/null 2>&1; then
             echo "Fix broke gates — reverting."
-            git stash && git stash drop 2>/dev/null || true
+            rollback_all
             continue
         fi
         run_quietly "$BUILD_CMD" || {
             echo "Fix broke build — reverting."
-            git stash && git stash drop 2>/dev/null || true
+            rollback_all
             continue
         }
         run_quietly "$UNIT_TEST_CMD" || {
             echo "Fix broke unit tests — reverting."
-            git stash && git stash drop 2>/dev/null || true
+            rollback_all
             continue
         }
 
-        git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt 2>/dev/null; git commit \
-            -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
+        git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md 2>/dev/null
+        git commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
     done
 
     notify_failure "$GATE" "$OUTPUT"
@@ -347,8 +365,11 @@ if [[ "$MODE" == "build" ]]; then
 $PROMPT"
         fi
 
-        # Sonnet escalation: after 2 consecutive failures on same gate, use Sonnet
-        if [[ "$CONSEC_FAIL" -ge 2 ]]; then
+        # Model escalation: Haiku → Sonnet (after 2 fails) → Opus (after 4 fails)
+        if [[ "$CONSEC_FAIL" -ge 4 ]]; then
+            echo "  (escalating to Opus after $CONSEC_FAIL consecutive failures on $LAST_FAIL_GATE)"
+            echo "$PROMPT" | claude_run_deep
+        elif [[ "$CONSEC_FAIL" -ge 2 ]]; then
             echo "  (escalating to Sonnet after $CONSEC_FAIL consecutive failures on $LAST_FAIL_GATE)"
             echo "$PROMPT" | claude_run
         else
@@ -359,7 +380,7 @@ $PROMPT"
         BUILD_OUTPUT=""
         if ! BUILD_OUTPUT=$(eval "$BUILD_CMD" 2>&1); then
             echo "HARD: Build failed — rolling back."
-            append_failure_context "build" "$(echo "$BUILD_OUTPUT" | grep -E 'error:|FAILED|failed' | head -15)" "$((ITER+1))"
+            append_failure_context "build" "$BUILD_OUTPUT" "$((ITER+1))"
             rollback_all
             echo "- Iter $((ITER+1)): build failed" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "build" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="build"; }
@@ -369,9 +390,17 @@ $PROMPT"
         # ── 2. Unit tests ─────────────────────────────────────────────────────────
         TEST_OUTPUT=""
         if ! TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
-            echo "HARD: Unit tests failed — rolling back."
-            append_failure_context "tests" "$(echo "$TEST_OUTPUT" | grep -E 'error:|FAILED|failed' | head -15)" "$((ITER+1))"
-            rollback_all
+            echo "HARD: Unit tests failed."
+            append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
+            # Selective rollback: only revert test files, keep passing source changes.
+            # Test files are identified by *Tests/ or *Spec/ directories.
+            TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
+            if [[ -n "$TEST_FILES" ]]; then
+                echo "Rolling back test files only — keeping source changes."
+                rollback_files "$TEST_FILES"
+            else
+                rollback_all
+            fi
             echo "- Iter $((ITER+1)): tests failed" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
             ITER=$((ITER + 1)) && continue

@@ -27,9 +27,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GATES_DIR="${SCRIPT_DIR}/gates/static"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(CDPATH= cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Source config if available (provides SOURCE_DIR, LAYER_MAP, etc.)
 # shellcheck source=/dev/null

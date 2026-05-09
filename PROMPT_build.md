@@ -35,3 +35,34 @@ Hard rules (never break these):
 - One task per iteration — commit only when green
 - Implement completely — no stubs, no TODOs, no placeholder logic
 - Update ralph/AGENTS.md if you discover something operationally useful about this codebase
+
+---
+
+Gate awareness — your code will be checked by these automated gates after you commit.
+Write compliant code upfront so gates pass on the first try:
+
+Code quality gates:
+- No force unwraps (try!, !., as!) — use guard/if let/throws
+- No ObservableObject — use @Observable (unless AGENTS.md says otherwise)
+- No stubs, TODOs, FIXME, fatalError("not implemented"), preconditionFailure
+- No print() in production code — use os_log or Logger
+- Explicit access control on all type declarations (public/internal/private)
+- Use .isEmpty instead of .count == 0
+- Keep types under 250 lines
+
+Architecture gates:
+- Services and repositories must not import SwiftUI or reference UI types
+- ViewModels must not reference concrete View types
+- Views must not hold @Environment(\.modelContext) — route through ViewModel
+- Lower layers must not import higher layers
+
+Security gates:
+- No hardcoded secrets, API keys, or tokens in source
+- No http:// URLs (use https://)
+- No logging sensitive data (passwords, tokens, credentials)
+- No storing credentials in UserDefaults — use Keychain
+
+Accessibility gates:
+- Images and Buttons need .accessibilityLabel
+- Use Dynamic Type (preferredFont/Font.body) not hardcoded font sizes
+- Don't use color alone to convey state
