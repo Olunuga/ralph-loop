@@ -549,7 +549,26 @@ $PROMPT"
             fi
         fi
 
-        # ── Commit & push ─────────────────────────────────────────────────────────
+        # ── Verify commit landed ──────────────────────────────────────────────────
+        # The build agent should have committed. If there are uncommitted changes,
+        # the commit silently failed (e.g., permission blocked, signing error).
+        if [[ -n "$(git status --porcelain -- "${SOURCE_DIR:-.}/" 2>/dev/null)" ]]; then
+            echo "HARD: Build agent marked tasks done but did not commit."
+            echo "  Uncommitted changes detected — commit may have been blocked."
+            echo "  Attempting commit on behalf of agent..."
+            git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md ralph/.loop_status 2>/dev/null
+            git -c commit.gpgsign=false commit -m "ralph: auto-commit (agent commit was blocked)" 2>/dev/null || {
+                echo "  Auto-commit also failed — rolling back."
+                append_failure_context "commit" "Agent completed tasks but commit failed. Check git/SSH permissions." "$((ITER+1))"
+                rollback_all
+                echo "- Iter $((ITER+1)): commit failed" >> progress.txt
+                [[ "$LAST_FAIL_GATE" == "commit" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="commit"; }
+                write_loop_status "$((ITER+1))"
+                ITER=$((ITER + 1)) && continue
+            }
+        fi
+
+        # ── Push ──────────────────────────────────────────────────────────────────
         git push origin "$BRANCH" 2>/dev/null || true
         echo "- Iter $((ITER+1)): green" >> progress.txt
         # Capture lesson if we broke through a struggle

@@ -2,7 +2,7 @@
     Do NOT repeat approaches that already failed. If the same task has failed 2+ times,
     consider a fundamentally different approach (different file structure, different pattern).
 0b. Read ralph/specs/* with subagents (up to 10 parallel).
-0c. Read ralph/AGENTS.md — understand build commands, architecture rules, guardrails.
+0c. Read ralph/AGENTS.md — understand build commands, architecture rules, gates.
 0d. Read IMPLEMENTATION_PLAN.md — pick the single most important unchecked [ ] item.
 0e. Search the source directory for existing code related to the chosen task before assuming anything is missing.
 0f. If ralph/gate_context.md exists, read it. If any gate scripts in

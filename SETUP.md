@@ -137,7 +137,7 @@ Ticket ID: $ticket_id
 
 ## Step 1 — Load context
 
-Read `ralph/AGENTS.md` to understand the project architecture, layers, and guardrails.
+Read `ralph/AGENTS.md` to understand the project architecture, layers, and gates.
 Read any existing files in `ralph/specs/` to understand the spec format.
 
 ## Step 2 — JTBD conversation

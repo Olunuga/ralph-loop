@@ -26,7 +26,11 @@ find ralph/scripts -name "*.sh" -exec chmod +x {} \;
 
 ## Step 2 — Discover project info
 
-Before asking the user anything, run these commands to discover what you can:
+Before asking the user anything, run these commands to discover what you can.
+
+Note: `xcrun simctl` and `xcodebuild -list` require access to system services that the
+Claude Code sandbox may block. If these commands fail with "Operation not permitted" or
+"CoreSimulatorService connection" errors, retry with `dangerouslyDisableSandbox: true`.
 
 ```bash
 # .xcodeproj name
@@ -150,6 +154,11 @@ Note: the workspace boundary hook (`ralph/scripts/hooks/workspace_boundary.sh`) 
       "Bash(git show*)",
       "Bash(git log*)",
       "Bash(git -C .worktrees/*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(git clean*)",
       "Bash(find ralph/*)",
       "Bash(find .worktrees/*)",
       "Bash(git status*)",
@@ -158,6 +167,7 @@ Note: the workspace boundary hook (`ralph/scripts/hooks/workspace_boundary.sh`) 
       "Bash(git merge-base*)",
       "Bash(gh pr list*)",
       "Bash(gh pr view*)",
+      "Bash(gh pr create*)",
       "Bash(ls .worktrees/*)",
       "Bash(ls ralph/*)",
       "Bash(source ralph/config.sh*)",
@@ -204,7 +214,7 @@ bash ralph/loop.sh bootstrap 2>&1
 
 This generates `ralph/AGENTS.md`. Wait for it to complete, then read the file and show a summary to the user.
 
-Use AskUserQuestion to ask: "Does this AGENTS.md look correct? Any layers, protocols, or guardrails to add? Reply 'yes' to finish, or describe what to fix."
+Use AskUserQuestion to ask: "Does this AGENTS.md look correct? Any layers, protocols, or gate rules to add? Reply 'yes' to finish, or describe what to fix."
 
 Apply any corrections the user requests, then save.
 
