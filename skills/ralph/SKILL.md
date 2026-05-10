@@ -46,7 +46,15 @@ If `spec/$ref` doesn't exist (spec was committed to main instead), fall back to 
 git worktree add .worktrees/$ref -b ralph/$ref 2>&1
 ```
 
-If the branch `ralph/$ref` already exists, inform the user and continue using the existing worktree.
+If the command fails because branch `ralph/$ref` already exists (from a prior run):
+
+1. If the worktree directory `.worktrees/$ref` already exists, continue — it's ready to use.
+2. If the worktree directory does not exist, checkout the existing branch without `-b`:
+```bash
+git worktree add .worktrees/$ref ralph/$ref 2>&1
+```
+
+Inform the user: "Branch ralph/$ref already exists from a prior run. Resuming with the existing branch."
 
 ## Step 3 — Plan
 
