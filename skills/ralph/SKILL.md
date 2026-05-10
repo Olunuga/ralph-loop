@@ -33,28 +33,28 @@ If the user replies anything other than yes, stop.
 
 Branch the worktree off `spec/$ref` so the spec file is available inside the worktree.
 
-Note: `git worktree add` writes files (e.g. `.mcp.json`) into the new worktree directory.
-If the Claude Code sandbox blocks this with "Operation not permitted", retry with
-`dangerouslyDisableSandbox: true` — the sandbox write allowlist does not cover `.worktrees/`.
+**IMPORTANT:** All `git worktree add` commands below MUST use `dangerouslyDisableSandbox: true` — the sandbox write allowlist does not cover `.worktrees/` and the command will fail with "Operation not permitted" otherwise.
 
+Try these in order, stopping at the first one that succeeds:
+
+1. Create new branch from spec branch:
 ```bash
 git worktree add .worktrees/$ref -b ralph/$ref spec/$ref 2>&1
 ```
 
-If `spec/$ref` doesn't exist (spec was committed to main instead), fall back to branching from main:
+2. If `spec/$ref` doesn't exist, branch from main:
 ```bash
 git worktree add .worktrees/$ref -b ralph/$ref 2>&1
 ```
 
-If the command fails because branch `ralph/$ref` already exists (from a prior run):
-
-1. If the worktree directory `.worktrees/$ref` already exists, continue — it's ready to use.
-2. If the worktree directory does not exist, checkout the existing branch without `-b`:
+3. If branch `ralph/$ref` already exists, checkout without `-b`:
 ```bash
 git worktree add .worktrees/$ref ralph/$ref 2>&1
 ```
 
-Inform the user: "Branch ralph/$ref already exists from a prior run. Resuming with the existing branch."
+4. If the worktree directory `.worktrees/$ref` already exists, it's ready — continue to Step 3.
+
+If resuming an existing branch, inform the user: "Branch ralph/$ref already exists from a prior run. Resuming with the existing branch."
 
 ## Step 3 — Plan
 
