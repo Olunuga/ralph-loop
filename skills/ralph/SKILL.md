@@ -59,7 +59,7 @@ If resuming an existing branch, inform the user: "Branch ralph/$ref already exis
 ## Step 3 — Plan
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel)
+PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
 SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "$ref*.md" 2>/dev/null | head -1)
 SPEC_TITLE=$(head -1 "$SPEC_FILE" | sed 's/^# //')
@@ -73,7 +73,7 @@ Wait for it to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to 
 Run the build loop using Bash with `run_in_background: true`. You will be notified when it completes.
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel)
+PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
 cd "$WORKTREE" && bash ralph/loop.sh 10 2>&1
 ```
@@ -134,7 +134,7 @@ git worktree list
 
 If `.worktrees/$ref` still appears in the list, remove it:
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel)
+PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 git worktree remove "$PROJECT_ROOT/.worktrees/$ref" --force 2>&1
 ```
 
