@@ -82,6 +82,7 @@ cd "$WORKTREE" && bash ralph/loop.sh 10 2>&1
 - Do NOT edit any source files in the worktree directly. The build agent handles all code changes.
 - If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && bash ralph/loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
+- **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `bash ralph/scripts/blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — create a GitHub issue instead (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Only attempt fixes with verdict `auto`.
 
 While waiting, periodically check progress by reading files **inside the worktree** (not the background task output):
 
