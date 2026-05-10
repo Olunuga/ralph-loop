@@ -9,6 +9,14 @@ set -euo pipefail
 # ./ralph/loop.sh plan-work "desc" [N]     # scoped plan for one feature
 # ./ralph/loop.sh post-loop                # re-run post-loop gates after manual fix
 
+# ── Prevent sleep ──────────────────────────────────────────────────────────────
+# caffeinate -i keeps the system awake (idle sleep inhibited) while the loop runs.
+# Re-execs itself under caffeinate if not already wrapped.
+if [[ -z "${RALPH_CAFFEINATED:-}" ]] && command -v caffeinate &>/dev/null; then
+    export RALPH_CAFFEINATED=1
+    exec caffeinate -i "$0" "$@"
+fi
+
 # ── Resolve paths ──────────────────────────────────────────────────────────────
 RALPH_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(CDPATH= cd "$RALPH_DIR/.." && pwd)"
