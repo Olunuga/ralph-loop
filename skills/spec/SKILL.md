@@ -88,7 +88,7 @@ Write the approved spec to `ralph/specs/<slug>.md`.
 
 ```bash
 git add ralph/specs/<slug>.md
-git commit -m "spec: <slug>"
+git -c commit.gpgsign=false commit -m "spec: <slug>"
 git checkout -
 ```
 

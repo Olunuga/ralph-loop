@@ -48,7 +48,7 @@ Rules for tasks:
 - Include the reference file so the build agent knows exactly what pattern to follow
 
 STEP 4 — Commit:
-git add IMPLEMENTATION_PLAN.md && git commit -m "ralph: generate plan from specs"
+git add IMPLEMENTATION_PLAN.md && git -c commit.gpgsign=false commit -m "ralph: generate plan from specs"
 
 ---
 

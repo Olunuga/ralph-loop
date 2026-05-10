@@ -105,7 +105,7 @@ Write `ralph/gate_context.md`:
 ```
 
 STEP 6 — Commit:
-git add ralph/AGENTS.md ralph/gate_context.md && git commit -m "ralph: bootstrap AGENTS.md and gate_context.md"
+git add ralph/AGENTS.md ralph/gate_context.md && git -c commit.gpgsign=false commit -m "ralph: bootstrap AGENTS.md and gate_context.md"
 
 ---
 
