@@ -70,38 +70,34 @@ Wait for it to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to 
 
 ## Step 4 — Build loop (monitored)
 
-Run the full build loop in the background. The loop runs autonomously — do not interrupt it unless it's struggling.
+Run the build loop using Bash with `run_in_background: true`. You will be notified when it completes.
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
-cd "$WORKTREE" && bash ralph/loop.sh 10 > ralph/.loop_output 2>&1 &
-LOOP_PID=$!
+cd "$WORKTREE" && bash ralph/loop.sh 10 2>&1
 ```
 
-While the loop is running, poll `ralph/.loop_status` every 30 seconds:
+**CRITICAL RULES — do NOT break these:**
+- Do NOT edit any source files in the worktree directly. The build agent handles all code changes.
+- If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && bash ralph/loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
+- Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
+
+While waiting, periodically check progress by reading files **inside the worktree** (not the background task output):
 
 ```bash
-while kill -0 $LOOP_PID 2>/dev/null; do
-    sleep 30
-    cat "$WORKTREE/ralph/.loop_status" 2>/dev/null || continue
-done
-wait $LOOP_PID
+cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 ```
 
-After each poll, read the status file and act:
-
-- If `result` changed to `green`: report to user — "Iteration N complete. M tasks remaining."
+Report progress to the user as iterations complete:
+- If `result` changed to `green`: report — "Iteration N complete. M tasks remaining."
 - If `consec_fail` reaches 3 or higher: read `$WORKTREE/iteration_context.md` for error details.
   Alert the user via AskUserQuestion: "Loop is stuck on [last_fail_gate] for [consec_fail] consecutive iterations. Error: [summary from iteration_context.md]. Continue or intervene?"
-  - If user says continue: let the loop keep running (it will escalate models automatically)
-  - If user wants to intervene: `kill $LOOP_PID 2>/dev/null` and let the user fix manually
-- If `tasks_remaining` reaches 0: the loop will exit on its own. Wait for it.
-- When the loop process exits: read final output and proceed to Step 4b.
+  - If user says continue: write any additional diagnosis to `$WORKTREE/iteration_context.md` and restart the loop
+  - If user wants to intervene: ask the user to cancel the background task, then proceed to Step 4b for manual post-loop
+- If `tasks_remaining` reaches 0: the loop will exit on its own.
 
-```bash
-cat "$WORKTREE/ralph/.loop_output"
-```
+When notified the loop has finished, proceed to Step 4b.
 
 ## Step 4b — Post-loop
 
