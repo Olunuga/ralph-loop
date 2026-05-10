@@ -53,7 +53,7 @@ Rules:
   The build agent will follow this pattern exactly.
 
 STEP 4 — Commit:
-git add IMPLEMENTATION_PLAN.md && git commit -m "ralph: plan — ${WORK_DESCRIPTION}"
+git add IMPLEMENTATION_PLAN.md && git -c commit.gpgsign=false commit -m "ralph: plan — ${WORK_DESCRIPTION}"
 
 ---
 

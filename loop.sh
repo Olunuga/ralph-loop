@@ -268,7 +268,7 @@ run_gate_with_fix() {
         }
 
         git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md 2>/dev/null
-        git commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
+        git -c commit.gpgsign=false commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
     done
 
     notify_failure "$GATE" "$OUTPUT"

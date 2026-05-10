@@ -30,7 +30,7 @@
   - If either fails, fix and re-validate. Do not commit a red state.
 3. When all validation passes:
   - Mark the item as [x] done in IMPLEMENTATION_PLAN.md
-  - git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt 2>/dev/null; git commit -m "ralph: [one-line description of what you did]"
+  - git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt 2>/dev/null; git -c commit.gpgsign=false commit -m "ralph: [one-line description of what you did]"
 
 ---
 
