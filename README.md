@@ -167,6 +167,48 @@ gate_check() {
 
 No changes to `loop.sh` or any other file required. The dispatcher discovers checks by scanning the directory.
 
+### Blast radius analysis
+
+When an LLM gate flags an architectural issue, the pipeline measures the **blast radius** of the affected type before attempting a fix. This prevents invasive multi-file refactors from breaking the build.
+
+The analysis (`scripts/blast_radius.sh`) measures four dimensions:
+
+| Dimension | What it measures | Low (0) | Medium (1) | High (2) |
+|-----------|-----------------|---------|------------|----------|
+| File fan-out | Files referencing the type | <= 5 | 6-15 | > 15 |
+| Type coupling | Distinct types that depend on it | <= 3 | 4-10 | > 10 |
+| Layers crossed | Architectural layers (dirs) affected | 1 | 2 | >= 3 |
+| Infra reach | Directories containing references | 1-2 | 3-4 | 5+ |
+| Test coupling | Test files referencing the type | <= 1 | 2-3 | > 3 |
+
+The composite score (0-10) determines the action:
+
+- **Score 0-3 (auto)**: Escalate to Opus for a careful, contained fix
+- **Score 4-6 (conditional)**: Escalate to Opus, but only if the change stays within one architectural layer — otherwise defer
+- **Score 7-10 (defer)**: Create a GitHub issue labeled `tech-debt` with the gate feedback, blast radius report, and recommended refactoring approach. The gate passes — architectural improvements don't block feature delivery
+
+Deferred issues are always saved to `ralph/deferred_issues.md` as a backup (in case `gh` is unavailable). Duplicate GitHub issues are detected via search before creation.
+
+All thresholds are configurable per-project via `ralph/gate_context.md`:
+
+```
+blast_radius_fanout_thresholds: 5,15
+blast_radius_coupling_thresholds: 3,10
+blast_radius_layer_thresholds: 1,2
+blast_radius_infra_thresholds: 2,4
+blast_radius_test_thresholds: 1,3
+blast_radius_auto_max: 3
+blast_radius_conditional_max: 6
+```
+
+You can run the analysis manually:
+
+```bash
+bash ralph/scripts/blast_radius.sh WorkoutSession Geyns/
+```
+
+Based on Robert C. Martin's coupling metrics, Google's Large-Scale Change sharding practice, and Michael Feathers' seam analysis from *Working Effectively with Legacy Code*.
+
 ### Creating a new LLM gate check
 
 Drop a `.md` file into `scripts/gates/llm/`. Use this format:

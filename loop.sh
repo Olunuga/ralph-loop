@@ -235,7 +235,7 @@ STAT
 
 # Run a post-loop gate, giving the agent up to MAX_FIX_ITERATIONS to fix it.
 # Validates that fixes don't break hard gates before committing.
-# For LLM gates, applies fixes one issue at a time to prevent cascading breakage.
+# For LLM gates, runs blast radius analysis to decide: auto-fix or defer to GitHub issue.
 run_gate_with_fix() {
     local GATE="$1"
     local GATE_CMD="$2"
@@ -259,9 +259,107 @@ run_gate_with_fix() {
         # LLM gates output "N: FAIL — reason" lines; pick the first one.
         FIRST_FAIL=$(echo "$OUTPUT" | grep -m1 "FAIL" || echo "$OUTPUT" | tail -10)
 
-        printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
-            "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-        | claude_run 2>/dev/null
+        # ── Blast radius analysis for LLM gates ──────────────────────────────
+        # Extract the affected type from the failure output and measure impact.
+        if [[ "$GATE" == "LLM_GATES" ]]; then
+            # Extract type names mentioned in the failure (PascalCase identifiers)
+            AFFECTED_TYPE=$(echo "$FIRST_FAIL" \
+                | grep -oE '[A-Z][a-z]+([A-Z][a-z]+)+' \
+                | head -1)
+
+            if [[ -n "$AFFECTED_TYPE" ]]; then
+                echo "Blast radius analysis for $AFFECTED_TYPE..."
+                BR_OUTPUT=$(bash ralph/scripts/blast_radius.sh "$AFFECTED_TYPE" "${SOURCE_DIR:-.}" 2>/dev/null || true)
+
+                if [[ -n "$BR_OUTPUT" ]]; then
+                    BR_SCORE=$(echo "$BR_OUTPUT" | grep "^BLAST_SCORE=" | cut -d= -f2)
+                    BR_VERDICT=$(echo "$BR_OUTPUT" | grep "^BLAST_VERDICT=" | cut -d= -f2)
+                    BR_LAYERS=$(echo "$BR_OUTPUT" | grep "^AFFECTED_LAYERS=" | cut -d= -f2)
+
+                    echo "$BR_OUTPUT"
+
+                    if [[ "$BR_VERDICT" == "defer" ]]; then
+                        echo "GATE $GATE: HIGH BLAST RADIUS (score $BR_SCORE) — deferring to tech debt."
+                        echo "- Post-loop $GATE: DEFERRED (blast radius $BR_SCORE, layers: $BR_LAYERS)" >> progress.txt
+
+                        ISSUE_TITLE="Tech Debt: $AFFECTED_TYPE — $(echo "$FIRST_FAIL" | head -1 | sed 's/^[0-9]*: FAIL — //')"
+                        ISSUE_BODY="## Architectural Improvement (Deferred by Ralph Pipeline)
+
+**Branch:** \`$BRANCH\`
+**Gate:** $GATE
+**Affected type:** \`$AFFECTED_TYPE\`
+**Blast radius score:** $BR_SCORE/10
+
+### Blast Radius Analysis
+\`\`\`
+$BR_OUTPUT
+\`\`\`
+
+### Gate Feedback
+\`\`\`
+$FIRST_FAIL
+\`\`\`
+
+### Why deferred
+The blast radius score ($BR_SCORE) exceeds the auto-fix threshold. This change touches $BR_LAYERS and would require a multi-file refactor that risks breaking the build if done automatically.
+
+### Recommended approach
+Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate callers incrementally across multiple PRs, then remove the old path."
+
+                        # Always write to file as backup
+                        {
+                            echo ""
+                            echo "---"
+                            echo "## $ISSUE_TITLE"
+                            echo "Date: $(date '+%Y-%m-%d')"
+                            echo ""
+                            echo "$ISSUE_BODY"
+                        } >> ralph/deferred_issues.md
+
+                        # Try GitHub issue — check for duplicates first
+                        if command -v gh &>/dev/null; then
+                            EXISTING=$(gh issue list --search "Tech Debt: $AFFECTED_TYPE" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || true)
+                            if [[ -n "$EXISTING" ]]; then
+                                echo "Existing issue #$EXISTING found — skipping duplicate."
+                                echo "- Deferred issue: existing #$EXISTING" >> progress.txt
+                            else
+                                gh issue create \
+                                    --title "$ISSUE_TITLE" \
+                                    --body "$ISSUE_BODY" \
+                                    --label "tech-debt" 2>/dev/null \
+                                && echo "GitHub issue created." \
+                                || echo "Issue creation failed — saved to ralph/deferred_issues.md."
+                            fi
+                        else
+                            echo "gh not installed — issue saved to ralph/deferred_issues.md."
+                        fi
+
+                        return 0  # Don't fail the gate — deferred as tech debt
+                    fi
+
+                    # Low/medium blast radius — escalate to Opus for careful fix
+                    echo "Blast radius score $BR_SCORE — escalating to Opus for careful fix."
+                    printf "Fix ONLY this single issue. Change as few files as possible. Do not refactor broadly.\nAffected type: %s (blast radius score: %s, layers: %s)\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
+                        "$AFFECTED_TYPE" "$BR_SCORE" "$BR_LAYERS" "$GATE" "$FIRST_FAIL" "$OUTPUT" \
+                    | claude_run_deep 2>/dev/null
+                else
+                    # Blast radius script failed — fall back to standard fix
+                    printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
+                        "$GATE" "$FIRST_FAIL" "$OUTPUT" \
+                    | claude_run 2>/dev/null
+                fi
+            else
+                # Could not extract type — fall back to standard fix
+                printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
+                    "$GATE" "$FIRST_FAIL" "$OUTPUT" \
+                | claude_run 2>/dev/null
+            fi
+        else
+            # Non-LLM gates — standard fix with Sonnet
+            printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
+                "$GATE" "$FIRST_FAIL" "$OUTPUT" \
+            | claude_run 2>/dev/null
+        fi
 
         # Ensure the fix didn't break hard gates
         if ! bash ralph/scripts/run_static_gates.sh fast > /dev/null 2>&1; then
@@ -283,6 +381,13 @@ run_gate_with_fix() {
         git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md 2>/dev/null
         git -c commit.gpgsign=false commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
     done
+
+    # For LLM gates, don't fail the entire pipeline — log and continue
+    if [[ "$GATE" == "LLM_GATES" ]]; then
+        echo "GATE $GATE: Could not auto-fix after $MAX_ATTEMPTS attempts — continuing."
+        echo "- Post-loop $GATE: UNFIXED after $MAX_ATTEMPTS attempts (manual review needed)" >> progress.txt
+        return 0
+    fi
 
     notify_failure "$GATE" "$OUTPUT"
 }
