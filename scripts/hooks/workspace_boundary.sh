@@ -47,6 +47,8 @@ is_outside_workspace() {
     [[ -z "$path" ]] && return 1          # empty path — allow
     [[ "$path" != /* ]] && return 1       # relative path — allow
     [[ "$path" == /dev/* ]] && return 1   # standard devices (/dev/null etc) — allow
+    [[ "$path" == "${TMPDIR}"* ]] && return 1  # system temp directory — allow
+    [[ "$path" == /private/tmp/* ]] && return 1  # macOS temp fallback — allow
     local resolved
     resolved=$(python3 -c "
 import os, sys
@@ -74,12 +76,13 @@ check_paths() {
     local label="${2:-command}"
     while IFS= read -r token; do
         [[ -z "$token" ]] && continue
+        [[ "$token" == *'*'* || "$token" == *'?'* ]] && continue  # skip glob patterns
         if is_outside_workspace "$token"; then
             block "$label references path outside workspace: '$token'"
         fi
     done < <(echo "$text" | python3 -c "
 import re, sys
-for m in re.finditer(r'(?<![\w:])/[a-zA-Z0-9_.][^\s|&;\"\'> ]*', sys.stdin.read()):
+for m in re.finditer(r'(?<![\w:/])/[a-zA-Z0-9_.][^\s|&;\"\'> ]*', sys.stdin.read()):
     print(m.group())
 " 2>/dev/null || true)
 }

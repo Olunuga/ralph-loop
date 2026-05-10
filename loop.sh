@@ -432,6 +432,7 @@ fi
 
 # ── Build loop ─────────────────────────────────────────────────────────────────
 if [[ "$MODE" == "build" ]]; then
+    echo "=== Pipeline started: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
     ITER=0
     CONSEC_FAIL=0
     LAST_FAIL_GATE=""
@@ -683,6 +684,8 @@ ${UI_LINE}
 - [ ] Dark mode
 - [ ] API surface matches ralph/specs/
 - [ ] Build log has no unexpected rollbacks"
+
+    echo "=== Pipeline finished: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

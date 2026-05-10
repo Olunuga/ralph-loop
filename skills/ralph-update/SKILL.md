@@ -199,6 +199,15 @@ else
 fi
 ```
 
-## Step 7 — Report
+## Step 7 — Commit updated ralph/
 
-Confirm: "Ralph updated in 'ralph/' to ralph-loop@$REF. RALPH_VERSION updated in config.sh."
+Commit the updated pipeline files so worktrees include the latest version.
+
+```bash
+git add ralph/ .claude/settings.json
+git -c commit.gpgsign=false commit -m "chore: update ralph to $REF"
+```
+
+## Step 8 — Report
+
+Confirm: "Ralph updated and committed to ralph-loop@$REF."
