@@ -51,8 +51,24 @@ Each LLM gate retry can invent new complaints instead of re-checking the same cr
 - Convergence rules in the prompt: "only flag concrete defects against the numbered checklist"
 - Max retries reduced to 2 (more retries cause more divergence)
 
-### LLM gate fix agent is too invasive
-`run_gate_with_fix` uses Sonnet to fix LLM gate failures. The agent interprets architectural suggestions (dependency injection, async refactoring) as requiring multi-file refactors that break the build. The prompt says "Fix ONLY this single issue" but the agent still makes broad changes. Known open issue — may need to skip LLM gate fixes that require architectural changes, or constrain the fix agent to single-file changes only.
+### Blast radius analysis for LLM gate fixes
+`run_gate_with_fix` runs blast radius analysis (`scripts/blast_radius.sh`) before attempting LLM gate fixes. The script measures 4 dimensions of a type's impact surface:
+
+| Dimension | Low (0) | Medium (1) | High (2) |
+|-----------|---------|------------|----------|
+| File fan-out | <= 5 | 6-15 | > 15 |
+| Type coupling (Ca) | <= 3 | 4-10 | > 10 |
+| Layers crossed | 1 | 2 | >= 3 |
+| Infrastructure reach | 1-2 dirs | 3-4 dirs | 5+ dirs |
+
+Based on the composite score (0-8):
+- **Score 0-2**: Escalate to Opus for careful, contained fix
+- **Score 3-5**: Auto-fix only if change stays within one architectural layer
+- **Score 6-8**: Defer — create GitHub issue as tech debt, don't fail the gate
+
+LLM gates that exhaust retries without a fix also don't fail the pipeline — they log for manual review. This prevents architectural suggestions from blocking feature delivery.
+
+Based on Martin's coupling metrics, Google's LSC sharding practice, and Feathers' seam analysis.
 - `run_gate_with_fix` accepts an optional max-attempts parameter
 
 ### Static gates must be diff-scoped
