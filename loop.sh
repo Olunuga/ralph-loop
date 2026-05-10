@@ -130,7 +130,15 @@ notify_failure() {
 }
 
 # Rollback all changes (build/test failures — can't attribute to single files).
+# Also undoes any uncommitted agent commits from this iteration.
 rollback_all() {
+    # Undo agent commits from this iteration (commits since last known-good state)
+    local agent_commits
+    agent_commits=$(git log --oneline --grep="^ralph:" --since="5 minutes ago" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$agent_commits" -gt 0 ]]; then
+        echo "Undoing $agent_commits agent commit(s) from this iteration."
+        git reset HEAD~"$agent_commits" 2>/dev/null || true
+    fi
     git checkout -- . 2>/dev/null || true
     git clean -fd 2>/dev/null || true
 }
@@ -142,6 +150,13 @@ rollback_files() {
     if [[ -z "$files" ]]; then
         rollback_all
         return
+    fi
+    # Check if agent committed this iteration — if so, need to undo commits first
+    local agent_commits
+    agent_commits=$(git log --oneline --grep="^ralph:" --since="5 minutes ago" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$agent_commits" -gt 0 ]]; then
+        echo "Undoing $agent_commits agent commit(s) before selective rollback."
+        git reset HEAD~"$agent_commits" 2>/dev/null || true
     fi
     while IFS= read -r f; do
         [[ -n "$f" && -f "$f" ]] && git checkout HEAD -- "$f" 2>/dev/null || true
@@ -341,24 +356,24 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
                     echo "Blast radius score $BR_SCORE — escalating to Opus for careful fix."
                     printf "Fix ONLY this single issue. Change as few files as possible. Do not refactor broadly.\nAffected type: %s (blast radius score: %s, layers: %s)\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                         "$AFFECTED_TYPE" "$BR_SCORE" "$BR_LAYERS" "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-                    | claude_run_deep 2>/dev/null
+                    | claude_run_deep 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
                 else
                     # Blast radius script failed — fall back to standard fix
                     printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                         "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-                    | claude_run 2>/dev/null
+                    | claude_run 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
                 fi
             else
                 # Could not extract type — fall back to standard fix
                 printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                     "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-                | claude_run 2>/dev/null
+                | claude_run 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
             fi
         else
             # Non-LLM gates — standard fix with Sonnet
             printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                 "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-            | claude_run 2>/dev/null
+            | claude_run 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
         fi
 
         # Ensure the fix didn't break hard gates
@@ -819,6 +834,8 @@ ${UI_LINE}
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "All gates passed."
+    # Ensure branch is pushed before creating PR
+    git push -u origin "$BRANCH" 2>/dev/null || true
     if command -v gh &>/dev/null; then
         gh pr create \
             --draft \
