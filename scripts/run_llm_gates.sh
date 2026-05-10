@@ -85,6 +85,12 @@ ${GATE_CONTEXT}
 
     FULL_PROMPT="${CONTEXT_HEADER}${PROMPT_BODY}
 
+IMPORTANT — Convergence rules:
+- Only flag concrete defects in the CODE CHANGES below. Do not flag stylistic preferences or suggestions for improvement.
+- Evaluate ONLY the numbered checklist items above. Do not invent additional criteria.
+- If a checklist item has no issues in the diff, it MUST be PASS. Do not search for marginal issues to fail.
+- Be deterministic: the same diff with the same checklist should always produce the same result.
+
 CODE CHANGES:
 $PREPARED_DIFF"
 

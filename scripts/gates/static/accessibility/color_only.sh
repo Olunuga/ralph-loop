@@ -34,30 +34,23 @@ gate_check() {
 
     [[ -z "$color_lines" ]] && return 0
 
-    # Extract unique files that use color in added lines
-    local color_files
-    color_files=$(echo "$color_lines" | cut -d: -f1 | sort -u)
+    # Check if added lines contain both conditionals and color — entirely within the diff
+    local conditional_color_files
+    conditional_color_files=$(echo "$color_lines" | cut -d: -f1 | sort -u)
 
-    # For each file, check if conditionals with color changes exist
     while IFS= read -r file; do
-        [[ -f "$file" ]] || continue
+        # Get all added lines for this file
+        local file_added
+        file_added=$(echo "$diff_output" | grep "^${file}:" || true)
 
-        # Check if the file has color changes inside conditional blocks
-        # Look for if/switch/ternary near foregroundColor/tint
-        local conditional_color
-        conditional_color=$(grep -n -E '(if |switch |.*\?.*:)' "$file" \
-            | while IFS= read -r cond_line; do
-                local line_num
-                line_num=$(echo "$cond_line" | cut -d: -f1)
-                # Check a window of 5 lines after the conditional for color usage
-                sed -n "$((line_num)),$((line_num + 5))p" "$file" \
-                    | grep -q '\.\(foregroundColor\|tint\)(' && echo "$file:$line_num"
-            done || true)
+        # Check if added lines contain conditionals near color
+        local has_conditional
+        has_conditional=$(echo "$file_added" | grep -E '(if |switch |.*\?.*:)' || true)
 
-        if [[ -n "$conditional_color" ]]; then
-            flagged="$flagged"$'\n'"  $conditional_color"
+        if [[ -n "$has_conditional" ]]; then
+            flagged="$flagged"$'\n'"  $file (conditional + color in added lines)"
         fi
-    done <<< "$color_files"
+    done <<< "$conditional_color_files"
 
     if [[ -n "$flagged" ]]; then
         echo "Possible color-only state differentiation found:"

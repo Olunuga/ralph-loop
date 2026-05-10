@@ -239,16 +239,21 @@ STAT
 run_gate_with_fix() {
     local GATE="$1"
     local GATE_CMD="$2"
+    local MAX_ATTEMPTS="${3:-$MAX_FIX_ITERATIONS}"
     local ATTEMPT=0
     local OUTPUT
 
-    while [[ "$ATTEMPT" -lt "$MAX_FIX_ITERATIONS" ]]; do
+    while [[ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]]; do
         local GATE_EXIT=0
         OUTPUT=$(eval "$GATE_CMD" 2>&1) || GATE_EXIT=$?
-        if [[ "$GATE_EXIT" -eq 0 ]]; then echo "GATE $GATE: PASS"; return 0; fi
+        if [[ "$GATE_EXIT" -eq 0 ]]; then
+            echo "GATE $GATE: PASS"
+            echo "- Post-loop $GATE: PASS" >> progress.txt
+            return 0
+        fi
 
         ATTEMPT=$((ATTEMPT + 1))
-        echo "GATE $GATE: FAIL (attempt $ATTEMPT/$MAX_FIX_ITERATIONS)"
+        echo "GATE $GATE: FAIL (attempt $ATTEMPT/$MAX_ATTEMPTS)"
 
         # Extract the first individual failure for focused fixing.
         # LLM gates output "N: FAIL — reason" lines; pick the first one.
@@ -433,6 +438,18 @@ fi
 # ── Build loop ─────────────────────────────────────────────────────────────────
 if [[ "$MODE" == "build" ]]; then
     echo "=== Pipeline started: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
+
+    # Detect prior progress — if ralph: commits exist, reconcile the plan
+    PRIOR_COMMITS=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$PRIOR_COMMITS" -gt 0 && -f "IMPLEMENTATION_PLAN.md" ]]; then
+        echo "Detected $PRIOR_COMMITS prior ralph commits — reconciling plan with code state..."
+        COMMIT_LOG=$(git log --oneline --grep="^ralph:" 2>/dev/null)
+        printf "These commits have already been made on this branch:\n%s\n\nUpdate IMPLEMENTATION_PLAN.md: mark any task as [x] done if the commit log shows it was implemented. Do not uncheck tasks. Do not change task descriptions. Only update checkboxes.\n\nIMPLEMENTATION_PLAN.md:\n%s" \
+            "$COMMIT_LOG" "$(cat IMPLEMENTATION_PLAN.md)" \
+        | claude_run_fast 2>/dev/null
+        echo "Plan reconciled."
+    fi
+
     ITER=0
     CONSEC_FAIL=0
     LAST_FAIL_GATE=""
@@ -522,11 +539,18 @@ $PROMPT"
             echo "GATES: Violation detected."
             echo "$GATE_OUTPUT"
 
-            # Try file-granular rollback — extract offending filenames from output
+            # Only roll back files the agent changed this iteration that are also flagged
             OFFENDING_FILES=$(echo "$GATE_OUTPUT" | grep -oE '[A-Za-z0-9_./]+\.swift' | sort -u || true)
-            if [[ -n "$OFFENDING_FILES" ]]; then
-                echo "Rolling back offending files only."
-                rollback_files "$OFFENDING_FILES"
+            AGENT_CHANGED=$(git diff --name-only HEAD 2>/dev/null | sort -u || true)
+            if [[ -n "$OFFENDING_FILES" && -n "$AGENT_CHANGED" ]]; then
+                # Intersect: only roll back files the agent touched AND the gate flagged
+                ROLLBACK_FILES=$(comm -12 <(echo "$OFFENDING_FILES") <(echo "$AGENT_CHANGED") || true)
+                if [[ -n "$ROLLBACK_FILES" ]]; then
+                    echo "Rolling back agent-changed files that failed gates."
+                    rollback_files "$ROLLBACK_FILES"
+                else
+                    echo "Gate flagged pre-existing code only — skipping rollback."
+                fi
             else
                 rollback_all
             fi
@@ -609,11 +633,11 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     echo "Post-loop gates"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    # Gate 1: Precise-tier static gates
+    # Gate 1: Precise-tier static gates (cheap, deterministic — run first to fail fast)
     run_gate_with_fix "GATES_PRECISE" "bash ralph/scripts/run_static_gates.sh precise"
 
-    # Gate 2: LLM gates — semantic review (1 Sonnet call per category)
-    run_gate_with_fix "LLM_GATES" "bash ralph/scripts/run_llm_gates.sh"
+    # Gate 2: LLM gates — semantic review (max 2 retries — more retries cause divergence)
+    run_gate_with_fix "LLM_GATES" "bash ralph/scripts/run_llm_gates.sh" 2
 
     # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""
