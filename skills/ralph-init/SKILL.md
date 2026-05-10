@@ -220,11 +220,22 @@ Apply any corrections the user requests, then save.
 
 ---
 
+## Step 7 — Commit ralph/ to git
+
+Ralph must be tracked in git so that worktrees created by `/ralph` include the pipeline files.
+
+```bash
+git add ralph/ .claude/settings.json .gitignore
+git -c commit.gpgsign=false commit -m "chore: add ralph autonomous pipeline"
+```
+
+---
+
 ## Done
 
 Tell the user:
 
-"Ralph is set up. Here's what was configured:
+"Ralph is set up and committed. Here's what was configured:
 - ralph/config.sh — build commands for <app_name>
 - .claude/settings.json — workspace boundary hook active
 - ralph/AGENTS.md — codebase architecture documented
