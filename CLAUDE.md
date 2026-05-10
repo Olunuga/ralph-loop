@@ -60,11 +60,14 @@ Each LLM gate retry can invent new complaints instead of re-checking the same cr
 | Type coupling (Ca) | <= 3 | 4-10 | > 10 |
 | Layers crossed | 1 | 2 | >= 3 |
 | Infrastructure reach | 1-2 dirs | 3-4 dirs | 5+ dirs |
+| Test coupling | <= 1 | 2-3 | > 3 |
 
-Based on the composite score (0-8):
-- **Score 0-2**: Escalate to Opus for careful, contained fix
-- **Score 3-5**: Auto-fix only if change stays within one architectural layer
-- **Score 6-8**: Defer — create GitHub issue as tech debt, don't fail the gate
+Based on the composite score (0-10):
+- **Score 0-3**: Escalate to Opus for careful, contained fix
+- **Score 4-6**: Auto-fix only if change stays within one architectural layer
+- **Score 7-10**: Defer — create GitHub issue as tech debt, don't fail the gate
+
+Thresholds are configurable per-project via `ralph/gate_context.md`.
 
 LLM gates that exhaust retries without a fix also don't fail the pipeline — they log for manual review. This prevents architectural suggestions from blocking feature delivery.
 

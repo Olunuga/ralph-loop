@@ -179,12 +179,25 @@ The analysis (`scripts/blast_radius.sh`) measures four dimensions:
 | Type coupling | Distinct types that depend on it | <= 3 | 4-10 | > 10 |
 | Layers crossed | Architectural layers (dirs) affected | 1 | 2 | >= 3 |
 | Infra reach | Directories containing references | 1-2 | 3-4 | 5+ |
+| Test coupling | Test files referencing the type | <= 1 | 2-3 | > 3 |
 
-The composite score (0-8) determines the action:
+The composite score (0-10) determines the action:
 
-- **Score 0-2 (auto)**: Escalate to Opus for a careful, contained fix
-- **Score 3-5 (conditional)**: Auto-fix only if the change stays within one architectural layer, otherwise defer
-- **Score 6-8 (defer)**: Create a GitHub issue labeled `tech-debt` with the gate feedback, blast radius report, and recommended refactoring approach. The gate passes — architectural improvements don't block feature delivery
+- **Score 0-3 (auto)**: Escalate to Opus for a careful, contained fix
+- **Score 4-6 (conditional)**: Auto-fix only if the change stays within one architectural layer, otherwise defer
+- **Score 7-10 (defer)**: Create a GitHub issue labeled `tech-debt` with the gate feedback, blast radius report, and recommended refactoring approach. The gate passes — architectural improvements don't block feature delivery
+
+All thresholds are configurable per-project via `ralph/gate_context.md`:
+
+```
+blast_radius_fanout_thresholds: 5,15
+blast_radius_coupling_thresholds: 3,10
+blast_radius_layer_thresholds: 1,2
+blast_radius_infra_thresholds: 2,4
+blast_radius_test_thresholds: 1,3
+blast_radius_auto_max: 3
+blast_radius_conditional_max: 6
+```
 
 You can run the analysis manually:
 
