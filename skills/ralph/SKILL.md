@@ -126,6 +126,50 @@ If the only commit is the spec commit (no "ralph:" prefixed commits), STOP and a
 
 Only proceed to cleanup after confirming implementation commits exist.
 
+## Step 5a — Post-mortem and operational learnings
+
+Before cleaning up the worktree, review the pipeline run. Read these files:
+
+```bash
+PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
+WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
+echo "=== progress ===" && cat "$WORKTREE/progress.txt" 2>/dev/null
+echo "=== status ===" && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
+echo "=== lessons ===" && cat "$WORKTREE/ralph/lessons.md" 2>/dev/null
+echo "=== commits ===" && git -C "$WORKTREE" log --oneline ralph/$ref --not spec/$ref 2>/dev/null | head -20
+```
+
+From this data, present a post-mortem to the user:
+
+```
+## Post-Mortem: $ref
+Date: [today]
+Duration: [end - start timestamps from progress.txt]
+
+### Summary
+- Iterations: N (M green, K failed)
+- Escalations: Sonnet ×A, Opus ×B
+- Agent errors: N
+- Commits: C
+
+### What went well
+- [tasks completed on first try, gates that passed cleanly]
+
+### What didn't go well
+- [repeated failures, escalations, agent errors, orchestrator issues]
+
+### What can be improved
+- [lessons captured, recurring patterns, pipeline suggestions]
+```
+
+Then check if the post-mortem revealed operational learnings about the codebase (e.g. model initializer gotchas, SwiftData threading rules, architecture constraints not yet documented). If so, update `ralph/AGENTS.md` in the worktree and commit:
+
+```bash
+cd "$WORKTREE" && git add ralph/AGENTS.md && git -c commit.gpgsign=false commit -m "ralph: update AGENTS.md with operational learnings" 2>/dev/null
+```
+
+Do NOT skip this step.
+
 ## Step 5b — Worktree cleanup
 
 ```bash
