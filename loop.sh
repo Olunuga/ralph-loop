@@ -282,14 +282,13 @@ run_gate_with_fix() {
                         echo "GATE $GATE: HIGH BLAST RADIUS (score $BR_SCORE) — deferring to tech debt."
                         echo "- Post-loop $GATE: DEFERRED (blast radius $BR_SCORE, layers: $BR_LAYERS)" >> progress.txt
 
-                        # Create GitHub issue for tech debt if gh is available
-                        if command -v gh &>/dev/null; then
-                            ISSUE_BODY="## Architectural Improvement (Deferred by Ralph Pipeline)
+                        ISSUE_TITLE="Tech Debt: $AFFECTED_TYPE — $(echo "$FIRST_FAIL" | head -1 | sed 's/^[0-9]*: FAIL — //')"
+                        ISSUE_BODY="## Architectural Improvement (Deferred by Ralph Pipeline)
 
 **Branch:** \`$BRANCH\`
 **Gate:** $GATE
 **Affected type:** \`$AFFECTED_TYPE\`
-**Blast radius score:** $BR_SCORE/8
+**Blast radius score:** $BR_SCORE/10
 
 ### Blast Radius Analysis
 \`\`\`
@@ -307,19 +306,39 @@ The blast radius score ($BR_SCORE) exceeds the auto-fix threshold. This change t
 ### Recommended approach
 Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate callers incrementally across multiple PRs, then remove the old path."
 
-                            gh issue create \
-                                --title "Tech Debt: $AFFECTED_TYPE — $(echo "$FIRST_FAIL" | head -1 | sed 's/^[0-9]*: FAIL — //')" \
-                                --body "$ISSUE_BODY" \
-                                --label "tech-debt" 2>/dev/null \
-                            && echo "GitHub issue created." \
-                            || echo "Issue creation failed — log manually."
+                        # Always write to file as backup
+                        {
+                            echo ""
+                            echo "---"
+                            echo "## $ISSUE_TITLE"
+                            echo "Date: $(date '+%Y-%m-%d')"
+                            echo ""
+                            echo "$ISSUE_BODY"
+                        } >> ralph/deferred_issues.md
+
+                        # Try GitHub issue — check for duplicates first
+                        if command -v gh &>/dev/null; then
+                            EXISTING=$(gh issue list --search "Tech Debt: $AFFECTED_TYPE" --state open --limit 1 --json number --jq '.[0].number' 2>/dev/null || true)
+                            if [[ -n "$EXISTING" ]]; then
+                                echo "Existing issue #$EXISTING found — skipping duplicate."
+                                echo "- Deferred issue: existing #$EXISTING" >> progress.txt
+                            else
+                                gh issue create \
+                                    --title "$ISSUE_TITLE" \
+                                    --body "$ISSUE_BODY" \
+                                    --label "tech-debt" 2>/dev/null \
+                                && echo "GitHub issue created." \
+                                || echo "Issue creation failed — saved to ralph/deferred_issues.md."
+                            fi
+                        else
+                            echo "gh not installed — issue saved to ralph/deferred_issues.md."
                         fi
 
                         return 0  # Don't fail the gate — deferred as tech debt
                     fi
 
-                    # Low blast radius — escalate to Opus for careful fix
-                    echo "Low blast radius (score $BR_SCORE) — escalating to Opus."
+                    # Low/medium blast radius — escalate to Opus for careful fix
+                    echo "Blast radius score $BR_SCORE — escalating to Opus for careful fix."
                     printf "Fix ONLY this single issue. Change as few files as possible. Do not refactor broadly.\nAffected type: %s (blast radius score: %s, layers: %s)\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                         "$AFFECTED_TYPE" "$BR_SCORE" "$BR_LAYERS" "$GATE" "$FIRST_FAIL" "$OUTPUT" \
                     | claude_run_deep 2>/dev/null

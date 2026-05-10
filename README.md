@@ -184,8 +184,10 @@ The analysis (`scripts/blast_radius.sh`) measures four dimensions:
 The composite score (0-10) determines the action:
 
 - **Score 0-3 (auto)**: Escalate to Opus for a careful, contained fix
-- **Score 4-6 (conditional)**: Auto-fix only if the change stays within one architectural layer, otherwise defer
+- **Score 4-6 (conditional)**: Escalate to Opus, but only if the change stays within one architectural layer — otherwise defer
 - **Score 7-10 (defer)**: Create a GitHub issue labeled `tech-debt` with the gate feedback, blast radius report, and recommended refactoring approach. The gate passes — architectural improvements don't block feature delivery
+
+Deferred issues are always saved to `ralph/deferred_issues.md` as a backup (in case `gh` is unavailable). Duplicate GitHub issues are detected via search before creation.
 
 All thresholds are configurable per-project via `ralph/gate_context.md`:
 

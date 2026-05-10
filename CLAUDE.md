@@ -64,7 +64,7 @@ Each LLM gate retry can invent new complaints instead of re-checking the same cr
 
 Based on the composite score (0-10):
 - **Score 0-3**: Escalate to Opus for careful, contained fix
-- **Score 4-6**: Auto-fix only if change stays within one architectural layer
+- **Score 4-6**: Escalate to Opus, but only if change stays within one layer — otherwise defer
 - **Score 7-10**: Defer — create GitHub issue as tech debt, don't fail the gate
 
 Thresholds are configurable per-project via `ralph/gate_context.md`.
