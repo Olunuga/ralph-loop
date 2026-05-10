@@ -33,7 +33,13 @@ Both can block the same operation for different reasons. When debugging, check w
 `loop.sh` spawns `claude -p` subprocesses. These cannot run inside an existing Claude Code session. The `/ralph` skill must use the Bash tool's `run_in_background: true` parameter — NOT shell backgrounding (`&`).
 
 ### `set -euo pipefail` kills the loop
-Any uncaught error in a `claude -p` call, `git push`, or API timeout kills the entire script. Agent calls are wrapped with `|| AGENT_OK=false` to catch failures and continue to the next iteration.
+Any uncaught error in a `claude -p` call, `git push`, or API timeout kills the entire script. Agent calls are wrapped with `|| AGENT_OK=false` (build loop) and `|| echo "WARN: ..."` (run_gate_with_fix) to catch failures and continue.
+
+### Rollback must undo commits, not just uncommitted changes
+The build agent commits its work before gates run. `git checkout HEAD -- <file>` only reverts uncommitted changes — committed code is untouched. `rollback_all` and `rollback_files` now detect agent commits from the current iteration (via `git log --grep="^ralph:" --since="5 minutes ago"`) and `git reset HEAD~N` to undo them before reverting files.
+
+### Branch must be pushed before PR creation
+The per-iteration push (line ~719) only fires after a green iteration. If gates fail after the agent committed, the branch is never pushed. A `git push` is now added before `gh pr create` in the post-loop section.
 
 ### `caffeinate -i` prevents idle sleep
 The script re-execs itself under `caffeinate -i` on macOS to prevent the system from sleeping during long pipeline runs. Uses `RALPH_CAFFEINATED` env var to avoid re-wrapping.
