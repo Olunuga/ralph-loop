@@ -464,14 +464,23 @@ $PROMPT"
         fi
 
         # Model escalation: Haiku → Sonnet (after 2 fails) → Opus (after 4 fails)
+        AGENT_OK=true
         if [[ "$CONSEC_FAIL" -ge 4 ]]; then
             echo "  (escalating to Opus after $CONSEC_FAIL consecutive failures on $LAST_FAIL_GATE)"
-            echo "$PROMPT" | claude_run_deep
+            echo "$PROMPT" | claude_run_deep || AGENT_OK=false
         elif [[ "$CONSEC_FAIL" -ge 2 ]]; then
             echo "  (escalating to Sonnet after $CONSEC_FAIL consecutive failures on $LAST_FAIL_GATE)"
-            echo "$PROMPT" | claude_run
+            echo "$PROMPT" | claude_run || AGENT_OK=false
         else
-            echo "$PROMPT" | claude_run_fast
+            echo "$PROMPT" | claude_run_fast || AGENT_OK=false
+        fi
+
+        if [[ "$AGENT_OK" == false ]]; then
+            echo "WARN: Agent call failed — retrying next iteration."
+            echo "- Iter $((ITER+1)): agent error (API timeout or crash)" >> progress.txt
+            [[ "$LAST_FAIL_GATE" == "agent" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="agent"; }
+            write_loop_status "$((ITER+1))"
+            ITER=$((ITER + 1)) && continue
         fi
 
         # ── 1. Build ─────────────────────────────────────────────────────────────

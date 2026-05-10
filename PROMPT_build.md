@@ -16,6 +16,7 @@
 
 1. Implement the chosen task.
   - Follow the reference pattern noted in the task (check IMPLEMENTATION_PLAN.md).
+  - Before writing tests, read the initializer signatures of every model/type you will instantiate in the test. Do not guess init parameters — get them from the source.
   - Use subagents for all reads. Use only 1 subagent for build/test runs.
   - If the task requires a new Swift file:
   a. Create the file in the correct source subdirectory.
