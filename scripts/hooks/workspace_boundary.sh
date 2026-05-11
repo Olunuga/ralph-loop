@@ -47,8 +47,10 @@ is_outside_workspace() {
     [[ -z "$path" ]] && return 1          # empty path — allow
     [[ "$path" != /* ]] && return 1       # relative path — allow
     [[ "$path" == /dev/* ]] && return 1   # standard devices (/dev/null etc) — allow
-    [[ "$path" == "${TMPDIR}"* ]] && return 1  # system temp directory — allow
-    [[ "$path" == /private/tmp/* ]] && return 1  # macOS temp fallback — allow
+    [[ "$path" == "${TMPDIR}"* ]] && return 1          # system temp directory — allow
+    [[ "$path" == "${TMPDIR/#\/tmp/\/private\/tmp}"* ]] && return 1  # resolved symlink — allow
+    [[ "$path" == /tmp/* ]] && return 1                # /tmp paths — allow
+    [[ "$path" == /private/tmp/* ]] && return 1        # macOS resolved /tmp — allow
     local resolved
     resolved=$(python3 -c "
 import os, sys
