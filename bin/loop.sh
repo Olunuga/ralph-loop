@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # ── Usage ──────────────────────────────────────────────────────────────────────
-# ./ralph/loop.sh                          # build loop, unlimited iterations
-# ./ralph/loop.sh 15                       # build loop, max 15 iterations
-# ./ralph/loop.sh bootstrap                # one-time: discover codebase → ralph/AGENTS.md
-# ./ralph/loop.sh plan                     # gap analysis: all specs vs codebase
-# ./ralph/loop.sh plan-work "desc" [N]     # scoped plan for one feature
-# ./ralph/loop.sh post-loop                # re-run post-loop gates after manual fix
+# loop.sh                          # build loop, unlimited iterations
+# loop.sh 15                       # build loop, max 15 iterations
+# loop.sh bootstrap                # one-time: discover codebase → ralph/AGENTS.md
+# loop.sh plan                     # gap analysis: all specs vs codebase
+# loop.sh plan-work "desc" [N]     # scoped plan for one feature
+# loop.sh post-loop                # re-run post-loop gates after manual fix
 
 # ── Prevent sleep ──────────────────────────────────────────────────────────────
 # caffeinate -i keeps the system awake (idle sleep inhibited) while the loop runs.
@@ -18,8 +18,11 @@ if [[ -z "${RALPH_CAFFEINATED:-}" ]] && command -v caffeinate &>/dev/null; then
 fi
 
 # ── Resolve paths ──────────────────────────────────────────────────────────────
-RALPH_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(CDPATH= cd "$RALPH_DIR/.." && pwd)"
+# RALPH_PLUGIN_DIR = where pipeline code lives (prompts, gates, scripts)
+# PROJECT_ROOT = the target project (config.sh, AGENTS.md, specs/)
+SCRIPT_SELF="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export RALPH_PLUGIN_DIR="$(CDPATH= cd "$SCRIPT_SELF/.." && pwd)"
+PROJECT_ROOT="$(pwd)"
 cd "$PROJECT_ROOT"
 
 # ── Mode ───────────────────────────────────────────────────────────────────────
@@ -32,29 +35,29 @@ case "${1:-}" in
     bootstrap)  MODE="bootstrap" ;;
     plan)       MODE="plan";      MAX_ITERATIONS="${2:-0}" ;;
     plan-work)
-        [[ -z "${2:-}" ]] && { echo "Usage: ./ralph/loop.sh plan-work \"description\" [N]"; exit 1; }
+        [[ -z "${2:-}" ]] && { echo "Usage: loop.sh plan-work \"description\" [N]"; exit 1; }
         MODE="plan-work"; WORK_DESCRIPTION="$2"; MAX_ITERATIONS="${3:-3}"
         ;;
     post-loop)  MODE="post-loop" ;;
     "" | [0-9]*) MODE="build"; [[ "${1:-}" =~ ^[0-9]+$ ]] && MAX_ITERATIONS="$1" ;;
-    *) echo "Usage: ./ralph/loop.sh [bootstrap|plan|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
+    *) echo "Usage: loop.sh [bootstrap|plan|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
 esac
 
 # ── Config (not needed for bootstrap) ─────────────────────────────────────────
 if [[ "$MODE" != "bootstrap" ]]; then
-    [[ ! -f "ralph/config.sh" ]] && {
+    [[ ! -f "$PROJECT_ROOT/ralph/config.sh" ]] && {
         echo "ERROR: ralph/config.sh not found."
-        echo "Run: ./ralph/loop.sh bootstrap"
+        echo "Run: loop.sh bootstrap"
         exit 1
     }
     # shellcheck source=/dev/null
-    source "ralph/config.sh"
+    source "$PROJECT_ROOT/ralph/config.sh"
 fi
 
 # ── Runtime state ──────────────────────────────────────────────────────────────
 BRANCH=$(git branch --show-current)
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
-SPEC_TITLE=$(find ralph/specs -name "*.md" 2>/dev/null \
+SPEC_TITLE=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" 2>/dev/null \
     | xargs grep -h "^# " 2>/dev/null | head -1 | sed 's/^# //' \
     || echo "$BRANCH")
 
@@ -115,11 +118,11 @@ notify_failure() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "STOPPED: $GATE failed after $MAX_FIX_ITERATIONS attempts."
     echo "Branch:  $BRANCH"
-    echo "Fix manually, then run: ./ralph/loop.sh post-loop"
+    echo "Fix manually, then run: loop.sh post-loop"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     if [[ -n "$SLACK_WEBHOOK" ]]; then
-        local MSG="ralph needs human on $BRANCH\n\nGate: $GATE\nLast: $(git log -1 --format='%s')\n\n$DETAILS\n\nFix, then: ./ralph/loop.sh post-loop"
+        local MSG="ralph needs human on $BRANCH\n\nGate: $GATE\nLast: $(git log -1 --format='%s')\n\n$DETAILS\n\nFix, then: loop.sh post-loop"
         curl -s -X POST "$SLACK_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{\"text\":\"$(echo -e "$MSG" | sed 's/"/\\"/g')\"}" > /dev/null || true
@@ -197,11 +200,11 @@ open('$ctx_file', 'w').write('\n'.join(blocks[-5:]))
 }
 
 # Capture a lesson when the agent breaks through a struggle (CONSEC_FAIL >= 2 → green).
-# Appends the error pattern and fix diff to ralph/lessons.md for future sessions.
+# Appends the error pattern and fix diff to $PROJECT_ROOT/ralph/lessons.md for future sessions.
 capture_lesson() {
     local gate="$1"
     local consec="$2"
-    local lessons_file="ralph/lessons.md"
+    local lessons_file="$PROJECT_ROOT/ralph/lessons.md"
 
     # Extract last failure block from iteration context
     local last_error
@@ -239,7 +242,7 @@ capture_lesson() {
 # Write structured status for orchestrator to poll.
 write_loop_status() {
     local iter="$1"
-    cat > ralph/.loop_status <<STAT
+    cat > "$PROJECT_ROOT/ralph/.loop_status" <<STAT
 iteration=$iter
 result=$(tail -1 progress.txt 2>/dev/null | sed 's/^- Iter [0-9]*: //')
 consec_fail=$CONSEC_FAIL
@@ -284,7 +287,7 @@ run_gate_with_fix() {
 
             if [[ -n "$AFFECTED_TYPE" ]]; then
                 echo "Blast radius analysis for $AFFECTED_TYPE..."
-                BR_OUTPUT=$(bash ralph/scripts/blast_radius.sh "$AFFECTED_TYPE" "${SOURCE_DIR:-.}" 2>/dev/null || true)
+                BR_OUTPUT=$(bash $RALPH_PLUGIN_DIR/scripts/blast_radius.sh "$AFFECTED_TYPE" "${SOURCE_DIR:-.}" 2>/dev/null || true)
 
                 if [[ -n "$BR_OUTPUT" ]]; then
                     BR_SCORE=$(echo "$BR_OUTPUT" | grep "^BLAST_SCORE=" | cut -d= -f2)
@@ -329,7 +332,7 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
                             echo "Date: $(date '+%Y-%m-%d')"
                             echo ""
                             echo "$ISSUE_BODY"
-                        } >> ralph/deferred_issues.md
+                        } >> "$PROJECT_ROOT/ralph/deferred_issues.md"
 
                         # Try GitHub issue — check for duplicates first
                         if command -v gh &>/dev/null; then
@@ -343,10 +346,10 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
                                     --body "$ISSUE_BODY" \
                                     --label "tech-debt" 2>/dev/null \
                                 && echo "GitHub issue created." \
-                                || echo "Issue creation failed — saved to ralph/deferred_issues.md."
+                                || echo "Issue creation failed — saved to $PROJECT_ROOT/ralph/deferred_issues.md."
                             fi
                         else
-                            echo "gh not installed — issue saved to ralph/deferred_issues.md."
+                            echo "gh not installed — issue saved to $PROJECT_ROOT/ralph/deferred_issues.md."
                         fi
 
                         return 0  # Don't fail the gate — deferred as tech debt
@@ -377,7 +380,7 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
         fi
 
         # Ensure the fix didn't break hard gates
-        if ! bash ralph/scripts/run_static_gates.sh fast > /dev/null 2>&1; then
+        if ! bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh fast > /dev/null 2>&1; then
             echo "Fix broke gates — reverting."
             rollback_all
             continue
@@ -413,11 +416,11 @@ if [[ "$MODE" == "bootstrap" ]]; then
     echo "Bootstrap — generating ralph/AGENTS.md"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    cat ralph/PROMPT_bootstrap.md | claude_run
+    cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_bootstrap.md" | claude_run
 
-    if [[ ! -f "ralph/AGENTS.md" ]]; then
+    if [[ ! -f "$PROJECT_ROOT/ralph/AGENTS.md" ]]; then
         echo ""
-        echo "WARNING: ralph/AGENTS.md was not created."
+        echo "WARNING: ralph/AGENTS.md was not created. Check the output above."
         echo "Check the output above and run bootstrap again."
         exit 1
     fi
@@ -425,10 +428,9 @@ if [[ "$MODE" == "bootstrap" ]]; then
     echo ""
     echo "Done. Next steps:"
     echo "  1. Review ralph/AGENTS.md"
-    echo "  2. Update BUILD_CMD / UNIT_TEST_CMD in ralph/config.sh with the discovered commands"
-    echo "  3. Create ralph/specs/[ticket].md from your L3 session"
-    echo "  4. Create a worktree: git worktree add .worktrees/[id] -b ralph/[id]"
-    echo "  5. cd .worktrees/[id] && ./ralph/loop.sh plan-work \"[feature]\" 3"
+    echo "  2. Update BUILD_CMD / UNIT_TEST_CMD in ralph/config.sh"
+    echo "  3. Run /ralph-loop:spec [ticket] to create a spec"
+    echo "  4. Run /ralph-loop:run [ticket] to start the pipeline"
     exit 0
 fi
 
@@ -445,7 +447,7 @@ if [[ "$MODE" == "plan" ]]; then
     while true; do
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
         echo "=== Plan iteration $((ITER + 1)) ==="
-        cat ralph/PROMPT_plan.md | claude_run
+        cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_plan.md" | claude_run
         ITER=$((ITER + 1))
     done
     exit 0
@@ -460,7 +462,7 @@ if [[ "$MODE" == "plan-work" ]]; then
 
         if [[ "$ITER" -eq 0 ]]; then
             # First iteration: generate from scratch
-            sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" ralph/PROMPT_plan_work.md \
+            sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" $RALPH_PLUGIN_DIR/prompts/PROMPT_plan_work.md \
                 | claude_run
         else
             # Subsequent iterations: refine, don't rewrite
@@ -472,7 +474,7 @@ if [[ "$MODE" == "plan-work" ]]; then
                 echo "Refine the plan above. Do not restart from scratch."
                 echo "Preserve tasks that are already well-specified. Focus on gaps and improvements."
                 echo "---"
-                sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" ralph/PROMPT_plan_work.md
+                sed "s|\${WORK_DESCRIPTION}|$WORK_DESCRIPTION|g" $RALPH_PLUGIN_DIR/prompts/PROMPT_plan_work.md
             } | claude_run
         fi
 
@@ -499,7 +501,7 @@ if [[ "$MODE" == "build" ]]; then
 
     [[ ! -f "IMPLEMENTATION_PLAN.md" ]] && {
         echo "ERROR: IMPLEMENTATION_PLAN.md not found."
-        echo "Run first: ./ralph/loop.sh plan-work \"[feature]\" 3"
+        echo "Run first: loop.sh plan-work \"[feature]\" 3"
         exit 1
     }
 
@@ -537,11 +539,11 @@ if [[ "$MODE" == "build" ]]; then
     fi
 
     # Detect new gates not yet calibrated in gate_context.md
-    if [[ -f "ralph/gate_context.md" ]]; then
-        for GATE_FILE in ralph/scripts/gates/static/*/*.sh; do
+    if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+        for GATE_FILE in "$RALPH_PLUGIN_DIR/scripts/gates/static"/*/*.sh "$PROJECT_ROOT/ralph/gates/static"/*/*.sh; do
             [[ -f "$GATE_FILE" ]] || continue
             GATE_NAME=$(basename "$GATE_FILE" .sh)
-            if ! grep -q "$GATE_NAME" ralph/gate_context.md 2>/dev/null; then
+            if ! grep -q "$GATE_NAME" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null; then
                 echo "WARNING: New gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
             fi
         done
@@ -587,16 +589,21 @@ if [[ "$MODE" == "build" ]]; then
         echo "=== Build iteration $((ITER + 1)) ==="
 
         # Build the prompt, prepending context if available
-        PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" ralph/PROMPT_build.md)
+        PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" "$RALPH_PLUGIN_DIR/prompts/PROMPT_build.md")
+        # Inject gate locations so build agent knows where to find them
+        PROMPT="Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/
+Gate scripts (project): $PROJECT_ROOT/ralph/gates/
+---
+$PROMPT"
         if [[ -f iteration_context.md ]]; then
             PROMPT="$(cat iteration_context.md)
 ---
 $PROMPT"
         fi
         # Load persistent lessons when struggling
-        if [[ "$CONSEC_FAIL" -ge 2 && -f "ralph/lessons.md" ]]; then
+        if [[ "$CONSEC_FAIL" -ge 2 && -f "$PROJECT_ROOT/ralph/lessons.md" ]]; then
             PROMPT="Lessons from previous sessions (follow these):
-$(cat ralph/lessons.md)
+$(cat "$PROJECT_ROOT/ralph/lessons.md")
 ---
 $PROMPT"
         fi
@@ -655,7 +662,7 @@ $PROMPT"
 
         # ── 3. Code quality + architecture gates (fast tier) ────────────────────
         GATE_OUTPUT=""
-        if ! GATE_OUTPUT=$(bash ralph/scripts/run_static_gates.sh fast 2>&1); then
+        if ! GATE_OUTPUT=$(bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh fast 2>&1); then
             echo "GATES: Violation detected."
             echo "$GATE_OUTPUT"
 
@@ -718,7 +725,7 @@ $PROMPT"
             echo "HARD: Build agent marked tasks done but did not commit."
             echo "  Uncommitted changes detected — commit may have been blocked."
             echo "  Attempting commit on behalf of agent..."
-            git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md ralph/.loop_status 2>/dev/null
+            git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md "$PROJECT_ROOT/ralph/.loop_status" 2>/dev/null
             git -c commit.gpgsign=false commit -m "ralph: auto-commit (agent commit was blocked)" 2>/dev/null || {
                 echo "  Auto-commit also failed — rolling back."
                 append_failure_context "commit" "Agent completed tasks but commit failed. Check git/SSH permissions." "$((ITER+1))"
@@ -754,10 +761,10 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     # Gate 1: Precise-tier static gates (cheap, deterministic — run first to fail fast)
-    run_gate_with_fix "GATES_PRECISE" "bash ralph/scripts/run_static_gates.sh precise"
+    run_gate_with_fix "GATES_PRECISE" "bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh precise"
 
     # Gate 2: LLM gates — semantic review (max 2 retries — more retries cause divergence)
-    run_gate_with_fix "LLM_GATES" "bash ralph/scripts/run_llm_gates.sh" 2
+    run_gate_with_fix "LLM_GATES" "bash $RALPH_PLUGIN_DIR/scripts/run_llm_gates.sh" 2
 
     # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""
@@ -826,7 +833,7 @@ ${UI_LINE}
 ### Reviewer checklist
 - [ ] Run on simulator or device
 - [ ] Dark mode
-- [ ] API surface matches ralph/specs/
+- [ ] API surface matches spec
 - [ ] Build log has no unexpected rollbacks"
 
     echo "=== Pipeline finished: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
