@@ -1,6 +1,18 @@
-# Ralph-Loop — Operational Knowledge
+# Ralph-Loop Plugin — Operational Knowledge
 
 This file documents known issues, fixes, and gotchas discovered through test runs. Read this before modifying the pipeline to avoid re-fixing solved problems.
+
+## Plugin Architecture
+
+- `bin/` — entry points on PATH (loop.sh, blast_radius.sh)
+- `scripts/` — internal scripts called by loop.sh (gates, dispatchers, hook)
+- `prompts/` — prompt templates fed to claude -p by loop.sh
+- `skills/` — user-facing commands (/ralph-loop:run, /ralph-loop:spec, /ralph-loop:init, /ralph-loop:migrate)
+- `settings.json` — default permissions
+
+Two path roots in all scripts:
+- `$RALPH_PLUGIN_DIR` — plugin directory (prompts, gates, scripts). Set by loop.sh, inherited by children.
+- `$PROJECT_ROOT` — target project (config.sh, AGENTS.md, specs/, custom gates). Defaults to `pwd`.
 
 ## Workspace Boundary Hook (`scripts/hooks/workspace_boundary.sh`)
 
