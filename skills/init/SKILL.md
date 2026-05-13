@@ -1,5 +1,5 @@
 ---
-name: ralph-init
+name: init
 description: One-time setup of the Ralph autonomous dev pipeline for a new project
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
@@ -11,15 +11,18 @@ Run each step in order. Tell the user which step you are on.
 
 ---
 
-## Step 1 — Confirm ralph/ is present
+## Step 1 — Create project directories
 
-Check that `ralph/loop.sh` exists. If not, stop and tell the user:
-"Copy the `ralph/` directory into this project root first, then re-run /ralph-init."
-
-Make scripts executable:
+Create the ralph project shell if it doesn't exist:
 ```bash
-chmod +x ralph/loop.sh
-find ralph/scripts -name "*.sh" -exec chmod +x {} \;
+mkdir -p ralph/specs ralph/gates/static ralph/gates/llm ralph/scripts/hooks
+```
+
+Copy the workspace boundary hook from the plugin:
+```bash
+PLUGIN_DIR="$(dirname "$(which loop.sh)")/.."
+cp "$PLUGIN_DIR/scripts/hooks/workspace_boundary.sh" ralph/scripts/hooks/workspace_boundary.sh
+chmod +x ralph/scripts/hooks/workspace_boundary.sh
 ```
 
 ---
@@ -54,13 +57,12 @@ From the output, infer:
 - `SIMULATOR` — the newest iPhone simulator available (prefer iPhone 16, fallback to highest number)
 - `SOURCE_DIR` — the directory matching the scheme name (or xcodeproj name without extension)
 
-If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty. Read `RALPH_VERSION` from it if present.
+If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty.
 
 Present everything you discovered to the user in a single AskUserQuestion:
 
 "Here's what I found — please confirm or correct:
 
-  Ralph version:   <from config.sh or 'main'>
   App name:        <inferred or 'unknown'>
   Description:     <from config.sh or 'unknown'>
   .xcodeproj:      <discovered>
@@ -82,9 +84,7 @@ Apply any corrections the user gives, then write `ralph/config.sh`.
 ```bash
 #!/bin/bash
 # ralph/config.sh — Project build configuration for the Ralph loop.
-# Sourced by ralph/loop.sh on every run.
-
-RALPH_VERSION="<ralph_version>"
+# Sourced by loop.sh on every run.
 
 APP_NAME="<app_name>"
 APP_DESCRIPTION="<description>"
@@ -136,16 +136,13 @@ Check if `.claude/settings.json` already exists. If it does, read it and merge t
 
 If it does not exist, create `.claude/` and write:
 
-Note: the workspace boundary hook (`ralph/scripts/hooks/workspace_boundary.sh`) enforces two layers:
-1. Direct absolute paths in any Bash command
-2. Contents of any shell script the agent executes — closing the backdoor where a script is written inside the workspace to reference outside paths
-
 ```json
 {
   "permissions": {
     "allow": [
-      "Bash(bash ralph/loop.sh*)",
-      "Bash(cd .worktrees/* && bash ralph/loop.sh*)",
+      "Bash(loop.sh*)",
+      "Bash(blast_radius.sh*)",
+      "Bash(cd .worktrees/* && loop.sh*)",
       "Bash(git worktree add*)",
       "Bash(git worktree remove*)",
       "Bash(git worktree list*)",
@@ -209,7 +206,7 @@ done
 Run the bootstrap to let Claude discover the codebase architecture:
 
 ```bash
-bash ralph/loop.sh bootstrap 2>&1
+loop.sh bootstrap 2>&1
 ```
 
 This generates `ralph/AGENTS.md`. Wait for it to complete, then read the file and show a summary to the user.
@@ -222,11 +219,11 @@ Apply any corrections the user requests, then save.
 
 ## Step 7 — Commit ralph/ to git
 
-Ralph must be tracked in git so that worktrees created by `/ralph` include the pipeline files.
+Ralph project files must be tracked in git so that worktrees include them.
 
 ```bash
 git add ralph/ .claude/settings.json .gitignore
-git -c commit.gpgsign=false commit -m "chore: add ralph autonomous pipeline"
+git -c commit.gpgsign=false commit -m "chore: configure ralph autonomous pipeline"
 ```
 
 ---
@@ -237,12 +234,13 @@ Tell the user:
 
 "Ralph is set up and committed. Here's what was configured:
 - ralph/config.sh — build commands for <app_name>
+- ralph/gates/ — directory for custom project gates
 - .claude/settings.json — workspace boundary hook active
 - ralph/AGENTS.md — codebase architecture documented
 
-Skills (/spec, /ralph, /ralph-init, /ralph-update) are installed globally
-via 'npx skills add Olunuga/ralph-loop'. If not installed yet, run that first.
-
 Next steps:
-  /spec TICKET-001   — describe a feature, get a spec
-  /ralph TICKET-001  — run the autonomous pipeline"
+  /ralph-loop:spec TICKET-001   — describe a feature, get a spec
+  /ralph-loop:run TICKET-001    — run the autonomous pipeline
+
+To add custom gates, drop .sh files into ralph/gates/static/<category>/
+or .md files into ralph/gates/llm/. See the plugin README for details."

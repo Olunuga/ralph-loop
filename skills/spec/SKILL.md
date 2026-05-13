@@ -92,4 +92,4 @@ git -c commit.gpgsign=false commit -m "spec: <slug>"
 git checkout -
 ```
 
-Confirm: "Spec written to branch spec/<slug> — run /ralph <slug> when ready."
+Confirm: "Spec written to branch spec/<slug> — run /ralph-loop:run <slug> when ready."
