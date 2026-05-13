@@ -416,7 +416,12 @@ if [[ "$MODE" == "bootstrap" ]]; then
     echo "Bootstrap — generating ralph/AGENTS.md"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_bootstrap.md" | claude_run
+    {
+        echo "Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/"
+        echo "Gate scripts (project): $PROJECT_ROOT/ralph/gates/"
+        echo "---"
+        cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_bootstrap.md"
+    } | claude_run
 
     if [[ ! -f "$PROJECT_ROOT/ralph/AGENTS.md" ]]; then
         echo ""
