@@ -174,14 +174,14 @@ Write AUDIENCE_JTBD.md first (lives at ralph/AUDIENCE_JTBD.md, not in specs/):
 
 ```bash
 git add ralph/AUDIENCE_JTBD.md
-git commit -m "spec: audience and JTBDs"
+git -c commit.gpgsign=false commit -m "spec: audience and JTBDs"
 ```
 
 Write each activity spec and commit individually:
 
 ```bash
 git add ralph/specs/<activity-slug>.md
-git commit -m "spec: <activity-slug>"
+git -c commit.gpgsign=false commit -m "spec: <activity-slug>"
 ```
 
 Return to previous branch:

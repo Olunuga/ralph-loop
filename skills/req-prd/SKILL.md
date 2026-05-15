@@ -97,8 +97,14 @@ Write each spec and commit individually:
 
 ```bash
 git add ralph/specs/<topic-slug>.md
-git commit -m "spec: <topic-slug>"
+git -c commit.gpgsign=false commit -m "spec: <topic-slug>"
+```
+
+After all specs are committed, return to previous branch:
+```bash
 git checkout -
 ```
+
+Do NOT suggest a build order or implementation sequence — that is the planning prompt's job, not the spec's.
 
 Confirm: "N specs written to branch spec/<slug> — run /ralph-loop:run <slug> when ready."
