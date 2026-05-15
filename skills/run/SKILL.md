@@ -102,8 +102,10 @@ While waiting, periodically check progress by reading files **inside the worktre
 cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 ```
 
+The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
+
 Report progress to the user as iterations complete:
-- If `result` changed to `green`: report — "Iteration N complete. M tasks remaining."
+- If `result` changed to `green`: report — "Iteration N: green. Tasks: D done / T total. Commits: C. (G green, F failed iterations so far)."
 - If `consec_fail` reaches 2: **spawn the diagnostician agent** while the loop continues. Use the Agent tool with the `ralph-loop:diagnostician` agent. Tell it to read `$WORKTREE/iteration_context.md` and the relevant source files. When it returns, append its diagnosis to `$WORKTREE/iteration_context.md` using the Write tool. Report the diagnosis to the user. The loop picks up the diagnosis automatically on the next iteration.
 - If `consec_fail` reaches 3 or higher: report the diagnostician's analysis to the user. Do NOT ask the user to intervene — let the loop continue. The loop handles model escalation (Sonnet at 2, Opus at 4) automatically.
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
