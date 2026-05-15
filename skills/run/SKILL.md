@@ -2,13 +2,15 @@
 name: run
 description: Run the Ralph autonomous development pipeline for a spec
 arguments: [ref]
-allowed-tools: Bash Read Write Edit AskUserQuestion Monitor
+allowed-tools: Bash Read Write Edit AskUserQuestion Monitor TaskCreate TaskUpdate TaskList Agent
 disable-model-invocation: true
 ---
 
 You are running the Ralph autonomous development pipeline.
 
 Reference: $ref
+
+**ALWAYS use TaskCreate and TaskUpdate to track pipeline progress.** Create a task for each major phase (plan, shared deps, each spec build, merge, final gates, post-mortem, PR). Mark tasks as `in_progress` when starting and `completed` when done. This gives the user a live progress view throughout the run.
 
 ## Step 1 — Find and show the spec
 
