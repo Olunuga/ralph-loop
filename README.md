@@ -87,6 +87,16 @@ This preserves your config, AGENTS.md, and specs, moves any custom gates to `ral
 
 SLC mode captures the **full activity space** upfront (basic → enhanced → advanced depths per activity). Planning then recommends the narrowest **Simple, Lovable, Complete** slice. Deferred activities stay visible as backlog. `ralph/AUDIENCE_JTBD.md` persists across releases — no re-interviews needed.
 
+### Resuming an incomplete run
+
+If the loop exits early (iteration budget exhausted, laptop slept, session ended), re-run the same command:
+
+```
+/ralph-loop:run my-feature         # detects existing commits, picks up remaining tasks
+```
+
+The pipeline detects prior `ralph:` commits on the branch, reconciles the plan (marks completed tasks), and continues from where it left off. No work is lost — committed code survives across runs.
+
 ### Post-merge cleanup
 
 ```
