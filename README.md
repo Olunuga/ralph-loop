@@ -8,11 +8,26 @@ Distributed as a **Claude Code plugin**.
 
 1. `/ralph-loop:spec` — structured JTBD conversation produces a spec committed to a `spec/<slug>` branch
 2. `/ralph-loop:run` — orchestrates the pipeline: creates a worktree, plans the work, runs the build loop, gates the output
-3. Build loop runs Claude (Haiku for iterations, Sonnet on escalation) autonomously: build → unit tests → static gates (code quality, architecture, security, accessibility) → lint → commit
-4. Post-loop gates: precise static gates → LLM gates (semantic review with blast radius analysis) → UI tests → opens a draft PR via `gh` → worktree cleanup
-5. You review the branch and merge
+3. **Single spec**: build loop in one worktree — Haiku for iterations, Sonnet/Opus on escalation
+4. **Multi-spec (2+ specs)**: parallel pipeline — shared deps built first, then one spec-builder agent per spec runs in parallel, then merge + final gates
+5. Post-loop gates: precise static gates → LLM gates (with blast radius analysis) → UI tests → draft PR
+6. You review the branch and merge
 
 Human decisions: spec approval and branch review. Everything else is automated.
+
+### Parallel builds
+
+When 2+ specs are on a branch, the orchestrator automatically switches to parallel mode:
+
+```
+Phase 1: Plan — decompose into shared deps + per-spec tasks
+Phase 2: Build shared deps (sequential, ~3 iterations)
+Phase 3: Parallel spec builds (one agent per spec, ~7 iterations each)
+Phase 4: Merge + resolve conflicts
+Phase 5: Final gates on merged branch + draft PR
+```
+
+Each spec-builder agent runs in its own worktree with independent iteration budget, failure tracking, and model escalation. The orchestrator monitors all agents and spawns the diagnostician when any agent is struggling.
 
 ### Model usage
 

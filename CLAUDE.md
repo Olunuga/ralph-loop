@@ -9,16 +9,22 @@ This is the **plugin source code**, not a target project. When a user runs `clau
 
 ### How it works end-to-end
 1. User installs plugin → runs `/ralph-loop:init` in their project → writes `ralph/config.sh`, `ralph/AGENTS.md`, `.claude/settings.json`
-2. User runs `/ralph-loop:spec my-feature` → structured conversation → spec committed to `spec/my-feature` branch
+2. User runs `/ralph-loop:spec my-feature` (or `req-prd`/`req-slc` for multi-spec) → specs committed to `spec/my-feature` branch
 3. User runs `/ralph-loop:run my-feature` → orchestrator creates worktree, plans, runs build loop, gates, post-mortem, opens PR
-4. Build loop (`bin/loop.sh`) spawns `claude -p` per iteration → agent writes code → build → test → static gates → commit → repeat
-5. Post-loop: precise gates → LLM gates (with blast radius routing) → UI tests → draft PR
+4. **Single spec**: build loop in one worktree, sequential iterations
+5. **Multi-spec (2+ specs)**: parallel pipeline — plan decomposes into shared deps + per-spec tasks → shared deps built first → spec-builder agents run in parallel (one per spec) → merge → final gates
+6. Post-loop: precise gates → LLM gates (with blast radius routing) → UI tests → draft PR
 
 ### File roles
 
 **`bin/` — entry points (on PATH)**
 - `loop.sh` — the core engine (800+ lines). Handles mode dispatch (bootstrap/plan/build/post-loop), model escalation (Haiku→Sonnet→Opus), iteration logic, gate orchestration, rollback, lesson capture, blast radius routing, PR creation. This is the most complex file — read it thoroughly before changing.
 - `blast_radius.sh` — measures impact of a type across 5 dimensions (fan-out, coupling, layers, infra reach, test coupling). Called by `run_gate_with_fix` in loop.sh and directly by the orchestrator skill.
+- `cleanup_specs.sh` — archives completed specs to `ralph/specs/done/`, deletes spec branches.
+
+**`agents/` — plugin agents**
+- `diagnostician.md` — Opus-powered diagnostic agent. Spawned by orchestrator at consec_fail=2 to read errors and write targeted diagnosis.
+- `spec-builder.md` — Sonnet-powered build agent. Manages one spec's full lifecycle in a worktree (create, loop, gates, report). Spawned during parallel multi-spec builds.
 
 **`scripts/` — internal (called by loop.sh, not on PATH)**
 - `run_static_gates.sh` — discovers and runs `.sh` gate scripts from both plugin and project directories. Handles tier filtering (fast/precise), category filtering, SKIP overrides from gate_context.md, deduplication (project overrides plugin).
