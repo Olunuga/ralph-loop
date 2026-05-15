@@ -79,6 +79,7 @@ check_paths() {
     while IFS= read -r token; do
         [[ -z "$token" ]] && continue
         [[ "$token" == *'*'* || "$token" == *'?'* ]] && continue  # skip glob patterns
+        [[ "${token:1}" != */* ]] && continue  # skip /filename with no directory (e.g. /iteration_context.md)
         if is_outside_workspace "$token"; then
             block "$label references path outside workspace: '$token'"
         fi
