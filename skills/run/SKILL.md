@@ -142,7 +142,7 @@ Using the Read and Write tools, split these into separate files in the worktree:
 - `$WORKTREE/IMPLEMENTATION_PLAN_shared.md` — shared section (if any tasks)
 - `$WORKTREE/IMPLEMENTATION_PLAN_<spec-name>.md` — per-spec section for each spec
 
-### Phase 2: Build shared dependencies
+### Phase 2: Build shared dependencies + gate-clean base
 
 If `IMPLEMENTATION_PLAN_shared.md` has tasks:
 
@@ -156,24 +156,32 @@ cd "$WORKTREE" && loop.sh 3 2>&1
 
 Monitor as in Step 4 (poll .loop_status, spawn diagnostician if stuck).
 
-After the loop completes, note the shared base commit:
+After shared deps are built, run a gate-fix pass on the shared base to eliminate pre-existing violations. This prevents parallel agents from wasting budget re-fixing the same gate issues.
+
+```bash
+cd "$WORKTREE" && loop.sh post-loop 2>&1
+```
+
+Note the shared base commit (this is the clean, gate-passing base all specs fork from):
 ```bash
 git -C "$WORKTREE" rev-parse HEAD
 ```
 
-If no shared deps, the shared base is the current HEAD.
+If no shared deps, still run the gate-fix pass to clean the base, then note HEAD.
 
 ### Phase 3: Spawn parallel spec-builder agents
 
-For EACH per-spec plan, spawn an `ralph-loop:spec-builder` agent **in parallel**. Use the Agent tool — send all agent spawns in a single message so they run concurrently.
+**Max 4 agents at a time.** If there are more specs, batch them into groups of 4. Run each batch, wait for completion, then start the next batch.
+
+For EACH per-spec plan in the current batch, spawn an `ralph-loop:spec-builder` agent **in parallel**. Use the Agent tool — send all agent spawns in a single message so they run concurrently.
 
 Each agent receives:
 - `SPEC_NAME` — the spec name (from the `## Per-Spec:` header)
 - `REF` — $ref
 - `SHARED_BASE` — commit hash from Phase 2
-- `BUDGET` — 7 (iterations per spec)
+- `BUDGET` — scale based on task count: `max(5, task_count * 2)` iterations per spec
 - `WORKTREE` — `.worktrees/$ref-$SPEC_NAME`
-- `PLAN_CONTENT` — the content of `IMPLEMENTATION_PLAN_<spec-name>.md`
+- `PLAN_CONTENT` — the full content of `IMPLEMENTATION_PLAN_<spec-name>.md`
 
 ### Phase 3 monitoring
 

@@ -30,7 +30,15 @@ git worktree add $WORKTREE ralph/$REF-$SPEC_NAME 2>&1
 
 ## Step 2 — Write the implementation plan
 
-Write the PLAN_CONTENT to `$WORKTREE/IMPLEMENTATION_PLAN.md` using the Write tool.
+**CRITICAL:** The worktree may contain an old IMPLEMENTATION_PLAN.md from the shared deps phase. You MUST overwrite it with your spec-specific plan.
+
+Write the PLAN_CONTENT to `$WORKTREE/IMPLEMENTATION_PLAN.md` using the Write tool. This REPLACES any existing file — do not append, do not read the old one.
+
+Verify the plan was written correctly:
+```bash
+head -3 $WORKTREE/IMPLEMENTATION_PLAN.md
+```
+The first line should mention your spec name, NOT "Shared Dependencies".
 
 ## Step 3 — Run the build loop
 
