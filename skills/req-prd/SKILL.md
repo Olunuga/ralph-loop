@@ -89,20 +89,39 @@ Revise and repeat until the user approves.
 
 ## Step 4 — Write to branch
 
+Create a worktree for the spec branch off main so the current working tree is not affected.
+
+**IMPORTANT:** All `git worktree add` commands MUST use `dangerouslyDisableSandbox: true`.
+
+Try in order, stopping at the first success:
+
+1. Create new branch from main:
 ```bash
-git checkout -b spec/<slug>
+git worktree add .worktrees/spec-<slug> -b spec/<slug> main 2>&1
 ```
 
-Write each spec and commit individually:
-
+2. If branch already exists, checkout without `-b`:
 ```bash
-git add ralph/specs/<topic-slug>.md
-git -c commit.gpgsign=false commit -m "spec: <topic-slug>"
+git worktree add .worktrees/spec-<slug> spec/<slug> 2>&1
 ```
 
-After all specs are committed, return to previous branch:
+3. If worktree directory already exists, continue — it's ready.
+
+Write each spec to `.worktrees/spec-<slug>/ralph/specs/<topic-slug>.md` using the Write tool.
+
+Commit each spec individually (separate Bash calls, no `&&` chains):
+
 ```bash
-git checkout -
+git -C .worktrees/spec-<slug> add ralph/specs/<topic-slug>.md
+```
+
+```bash
+git -C .worktrees/spec-<slug> -c commit.gpgsign=false commit -m "spec: <topic-slug>"
+```
+
+After all specs are committed, clean up the worktree (branch is kept):
+```bash
+git worktree remove .worktrees/spec-<slug> 2>&1
 ```
 
 Do NOT suggest a build order or implementation sequence — that is the planning prompt's job, not the spec's.

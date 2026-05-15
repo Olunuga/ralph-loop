@@ -166,29 +166,50 @@ Revise and repeat until the user approves.
 
 ## Step 9 — Write to branch
 
+Create a worktree for the spec branch off main so the current working tree is not affected.
+
+**IMPORTANT:** All `git worktree add` commands MUST use `dangerouslyDisableSandbox: true`.
+
+Try in order, stopping at the first success:
+
+1. Create new branch from main:
 ```bash
-git checkout -b spec/<slug>
+git worktree add .worktrees/spec-<slug> -b spec/<slug> main 2>&1
 ```
 
-Write AUDIENCE_JTBD.md first (lives at ralph/AUDIENCE_JTBD.md, not in specs/):
-
+2. If branch already exists, checkout without `-b`:
 ```bash
-git add ralph/AUDIENCE_JTBD.md
-git -c commit.gpgsign=false commit -m "spec: audience and JTBDs"
+git worktree add .worktrees/spec-<slug> spec/<slug> 2>&1
 ```
 
-Write each activity spec and commit individually:
+3. If worktree directory already exists, continue — it's ready.
 
+Write AUDIENCE_JTBD.md first (lives at `.worktrees/spec-<slug>/ralph/AUDIENCE_JTBD.md`, not in specs/) using the Write tool.
+
+Commit (separate Bash calls):
 ```bash
-git add ralph/specs/<activity-slug>.md
-git -c commit.gpgsign=false commit -m "spec: <activity-slug>"
+git -C .worktrees/spec-<slug> add ralph/AUDIENCE_JTBD.md
+```
+```bash
+git -C .worktrees/spec-<slug> -c commit.gpgsign=false commit -m "spec: audience and JTBDs"
 ```
 
-Return to previous branch:
+Write each activity spec to `.worktrees/spec-<slug>/ralph/specs/<activity-slug>.md` using the Write tool.
 
+Commit each individually:
 ```bash
-git checkout -
+git -C .worktrees/spec-<slug> add ralph/specs/<activity-slug>.md
 ```
+```bash
+git -C .worktrees/spec-<slug> -c commit.gpgsign=false commit -m "spec: <activity-slug>"
+```
+
+After all specs are committed, clean up the worktree (branch is kept):
+```bash
+git worktree remove .worktrees/spec-<slug> 2>&1
+```
+
+Do NOT suggest a build order or implementation sequence — that is the planning prompt's job.
 
 Confirm: "N activity specs + AUDIENCE_JTBD.md written to branch spec/<slug>.
 SLC slicing happens at planning time — run /ralph-loop:run <slug> when ready."
