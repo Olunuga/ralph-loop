@@ -58,9 +58,21 @@ If resuming an existing branch, inform the user: "Branch ralph/$ref already exis
 
 ## Step 3 — Plan
 
+Detect the planning mode based on project structure:
+
 ```bash
 PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
+test -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" && echo "SLC_MODE" || echo "SINGLE_MODE"
+```
+
+If SLC_MODE (AUDIENCE_JTBD.md exists — multi-spec with activity depths):
+```bash
+cd "$WORKTREE" && loop.sh plan-slc 3 2>&1
+```
+
+If SINGLE_MODE (standard single-spec):
+```bash
 SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "$ref*.md" 2>/dev/null | head -1)
 SPEC_TITLE=$(head -1 "$SPEC_FILE" | sed 's/^# //')
 cd "$WORKTREE" && loop.sh plan-work "$SPEC_TITLE" 3 2>&1
