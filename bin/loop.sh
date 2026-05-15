@@ -7,6 +7,7 @@ set -euo pipefail
 # loop.sh bootstrap                # one-time: discover codebase → ralph/AGENTS.md
 # loop.sh plan                     # gap analysis: all specs vs codebase
 # loop.sh plan-slc [N]            # SLC-aware plan: reads AUDIENCE_JTBD.md, recommends slice
+# loop.sh plan-parallel [N]       # multi-spec: decompose into shared deps + per-spec tasks
 # loop.sh plan-work "desc" [N]     # scoped plan for one feature
 # loop.sh post-loop                # re-run post-loop gates after manual fix
 
@@ -35,14 +36,15 @@ MAX_FIX_ITERATIONS=4
 case "${1:-}" in
     bootstrap)  MODE="bootstrap" ;;
     plan)       MODE="plan";      MAX_ITERATIONS="${2:-0}" ;;
-    plan-slc)   MODE="plan-slc";  MAX_ITERATIONS="${2:-0}" ;;
+    plan-slc)      MODE="plan-slc";      MAX_ITERATIONS="${2:-0}" ;;
+    plan-parallel) MODE="plan-parallel"; MAX_ITERATIONS="${2:-3}" ;;
     plan-work)
         [[ -z "${2:-}" ]] && { echo "Usage: loop.sh plan-work \"description\" [N]"; exit 1; }
         MODE="plan-work"; WORK_DESCRIPTION="$2"; MAX_ITERATIONS="${3:-3}"
         ;;
     post-loop)  MODE="post-loop" ;;
     "" | [0-9]*) MODE="build"; [[ "${1:-}" =~ ^[0-9]+$ ]] && MAX_ITERATIONS="$1" ;;
-    *) echo "Usage: loop.sh [bootstrap|plan|plan-slc|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
+    *) echo "Usage: loop.sh [bootstrap|plan|plan-slc|plan-parallel|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
 esac
 
 # ── Config (not needed for bootstrap) ─────────────────────────────────────────
@@ -483,6 +485,31 @@ if [[ "$MODE" == "plan-slc" ]]; then
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
         echo "=== Plan-SLC iteration $((ITER + 1)) ==="
         cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_plan_slc.md" | claude_run
+        ITER=$((ITER + 1))
+    done
+    exit 0
+fi
+
+if [[ "$MODE" == "plan-parallel" ]]; then
+    SPEC_COUNT=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" -not -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
+    [[ "$SPEC_COUNT" -lt 2 ]] && {
+        echo "ERROR: plan-parallel requires 2+ specs. Found $SPEC_COUNT."
+        echo "Use plan-work for single-spec planning."
+        exit 1
+    }
+    echo "Planning parallel build for $SPEC_COUNT specs..."
+    ITER=0
+    PREV_HASH="none"
+    while true; do
+        [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
+        echo "=== Plan-parallel iteration $((ITER + 1)) ==="
+        cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_plan_parallel.md" | claude_run
+        NEW_HASH=$(file_hash IMPLEMENTATION_PLAN.md 2>/dev/null || echo "none")
+        if [[ "$ITER" -ge 1 && "$NEW_HASH" == "$PREV_HASH" ]]; then
+            echo "Plan converged after $((ITER + 1)) iterations."
+            break
+        fi
+        PREV_HASH="$NEW_HASH"
         ITER=$((ITER + 1))
     done
     exit 0
