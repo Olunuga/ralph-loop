@@ -79,17 +79,39 @@ Derive the filename slug from $ref:
 - If $ref is already a short slug or ID (no spaces, under 30 chars), use it directly as the prefix
 - If $ref is a longer description, convert to kebab-case and use that as the full filename
 
-Create a spec branch and commit the spec there — do not write directly to main:
+Create a worktree for the spec branch off main so the current working tree is not affected.
+
+**IMPORTANT:** All `git worktree add` commands MUST use `dangerouslyDisableSandbox: true`.
+
+Try in order, stopping at the first success:
+
+1. Create new branch from main:
 ```bash
-git checkout -b spec/<slug>
+git worktree add .worktrees/spec-<slug> -b spec/<slug> main 2>&1
 ```
 
-Write the approved spec to `ralph/specs/<slug>.md`.
+2. If branch already exists, checkout without `-b`:
+```bash
+git worktree add .worktrees/spec-<slug> spec/<slug> 2>&1
+```
+
+3. If worktree directory already exists, continue — it's ready.
+
+Write the approved spec to `.worktrees/spec-<slug>/ralph/specs/<slug>.md` using the Write tool.
+
+Then commit (each command as a separate Bash call):
 
 ```bash
-git add ralph/specs/<slug>.md
-git -c commit.gpgsign=false commit -m "spec: <slug>"
-git checkout -
+git -C .worktrees/spec-<slug> add ralph/specs/<slug>.md
+```
+
+```bash
+git -C .worktrees/spec-<slug> -c commit.gpgsign=false commit -m "spec: <slug>"
+```
+
+Clean up the worktree (branch is kept):
+```bash
+git worktree remove .worktrees/spec-<slug> 2>&1
 ```
 
 Confirm: "Spec written to branch spec/<slug> — run /ralph-loop:run <slug> when ready."

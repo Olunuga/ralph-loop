@@ -15,7 +15,7 @@ Run each step in order. Tell the user which step you are on.
 
 Create the ralph project shell if it doesn't exist:
 ```bash
-mkdir -p ralph/specs ralph/gates/static ralph/gates/llm ralph/scripts/hooks
+mkdir -p ralph/specs ralph/specs/done ralph/gates/static ralph/gates/llm ralph/scripts/hooks
 ```
 
 Copy the workspace boundary hook from the plugin:

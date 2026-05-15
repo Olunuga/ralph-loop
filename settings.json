@@ -6,7 +6,9 @@
       "Bash(bash loop.sh*)",
       "Bash(bash blast_radius.sh*)",
       "Bash(cd .worktrees/* && loop.sh*)",
-      "Bash(cd .worktrees/* && bash loop.sh*)"
+      "Bash(cd .worktrees/* && bash loop.sh*)",
+      "Bash(cleanup_specs.sh*)",
+      "Bash(bash cleanup_specs.sh*)"
     ]
   }
 }

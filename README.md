@@ -62,11 +62,45 @@ This preserves your config, AGENTS.md, and specs, moves any custom gates to `ral
 
 ---
 
-## Daily workflow
+## Workflows
+
+### Single feature (quick)
 
 ```
 /ralph-loop:spec my-feature        # describe what to build, get a spec
 /ralph-loop:run my-feature         # run the pipeline autonomously
+```
+
+### Multi-topic PRD (multiple specs from one JTBD)
+
+```
+/ralph-loop:req-prd my-project     # decompose JTBD into topics, one spec per topic
+/ralph-loop:run my-project         # pipeline plans across all specs
+```
+
+### SLC release planning (incremental delivery)
+
+```
+/ralph-loop:req-slc my-product     # capture audience, JTBDs, activities at all depths
+/ralph-loop:run my-product         # auto-detects SLC mode, recommends thin slice
+```
+
+SLC mode captures the **full activity space** upfront (basic → enhanced → advanced depths per activity). Planning then recommends the narrowest **Simple, Lovable, Complete** slice. Deferred activities stay visible as backlog. `ralph/AUDIENCE_JTBD.md` persists across releases — no re-interviews needed.
+
+### Resuming an incomplete run
+
+If the loop exits early (iteration budget exhausted, laptop slept, session ended), re-run the same command:
+
+```
+/ralph-loop:run my-feature         # detects existing commits, picks up remaining tasks
+```
+
+The pipeline detects prior `ralph:` commits on the branch, reconciles the plan (marks completed tasks), and continues from where it left off. No work is lost — committed code survives across runs.
+
+### Post-merge cleanup
+
+```
+/ralph-loop:cleanup my-feature     # archive specs to done/, delete spec branch
 ```
 
 A draft PR is opened automatically when all gates pass. Review the `ralph/my-feature` branch and mark it ready when satisfied.
@@ -196,7 +230,9 @@ These live in your project's `ralph/` directory (not in the plugin):
 |---|---|---|
 | `ralph/config.sh` | `/ralph-loop:init` | Build commands, paths, simulator |
 | `ralph/AGENTS.md` | `loop.sh bootstrap` | Architecture and conventions |
-| `ralph/specs/` | `/ralph-loop:spec` | Feature specifications |
+| `ralph/specs/` | `/ralph-loop:spec`, `req-prd`, `req-slc` | Feature specifications |
+| `ralph/specs/done/` | `/ralph-loop:cleanup` | Archived completed specs |
+| `ralph/AUDIENCE_JTBD.md` | `/ralph-loop:req-slc` | Permanent audience context (spans releases) |
 | `ralph/gates/` | `/ralph-loop:init` | Custom project gates |
 | `ralph/gate_context.md` | Bootstrap / manual | Gate calibration and blast radius thresholds |
 | `ralph/lessons.md` | `loop.sh` | Persistent lessons for hard problems |

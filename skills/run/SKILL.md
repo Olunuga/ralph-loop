@@ -58,9 +58,21 @@ If resuming an existing branch, inform the user: "Branch ralph/$ref already exis
 
 ## Step 3 — Plan
 
+Detect the planning mode based on project structure:
+
 ```bash
 PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
+test -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" && echo "SLC_MODE" || echo "SINGLE_MODE"
+```
+
+If SLC_MODE (AUDIENCE_JTBD.md exists — multi-spec with activity depths):
+```bash
+cd "$WORKTREE" && loop.sh plan-slc 3 2>&1
+```
+
+If SINGLE_MODE (standard single-spec):
+```bash
 SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "$ref*.md" 2>/dev/null | head -1)
 SPEC_TITLE=$(head -1 "$SPEC_FILE" | sed 's/^# //')
 cd "$WORKTREE" && loop.sh plan-work "$SPEC_TITLE" 3 2>&1
@@ -92,10 +104,8 @@ cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 
 Report progress to the user as iterations complete:
 - If `result` changed to `green`: report — "Iteration N complete. M tasks remaining."
-- If `consec_fail` reaches 3 or higher: read `$WORKTREE/iteration_context.md` for error details.
-  Alert the user via AskUserQuestion: "Loop is stuck on [last_fail_gate] for [consec_fail] consecutive iterations. Error: [summary from iteration_context.md]. Continue or intervene?"
-  - If user says continue: write any additional diagnosis to `$WORKTREE/iteration_context.md` and restart the loop
-  - If user wants to intervene: ask the user to cancel the background task, then proceed to Step 4b for manual post-loop
+- If `consec_fail` reaches 2: **spawn the diagnostician agent** while the loop continues. Use the Agent tool with the `ralph-loop:diagnostician` agent. Tell it to read `$WORKTREE/iteration_context.md` and the relevant source files. When it returns, append its diagnosis to `$WORKTREE/iteration_context.md` using the Write tool. Report the diagnosis to the user. The loop picks up the diagnosis automatically on the next iteration.
+- If `consec_fail` reaches 3 or higher: report the diagnostician's analysis to the user. Do NOT ask the user to intervene — let the loop continue. The loop handles model escalation (Sonnet at 2, Opus at 4) automatically.
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
 
 When notified the loop has finished, proceed to Step 4b.
@@ -185,10 +195,30 @@ git worktree remove "$PROJECT_ROOT/.worktrees/$ref" --force 2>&1
 
 Confirm removal with another `git worktree list`. The branch `ralph/$ref` must still exist — only the working directory is removed.
 
-## Step 6 — Report
+## Step 6 — Push and create draft PR
 
-When the loop completes, report:
-- Branch: `ralph/$ref` (contains spec + implementation — open one PR to main)
+Ensure the branch is pushed and a draft PR exists. The loop may not have done this if it exited early.
+
+```bash
+git push -u origin ralph/$ref 2>&1
+```
+
+Check if a PR already exists:
+```bash
+gh pr list --head ralph/$ref --json number --jq '.[0].number' 2>/dev/null
+```
+
+If no PR exists, create one. Use the post-mortem data to write a meaningful PR body — include what was built, which gates passed, and what's incomplete (if anything):
+
+```bash
+gh pr create --draft --title "ralph/$ref" --body "<PR body based on post-mortem>" 2>&1
+```
+
+## Step 7 — Report
+
+Report to the user:
+- Branch: `ralph/$ref`
+- PR: link to the draft PR
 - Gates: list which passed
 - What was built: summarise from the Done section of IMPLEMENTATION_PLAN.md
-- Next step: "Review `ralph/$ref`, then open a PR to main when satisfied."
+- If tasks remain: note what's incomplete and suggest re-running `/ralph-loop:run $ref`
