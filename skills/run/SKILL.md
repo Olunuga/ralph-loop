@@ -195,10 +195,30 @@ git worktree remove "$PROJECT_ROOT/.worktrees/$ref" --force 2>&1
 
 Confirm removal with another `git worktree list`. The branch `ralph/$ref` must still exist — only the working directory is removed.
 
-## Step 6 — Report
+## Step 6 — Push and create draft PR
 
-When the loop completes, report:
-- Branch: `ralph/$ref` (contains spec + implementation — open one PR to main)
+Ensure the branch is pushed and a draft PR exists. The loop may not have done this if it exited early.
+
+```bash
+git push -u origin ralph/$ref 2>&1
+```
+
+Check if a PR already exists:
+```bash
+gh pr list --head ralph/$ref --json number --jq '.[0].number' 2>/dev/null
+```
+
+If no PR exists, create one. Use the post-mortem data to write a meaningful PR body — include what was built, which gates passed, and what's incomplete (if anything):
+
+```bash
+gh pr create --draft --title "ralph/$ref" --body "<PR body based on post-mortem>" 2>&1
+```
+
+## Step 7 — Report
+
+Report to the user:
+- Branch: `ralph/$ref`
+- PR: link to the draft PR
 - Gates: list which passed
 - What was built: summarise from the Done section of IMPLEMENTATION_PLAN.md
-- Next step: "Review `ralph/$ref`, then open a PR to main when satisfied."
+- If tasks remain: note what's incomplete and suggest re-running `/ralph-loop:run $ref`
