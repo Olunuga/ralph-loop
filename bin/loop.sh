@@ -6,6 +6,7 @@ set -euo pipefail
 # loop.sh 15                       # build loop, max 15 iterations
 # loop.sh bootstrap                # one-time: discover codebase → ralph/AGENTS.md
 # loop.sh plan                     # gap analysis: all specs vs codebase
+# loop.sh plan-slc [N]            # SLC-aware plan: reads AUDIENCE_JTBD.md, recommends slice
 # loop.sh plan-work "desc" [N]     # scoped plan for one feature
 # loop.sh post-loop                # re-run post-loop gates after manual fix
 
@@ -34,13 +35,14 @@ MAX_FIX_ITERATIONS=4
 case "${1:-}" in
     bootstrap)  MODE="bootstrap" ;;
     plan)       MODE="plan";      MAX_ITERATIONS="${2:-0}" ;;
+    plan-slc)   MODE="plan-slc";  MAX_ITERATIONS="${2:-0}" ;;
     plan-work)
         [[ -z "${2:-}" ]] && { echo "Usage: loop.sh plan-work \"description\" [N]"; exit 1; }
         MODE="plan-work"; WORK_DESCRIPTION="$2"; MAX_ITERATIONS="${3:-3}"
         ;;
     post-loop)  MODE="post-loop" ;;
     "" | [0-9]*) MODE="build"; [[ "${1:-}" =~ ^[0-9]+$ ]] && MAX_ITERATIONS="$1" ;;
-    *) echo "Usage: loop.sh [bootstrap|plan|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
+    *) echo "Usage: loop.sh [bootstrap|plan|plan-slc|plan-work \"desc\"|post-loop|N]"; exit 1 ;;
 esac
 
 # ── Config (not needed for bootstrap) ─────────────────────────────────────────
@@ -453,6 +455,22 @@ if [[ "$MODE" == "plan" ]]; then
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
         echo "=== Plan iteration $((ITER + 1)) ==="
         cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_plan.md" | claude_run
+        ITER=$((ITER + 1))
+    done
+    exit 0
+fi
+
+if [[ "$MODE" == "plan-slc" ]]; then
+    [[ ! -f "$PROJECT_ROOT/ralph/AUDIENCE_JTBD.md" ]] && {
+        echo "ERROR: ralph/AUDIENCE_JTBD.md not found."
+        echo "Run /ralph-loop:req-slc first to define audience, JTBDs, and activities."
+        exit 1
+    }
+    ITER=0
+    while true; do
+        [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
+        echo "=== Plan-SLC iteration $((ITER + 1)) ==="
+        cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_plan_slc.md" | claude_run
         ITER=$((ITER + 1))
     done
     exit 0
