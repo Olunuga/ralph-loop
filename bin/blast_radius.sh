@@ -47,8 +47,8 @@ TEST_LOW=1;      TEST_HIGH=3
 AUTO_MAX=3;      CONDITIONAL_MAX=6
 
 # Read overrides from gate_context.md if available
-SCRIPT_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GATE_CTX="${SCRIPT_DIR}/../gate_context.md"
+PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
+GATE_CTX="$PROJECT_ROOT/ralph/gate_context.md"
 if [[ -f "$GATE_CTX" ]]; then
     _read_threshold() {
         local key="$1" val

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(loop.sh*)",
+      "Bash(blast_radius.sh*)",
+      "Bash(bash loop.sh*)",
+      "Bash(bash blast_radius.sh*)",
+      "Bash(cd .worktrees/* && loop.sh*)",
+      "Bash(cd .worktrees/* && bash loop.sh*)"
+    ]
+  }
+}

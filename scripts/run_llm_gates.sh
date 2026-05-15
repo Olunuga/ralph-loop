@@ -25,19 +25,20 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LLM_GATES_DIR="${SCRIPT_DIR}/gates/llm"
+PLUGIN_LLM_DIR="${RALPH_PLUGIN_DIR:-$SCRIPT_DIR/..}/scripts/gates/llm"
+PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
+PROJECT_LLM_DIR="$PROJECT_ROOT/ralph/gates/llm"
 
 # Source shared diff utility
 # shellcheck source=/dev/null
-source "$SCRIPT_DIR/prepare_diff.sh"
+source "${RALPH_PLUGIN_DIR:-$SCRIPT_DIR/..}/scripts/prepare_diff.sh"
 
 if [[ -z "$PREPARED_DIFF" ]]; then
     echo "LLM gates: No diff against main — nothing to review."
     exit 0
 fi
 
-# Read protocols for context (if available)
-PROJECT_ROOT="$(CDPATH= cd "$SCRIPT_DIR/../.." && pwd)"
+# Read config for context (if available)
 # shellcheck source=/dev/null
 [[ -f "$PROJECT_ROOT/ralph/config.sh" ]] && source "$PROJECT_ROOT/ralph/config.sh"
 
@@ -56,9 +57,17 @@ fi
 FAIL=0
 CHECKED=0
 FAILED_CATEGORIES=""
+SEEN_GATES=""
 
-for PROMPT_FILE in "$LLM_GATES_DIR"/*.md; do
+for PROMPT_FILE in "$PLUGIN_LLM_DIR"/*.md "$PROJECT_LLM_DIR"/*.md; do
     [[ -f "$PROMPT_FILE" ]] || continue
+
+    # Deduplicate: project gates override plugin gates with same name
+    GATE_BASENAME=$(basename "$PROMPT_FILE")
+    if echo "$SEEN_GATES" | grep -qx "$GATE_BASENAME" 2>/dev/null; then
+        continue
+    fi
+    SEEN_GATES="$SEEN_GATES"$'\n'"$GATE_BASENAME"
 
     # Parse frontmatter for category
     PROMPT_CATEGORY=$(awk '/^---$/ { if (++c == 2) exit } c == 1 && /^category:/ { gsub(/category:\s*/, ""); print }' "$PROMPT_FILE")

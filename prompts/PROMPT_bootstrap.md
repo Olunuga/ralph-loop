@@ -72,8 +72,8 @@ Use this structure — fill in discovered values, do not invent:
 STEP 5 — Generate gate calibration (ralph/gate_context.md)
 
 Read all gate check scripts and LLM gate prompts to understand what the pipeline enforces:
-- List and read `ralph/scripts/gates/static/*/*.sh` — understand what each checks
-- List and read `ralph/scripts/gates/llm/*.md` — understand what each evaluates
+- List and read the gate scripts at the paths shown above the --- separator — understand what each checks
+- Check both plugin gates and project gates (ralph/gates/) if present
 
 Compare gate expectations against the project's actual patterns discovered in Steps 1-2:
 

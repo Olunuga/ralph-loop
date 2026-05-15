@@ -28,8 +28,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(CDPATH= cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GATES_DIR="${SCRIPT_DIR}/gates/static"
-PROJECT_ROOT="$(CDPATH= cd "$SCRIPT_DIR/../.." && pwd)"
+PLUGIN_GATES_DIR="${RALPH_PLUGIN_DIR:-$SCRIPT_DIR/..}/scripts/gates/static"
+PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
+PROJECT_GATES_DIR="$PROJECT_ROOT/ralph/gates/static"
 
 # Source config if available (provides SOURCE_DIR, LAYER_MAP, etc.)
 # shellcheck source=/dev/null
@@ -45,13 +46,20 @@ fi
 FAIL=0
 CHECKED=0
 FAILED_NAMES=""
+SEEN_GATES=""
 
-# Find all check scripts across gate subdirectories
-for CHECK_FILE in "$GATES_DIR"/*/*.sh; do
+# Scan plugin gates first, then project gates (project overrides plugin by basename)
+for CHECK_FILE in "$PLUGIN_GATES_DIR"/*/*.sh "$PROJECT_GATES_DIR"/*/*.sh; do
     [[ -f "$CHECK_FILE" ]] || continue
 
-    # Check for SKIP override
+    # Deduplicate: if we've already seen this gate name, skip (project overrides plugin)
     CHECK_BASENAME=$(basename "$CHECK_FILE" .sh)
+    if echo "$SEEN_GATES" | grep -qx "$CHECK_BASENAME" 2>/dev/null; then
+        continue
+    fi
+    SEEN_GATES="$SEEN_GATES"$'\n'"$CHECK_BASENAME"
+
+    # Check for SKIP override
     if [[ -n "$GATE_SKIPS" ]] && echo "$GATE_SKIPS" | grep -qx "$CHECK_BASENAME"; then
         echo "SKIP: $CHECK_BASENAME (gate_context.md override)"
         continue

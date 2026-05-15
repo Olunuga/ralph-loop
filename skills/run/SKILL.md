@@ -1,5 +1,5 @@
 ---
-name: ralph
+name: run
 description: Run the Ralph autonomous development pipeline for a spec
 arguments: [ref]
 allowed-tools: Bash Read Write Edit AskUserQuestion Monitor
@@ -22,7 +22,7 @@ If that fails, also try finding it in the current working tree (in case spec was
 find ralph/specs -name "$ref*.md" | head -1
 ```
 
-If no spec is found either way, tell the user: "No spec found for '$ref'. Run /spec $ref first." and stop.
+If no spec is found either way, tell the user: "No spec found for '$ref'. Run /ralph-loop:spec $ref first." and stop.
 
 Read the spec content and use AskUserQuestion to show it and ask:
 "Proceed with this spec? This will run the full autonomous pipeline (plan → build → test → gates). Reply 'yes' to proceed or 'no' to cancel."
@@ -63,7 +63,7 @@ PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
 SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "$ref*.md" 2>/dev/null | head -1)
 SPEC_TITLE=$(head -1 "$SPEC_FILE" | sed 's/^# //')
-cd "$WORKTREE" && bash ralph/loop.sh plan-work "$SPEC_TITLE" 3 2>&1
+cd "$WORKTREE" && loop.sh plan-work "$SPEC_TITLE" 3 2>&1
 ```
 
 Wait for it to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to the user (informational — no approval needed, pipeline continues automatically).
@@ -75,14 +75,14 @@ Run the build loop using Bash with `run_in_background: true`. You will be notifi
 ```bash
 PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
-cd "$WORKTREE" && bash ralph/loop.sh 10 2>&1
+cd "$WORKTREE" && loop.sh 10 2>&1
 ```
 
 **CRITICAL RULES — do NOT break these:**
 - Do NOT edit any source files in the worktree directly. The build agent handles all code changes.
-- If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && bash ralph/loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
+- If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
-- **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `bash ralph/scripts/blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.
+- **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.
 
 While waiting, periodically check progress by reading files **inside the worktree** (not the background task output):
 
@@ -109,7 +109,7 @@ tail -20 "$WORKTREE/progress.txt"
 
 If the loop was killed before post-loop, run it manually:
 ```bash
-cd "$WORKTREE" && bash ralph/loop.sh post-loop 2>&1
+cd "$WORKTREE" && loop.sh post-loop 2>&1
 ```
 
 Report each gate outcome to the user.

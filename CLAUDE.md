@@ -1,6 +1,73 @@
-# Ralph-Loop — Operational Knowledge
+# Ralph-Loop Plugin
 
-This file documents known issues, fixes, and gotchas discovered through test runs. Read this before modifying the pipeline to avoid re-fixing solved problems.
+An autonomous development pipeline distributed as a Claude Code plugin. Language-agnostic core — project-specific configuration (build commands, gates, architecture) lives in the target project's `ralph/` directory.
+
+## Project Context
+
+### What this repo is
+This is the **plugin source code**, not a target project. When a user runs `claude plugin install Olunuga/ralph-loop`, this entire repo becomes the plugin. When working here, you're modifying the pipeline framework itself — not building features with it.
+
+### How it works end-to-end
+1. User installs plugin → runs `/ralph-loop:init` in their project → writes `ralph/config.sh`, `ralph/AGENTS.md`, `.claude/settings.json`
+2. User runs `/ralph-loop:spec my-feature` → structured conversation → spec committed to `spec/my-feature` branch
+3. User runs `/ralph-loop:run my-feature` → orchestrator creates worktree, plans, runs build loop, gates, post-mortem, opens PR
+4. Build loop (`bin/loop.sh`) spawns `claude -p` per iteration → agent writes code → build → test → static gates → commit → repeat
+5. Post-loop: precise gates → LLM gates (with blast radius routing) → UI tests → draft PR
+
+### File roles
+
+**`bin/` — entry points (on PATH)**
+- `loop.sh` — the core engine (800+ lines). Handles mode dispatch (bootstrap/plan/build/post-loop), model escalation (Haiku→Sonnet→Opus), iteration logic, gate orchestration, rollback, lesson capture, blast radius routing, PR creation. This is the most complex file — read it thoroughly before changing.
+- `blast_radius.sh` — measures impact of a type across 5 dimensions (fan-out, coupling, layers, infra reach, test coupling). Called by `run_gate_with_fix` in loop.sh and directly by the orchestrator skill.
+
+**`scripts/` — internal (called by loop.sh, not on PATH)**
+- `run_static_gates.sh` — discovers and runs `.sh` gate scripts from both plugin and project directories. Handles tier filtering (fast/precise), category filtering, SKIP overrides from gate_context.md, deduplication (project overrides plugin).
+- `run_llm_gates.sh` — discovers and runs `.md` LLM gate prompts via Sonnet. Same dual-directory scanning and dedup. Injects convergence rules.
+- `prepare_diff.sh` — computes branch diff, exports `$PREPARED_DIFF`, `$CHANGED_FILES`, `$DIFF_TOKEN_ESTIMATE`. Sourced (not executed) by run_llm_gates.sh.
+- `hooks/workspace_boundary.sh` — PreToolUse hook copied into target projects by init. Blocks file operations outside the workspace. Not used by the plugin itself.
+- `gates/static/` — 21 default gate scripts across 4 categories (code_quality, architecture, security, accessibility). Each exports `gate_name()`, `gate_category()`, `gate_tier()`, `gate_check()`.
+- `gates/llm/` — 4 default LLM gate prompts (code_quality, architecture, security, accessibility). Markdown with frontmatter.
+
+**`prompts/` — agent instructions**
+- `PROMPT_build.md` — fed to `claude -p` each build iteration. Tells the agent what to do: read specs, pick a task, implement, validate, commit. References are injected by loop.sh (gate paths, XCODEPROJ).
+- `PROMPT_bootstrap.md` — fed to `claude -p` once during init. Agent discovers codebase architecture and writes `ralph/AGENTS.md`.
+- `PROMPT_plan.md` — gap analysis across all specs.
+- `PROMPT_plan_work.md` — scoped planning for one feature. `${WORK_DESCRIPTION}` is templated by loop.sh.
+
+**`skills/` — user-facing commands**
+- `run/SKILL.md` — `/ralph-loop:run` orchestrator. Creates worktree, runs plan, monitors build loop, does post-mortem, cleans up. Has critical rules (don't edit files, use iteration_context.md, blast radius policy).
+- `spec/SKILL.md` — `/ralph-loop:spec` structured JTBD conversation → spec on a branch.
+- `init/SKILL.md` — `/ralph-loop:init` one-time project setup. Creates `ralph/` shell, copies hook, discovers build config, bootstraps AGENTS.md.
+- `migrate/SKILL.md` — `/ralph-loop:migrate` converts legacy file-copy installations to plugin mode.
+
+**Root files**
+- `.claude-plugin/plugin.json` — plugin manifest (name, version, author)
+- `settings.json` — default permissions (pre-approves loop.sh, blast_radius.sh)
+- `CLAUDE.md` — this file. Auto-loaded by Claude Code.
+- `README.md` — user-facing documentation.
+
+### Two path roots
+
+Every script resolves two directories:
+- **`$RALPH_PLUGIN_DIR`** — where this plugin is installed. Set by `loop.sh`, exported for child scripts. Points to prompts, gates, scripts.
+- **`$PROJECT_ROOT`** — the user's project. Defaults to `pwd`. Points to `ralph/config.sh`, `ralph/AGENTS.md`, `ralph/specs/`, `ralph/gates/` (custom gates).
+
+When modifying path references, always ask: is this a plugin file or a project file?
+
+### Conventions for contributing
+
+- **Don't hardcode language/platform specifics** in the plugin. iOS-specific things belong in default gates or prompts, not in loop.sh logic.
+- **Gate scripts must be diff-scoped** — check added lines only, not the entire file. Use `git diff $BASE_REF...HEAD` patterns.
+- **All `claude -p` calls must be error-guarded** — `|| AGENT_OK=false` or `|| echo "WARN: ..."`. Unguarded calls crash the loop via `set -euo pipefail`.
+- **Test with `claude --plugin-dir .`** from this repo root to load the plugin locally.
+- **Skills are prompts, not programs** — the agent interprets them. Use numbered sequences, bold critical rules, minimize conditionals. The simpler the instruction, the more reliably the agent follows it.
+- **Project files go in `$PROJECT_ROOT/ralph/`**, plugin files go in `$RALPH_PLUGIN_DIR/`. Never mix them.
+
+---
+
+## Operational Knowledge
+
+Known issues, fixes, and gotchas from test runs. Read this before modifying to avoid re-fixing solved problems.
 
 ## Workspace Boundary Hook (`scripts/hooks/workspace_boundary.sh`)
 
