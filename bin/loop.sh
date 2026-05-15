@@ -244,12 +244,24 @@ capture_lesson() {
 # Write structured status for orchestrator to poll.
 write_loop_status() {
     local iter="$1"
+    local total_tasks=$(grep -c '^\- \[' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
+    local tasks_done=$(grep -c '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
+    local tasks_remaining=$((total_tasks - tasks_done))
+    local commits=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
+    local green_iters=$(grep -c ': green$' progress.txt 2>/dev/null || echo 0)
+    local failed_iters=$(grep -c ': \(build\|tests\|gate\|lint\|agent\|commit\) failed\|: gate violation' progress.txt 2>/dev/null || echo 0)
+
     cat > "$PROJECT_ROOT/ralph/.loop_status" <<STAT
 iteration=$iter
 result=$(tail -1 progress.txt 2>/dev/null | sed 's/^- Iter [0-9]*: //')
 consec_fail=$CONSEC_FAIL
 last_fail_gate=$LAST_FAIL_GATE
-tasks_remaining=$(grep -c '^\- \[ \]' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
+tasks_total=$total_tasks
+tasks_done=$tasks_done
+tasks_remaining=$tasks_remaining
+commits=$commits
+green_iters=$green_iters
+failed_iters=$failed_iters
 STAT
 }
 
