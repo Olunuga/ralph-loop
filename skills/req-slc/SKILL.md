@@ -166,15 +166,23 @@ Revise and repeat until the user approves.
 
 ## Step 9 — Write to branch
 
-Create a worktree for the spec branch off main so the current working tree is not affected.
+Ask which branch to start from:
+
+```bash
+echo "Recent branches:" && git branch --sort=-committerdate --format='%(refname:short)' | head -8
+```
+
+Use AskUserQuestion: "Which branch should this spec branch from? (default: main)" with the branch list.
+
+Create a worktree for the spec branch so the current working tree is not affected.
 
 **IMPORTANT:** All `git worktree add` commands MUST use `dangerouslyDisableSandbox: true`.
 
 Try in order, stopping at the first success:
 
-1. Create new branch from main:
+1. Create new branch from selected base:
 ```bash
-git worktree add .worktrees/spec-<slug> -b spec/<slug> main 2>&1
+git worktree add .worktrees/spec-<slug> -b spec/<slug> <BASE_BRANCH> 2>&1
 ```
 
 2. If branch already exists, checkout without `-b`:

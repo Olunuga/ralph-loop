@@ -2,13 +2,15 @@
 name: run
 description: Run the Ralph autonomous development pipeline for a spec
 arguments: [ref]
-allowed-tools: Bash Read Write Edit AskUserQuestion Monitor
+allowed-tools: Bash Read Write Edit AskUserQuestion Monitor TaskCreate TaskUpdate TaskList Agent
 disable-model-invocation: true
 ---
 
 You are running the Ralph autonomous development pipeline.
 
 Reference: $ref
+
+**ALWAYS use TaskCreate and TaskUpdate to track pipeline progress.** Create a task for each major phase (plan, shared deps, each spec build, merge, final gates, post-mortem, PR). Mark tasks as `in_progress` when starting and `completed` when done. This gives the user a live progress view throughout the run.
 
 ## Step 1 — Find and show the spec
 
@@ -58,29 +60,43 @@ If resuming an existing branch, inform the user: "Branch ralph/$ref already exis
 
 ## Step 3 — Plan
 
-Detect the planning mode based on project structure:
+Detect the planning mode:
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
-test -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" && echo "SLC_MODE" || echo "SINGLE_MODE"
+SPEC_COUNT=$(find "$WORKTREE/ralph/specs" -name "*.md" -not -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
+test -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" && echo "SLC_MODE" || echo "NO_SLC"
+echo "SPEC_COUNT=$SPEC_COUNT"
 ```
 
-If SLC_MODE (AUDIENCE_JTBD.md exists — multi-spec with activity depths):
-```bash
-cd "$WORKTREE" && loop.sh plan-slc 3 2>&1
-```
-
-If SINGLE_MODE (standard single-spec):
+**If 1 spec (no SLC)** → single-spec flow:
 ```bash
 SPEC_FILE=$(find "$WORKTREE/ralph/specs" -name "$ref*.md" 2>/dev/null | head -1)
 SPEC_TITLE=$(head -1 "$SPEC_FILE" | sed 's/^# //')
 cd "$WORKTREE" && loop.sh plan-work "$SPEC_TITLE" 3 2>&1
 ```
+Then proceed to **Step 4 (Single-spec build)**.
 
-Wait for it to complete. Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to the user (informational — no approval needed, pipeline continues automatically).
+**If 1 spec (SLC)** → SLC flow:
+```bash
+cd "$WORKTREE" && loop.sh plan-slc 3 2>&1
+```
+Then proceed to **Step 4 (Single-spec build)**.
 
-## Step 4 — Build loop (monitored)
+**If 2+ specs** → parallel flow:
+```bash
+cd "$WORKTREE" && loop.sh plan-parallel 3 2>&1
+```
+Then proceed to **Step 4P (Parallel build)**.
+
+Read `$WORKTREE/IMPLEMENTATION_PLAN.md` and show it to the user (informational — no approval needed).
+
+---
+
+## Step 4 — Single-spec build (monitored)
+
+*Skip this step if in parallel mode — go to Step 4P instead.*
 
 Run the build loop using Bash with `run_in_background: true`. You will be notified when it completes.
 
@@ -96,21 +112,138 @@ cd "$WORKTREE" && loop.sh 10 2>&1
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
 - **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.
 
-While waiting, periodically check progress by reading files **inside the worktree** (not the background task output):
+While waiting, check progress by reading files inside the worktree. **Wait at least 60 seconds between checks** — do NOT poll rapidly. Adjust the interval based on context (longer if things are stable, shorter if actively debugging).
 
 ```bash
-cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
+sleep 60 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 ```
 
 The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
 
 Report progress to the user as iterations complete:
 - If `result` changed to `green`: report — "Iteration N: green. Tasks: D done / T total. Commits: C. (G green, F failed iterations so far)."
-- If `consec_fail` reaches 2: **spawn the diagnostician agent** while the loop continues. Use the Agent tool with the `ralph-loop:diagnostician` agent. Tell it to read `$WORKTREE/iteration_context.md` and the relevant source files. When it returns, append its diagnosis to `$WORKTREE/iteration_context.md` using the Write tool. Report the diagnosis to the user. The loop picks up the diagnosis automatically on the next iteration.
-- If `consec_fail` reaches 3 or higher: report the diagnostician's analysis to the user. Do NOT ask the user to intervene — let the loop continue. The loop handles model escalation (Sonnet at 2, Opus at 4) automatically.
+- If `consec_fail` reaches 2: **spawn the diagnostician agent** (`ralph-loop:diagnostician`) to read `$WORKTREE/iteration_context.md` and diagnose. Append its analysis to `$WORKTREE/iteration_context.md`. Report to user.
+- If `consec_fail` reaches 3 or higher: report the diagnostician's analysis. Do NOT ask the user to intervene — the loop handles model escalation automatically.
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
 
 When notified the loop has finished, proceed to Step 4b.
+
+---
+
+## Step 4P — Parallel build (multi-spec)
+
+*Skip this step if in single-spec mode — use Step 4 instead.*
+
+### Phase 1: Split the plan
+
+Read `$WORKTREE/IMPLEMENTATION_PLAN.md`. It contains:
+- `## Shared Dependencies` section — tasks needed by 2+ specs
+- `## Per-Spec: <name>` sections — tasks unique to each spec
+
+Using the Read and Write tools, split these into separate files in the worktree:
+- `$WORKTREE/IMPLEMENTATION_PLAN_shared.md` — shared section (if any tasks)
+- `$WORKTREE/IMPLEMENTATION_PLAN_<spec-name>.md` — per-spec section for each spec
+
+### Phase 2: Build shared dependencies + gate-clean base
+
+If `IMPLEMENTATION_PLAN_shared.md` has tasks:
+
+```bash
+cp "$WORKTREE/IMPLEMENTATION_PLAN_shared.md" "$WORKTREE/IMPLEMENTATION_PLAN.md"
+```
+
+```bash
+cd "$WORKTREE" && loop.sh 3 2>&1
+```
+
+Monitor as in Step 4 (poll .loop_status, spawn diagnostician if stuck).
+
+After shared deps are built, run a gate-fix pass on the shared base to eliminate pre-existing violations. This prevents parallel agents from wasting budget re-fixing the same gate issues.
+
+```bash
+cd "$WORKTREE" && loop.sh post-loop 2>&1
+```
+
+Note the shared base commit (this is the clean, gate-passing base all specs fork from):
+```bash
+git -C "$WORKTREE" rev-parse HEAD
+```
+
+If no shared deps, still run the gate-fix pass to clean the base, then note HEAD.
+
+### Phase 3: Spawn parallel spec-builder agents
+
+**Max 4 agents at a time.** If there are more specs, batch them into groups of 4. Run each batch, wait for completion, then start the next batch.
+
+For EACH per-spec plan in the current batch, spawn an `ralph-loop:spec-builder` agent **in parallel**. Use the Agent tool — send all agent spawns in a single message so they run concurrently.
+
+Each agent receives:
+- `SPEC_NAME` — the spec name (from the `## Per-Spec:` header)
+- `REF` — $ref
+- `SHARED_BASE` — commit hash from Phase 2
+- `BUDGET` — scale based on task count: `max(5, task_count * 2)` iterations per spec
+- `WORKTREE` — `.worktrees/$ref-$SPEC_NAME`
+- `PLAN_CONTENT` — the full content of `IMPLEMENTATION_PLAN_<spec-name>.md`
+
+### Phase 3 monitoring
+
+While agents are running, check each worktree's status. **Wait at least 60 seconds between checks** — adjust based on context:
+
+```bash
+for dir in .worktrees/$ref-*/; do
+  echo "=== $(basename $dir) ===" && cat "$dir/ralph/.loop_status" 2>/dev/null
+done
+```
+
+- If any agent shows `consec_fail >= 2`: spawn `ralph-loop:diagnostician` for that worktree
+- Report periodic summary to user:
+  ```
+  Parallel build status:
+    spec-1: iter 3/7, 4/6 tasks done, 2 commits (green)
+    spec-2: iter 5/7, 5/8 tasks done, 3 commits (tests failing)
+    spec-3: iter 2/7, 1/5 tasks done, 1 commit (building)
+  ```
+
+Wait for ALL agents to complete.
+
+### Phase 4: Merge spec branches
+
+Merge each spec branch sequentially into the main feature branch:
+
+```bash
+git -C "$WORKTREE" checkout ralph/$ref
+```
+
+For each spec branch (in the order they appear in the plan):
+```bash
+git -C "$WORKTREE" merge ralph/$ref-$SPEC_NAME --no-edit 2>&1
+```
+
+If a merge conflict occurs:
+1. Read both versions of the conflicting files
+2. You have full context from all specs — resolve the conflict
+3. Write the resolved file using the Write tool
+4. `git -C "$WORKTREE" add -A && git -C "$WORKTREE" -c commit.gpgsign=false commit --no-edit`
+
+### Phase 5: Final gates on merged branch
+
+```bash
+cd "$WORKTREE" && loop.sh post-loop 2>&1
+```
+
+Then proceed to Step 4b (the existing post-loop section handles the rest).
+
+### Phase 5 cleanup
+
+Remove ALL parallel worktrees (keep the main one for post-mortem):
+
+```bash
+for dir in .worktrees/$ref-*/; do
+  git worktree remove "$dir" --force 2>&1
+done
+```
+
+Then proceed to Step 5 (verify branch content) as normal.
 
 ## Step 4b — Post-loop
 
