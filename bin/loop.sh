@@ -87,9 +87,12 @@ run_quietly() {
     fi
 }
 
+# Max time (seconds) for a single claude -p call before it's killed.
+CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-300}"
+
 # Run a Claude agent instance (Sonnet — planning, bootstrap, post-loop gates).
 claude_run() {
-    claude -p \
+    timeout "$CLAUDE_TIMEOUT" claude -p \
         --dangerously-skip-permissions \
         --output-format text \
         --model claude-sonnet-4-6 \
@@ -98,7 +101,7 @@ claude_run() {
 
 # Run a Claude agent instance (Haiku — iterative build/lint fixes).
 claude_run_fast() {
-    claude -p \
+    timeout "$CLAUDE_TIMEOUT" claude -p \
         --dangerously-skip-permissions \
         --output-format text \
         --model claude-haiku-4-5-20251001 \
@@ -107,7 +110,7 @@ claude_run_fast() {
 
 # Run a Claude agent instance (Opus — hard problems that Sonnet can't solve).
 claude_run_deep() {
-    claude -p \
+    timeout "$CLAUDE_TIMEOUT" claude -p \
         --dangerously-skip-permissions \
         --output-format text \
         --model claude-opus-4-6 \
@@ -375,24 +378,24 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
                     echo "Blast radius score $BR_SCORE — escalating to Opus for careful fix."
                     printf "Fix ONLY this single issue. Change as few files as possible. Do not refactor broadly.\nAffected type: %s (blast radius score: %s, layers: %s)\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                         "$AFFECTED_TYPE" "$BR_SCORE" "$BR_LAYERS" "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-                    | claude_run_deep 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
+                    | claude_run_deep 2>>"$PROJECT_ROOT/ralph/.fix_agent.log" || echo "WARN: Fix agent call failed (timeout or crash) — retrying."
                 else
                     # Blast radius script failed — fall back to standard fix
                     printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                         "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-                    | claude_run 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
+                    | claude_run 2>>"$PROJECT_ROOT/ralph/.fix_agent.log" || echo "WARN: Fix agent call failed (timeout or crash) — retrying."
                 fi
             else
                 # Could not extract type — fall back to standard fix
                 printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                     "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-                | claude_run 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
+                | claude_run 2>>"$PROJECT_ROOT/ralph/.fix_agent.log" || echo "WARN: Fix agent call failed (timeout or crash) — retrying."
             fi
         else
             # Non-LLM gates — standard fix with Sonnet
             printf "Fix ONLY this single issue. Do not refactor or change anything else.\n\nGate: %s\nIssue:\n%s\n\nFull context:\n%s" \
                 "$GATE" "$FIRST_FAIL" "$OUTPUT" \
-            | claude_run 2>/dev/null || echo "WARN: Fix agent call failed — retrying."
+            | claude_run 2>>"$PROJECT_ROOT/ralph/.fix_agent.log" || echo "WARN: Fix agent call failed (timeout or crash) — retrying."
         fi
 
         # Ensure the fix didn't break hard gates
