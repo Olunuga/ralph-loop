@@ -122,8 +122,8 @@ The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`
 
 Report progress to the user as iterations complete:
 - If `result` changed to `green`: report — "Iteration N: green. Tasks: D done / T total. Commits: C. (G green, F failed iterations so far)."
-- If `consec_fail` reaches 2: **spawn the diagnostician agent** (`ralph-loop:diagnostician`) to read `$WORKTREE/iteration_context.md` and diagnose. Append its analysis to `$WORKTREE/iteration_context.md`. Report to user.
-- If `consec_fail` reaches 3 or higher: report the diagnostician's analysis. Do NOT ask the user to intervene — the loop handles model escalation automatically.
+- On any failure: the loop automatically runs the diagnostician agent (Sonnet) and appends its analysis to `iteration_context.md`. You do NOT need to spawn a separate diagnostician for in-loop failures.
+- If `consec_fail` reaches 2 or higher: report the current failure pattern and diagnostician analysis to the user. Do NOT ask the user to intervene — the loop handles model escalation automatically.
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
 
 When notified the loop has finished, proceed to Step 4b.
@@ -195,7 +195,7 @@ for dir in .worktrees/$ref-*/; do
 done
 ```
 
-- If any agent shows `consec_fail >= 2`: spawn `ralph-loop:diagnostician` for that worktree
+- The loop automatically runs diagnostician on every failure — no need to spawn separately
 - Report periodic summary to user:
   ```
   Parallel build status:

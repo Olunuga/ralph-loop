@@ -193,7 +193,7 @@ append_failure_context() {
 
     # Cap to last 5 entries
     local count
-    count=$(grep -c "^## Iteration" "$ctx_file" 2>/dev/null || echo 0)
+    count=$(grep -c "^## Iteration" "$ctx_file" 2>/dev/null) || count=0
     if [[ "$count" -gt 5 ]]; then
         # Keep only the last 5 blocks
         python3 -c "
@@ -246,15 +246,41 @@ capture_lesson() {
     echo "LESSON: Captured to $lessons_file"
 }
 
+# Run the diagnostician agent after every failure.
+# Reads iteration_context.md, source files, and writes actionable diagnosis.
+run_diagnostician() {
+    local iter="$1"
+    local gate="$2"
+    echo "  Running diagnostician for $gate failure (iter $iter)..."
+    local diag_prompt
+    diag_prompt=$(awk 'BEGIN{n=0} /^---$/{n++; next} n>=2' "$RALPH_PLUGIN_DIR/agents/diagnostician.md")
+    local diag_output
+    diag_output=$(printf "%s\n\n---\n\nCurrent iteration_context.md:\n%s" \
+        "$diag_prompt" \
+        "$(cat iteration_context.md 2>/dev/null)" \
+    | claude_run 2>/dev/null) || diag_output=""
+
+    if [[ -n "$diag_output" ]]; then
+        {
+            echo ""
+            echo "## Diagnostician (iter $iter, gate: $gate)"
+            echo "$diag_output"
+        } >> iteration_context.md
+        echo "  Diagnostician: analysis appended to iteration_context.md"
+    else
+        echo "  Diagnostician: no output (timeout or error)"
+    fi
+}
+
 # Write structured status for orchestrator to poll.
 write_loop_status() {
     local iter="$1"
-    local total_tasks=$(grep -c '^\- \[' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
-    local tasks_done=$(grep -c '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
+    local total_tasks; total_tasks=$(grep -c '^\- \[' IMPLEMENTATION_PLAN.md 2>/dev/null) || total_tasks=0
+    local tasks_done; tasks_done=$(grep -c '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null) || tasks_done=0
     local tasks_remaining=$((total_tasks - tasks_done))
     local commits=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
-    local green_iters=$(grep -c ': green$' progress.txt 2>/dev/null || echo 0)
-    local failed_iters=$(grep -c ': \(build\|tests\|gate\|lint\|agent\|commit\) failed\|: gate violation' progress.txt 2>/dev/null || echo 0)
+    local green_iters; green_iters=$(grep -c ': green$' progress.txt 2>/dev/null) || green_iters=0
+    local failed_iters; failed_iters=$(grep -c ': \(build\|tests\|gate\|lint\|agent\|commit\) failed\|: gate violation' progress.txt 2>/dev/null) || failed_iters=0
 
     cat > "$PROJECT_ROOT/ralph/.loop_status" <<STAT
 iteration=$iter
@@ -624,6 +650,10 @@ fi
 
 # ── Build loop ─────────────────────────────────────────────────────────────────
 if [[ "$MODE" == "build" ]]; then
+    # Reset stale state from prior runs to prevent false exits
+    > "$PROJECT_ROOT/ralph/.loop_status"
+    > iteration_context.md
+
     echo "=== Pipeline started: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
 
     # Detect prior progress — if ralph: commits exist, reconcile the plan
@@ -699,6 +729,7 @@ $PROMPT"
             echo "HARD: Build failed — rolling back."
             append_failure_context "build" "$BUILD_OUTPUT" "$((ITER+1))"
             rollback_all
+            run_diagnostician "$((ITER+1))" "build"
             echo "- Iter $((ITER+1)): build failed" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "build" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="build"; }
             write_loop_status "$((ITER+1))"
@@ -710,6 +741,7 @@ $PROMPT"
         if ! TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
             echo "HARD: Unit tests failed."
             append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
+            run_diagnostician "$((ITER+1))" "tests"
             # Selective rollback: only revert test files, keep passing source changes.
             # Test files are identified by *Tests/ or *Spec/ directories.
             TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
@@ -748,6 +780,7 @@ $PROMPT"
             fi
 
             append_failure_context "gates" "$GATE_OUTPUT" "$((ITER+1))"
+            run_diagnostician "$((ITER+1))" "gates"
             echo "- Iter $((ITER+1)): gate violation" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "gates" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="gates"; }
             write_loop_status "$((ITER+1))"
@@ -775,6 +808,7 @@ $PROMPT"
             if [[ "$LINT_PASS" == false ]]; then
                 echo "LINT: Could not fix in 4 attempts — rolling back."
                 append_failure_context "lint" "$LINT_OUTPUT" "$((ITER+1))"
+                run_diagnostician "$((ITER+1))" "lint"
                 rollback_all
                 echo "- Iter $((ITER+1)): lint unfixable" >> progress.txt
                 [[ "$LAST_FAIL_GATE" == "lint" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="lint"; }
@@ -794,6 +828,7 @@ $PROMPT"
             git -c commit.gpgsign=false commit -m "ralph: auto-commit (agent commit was blocked)" 2>/dev/null || {
                 echo "  Auto-commit also failed — rolling back."
                 append_failure_context "commit" "Agent completed tasks but commit failed. Check git/SSH permissions." "$((ITER+1))"
+                run_diagnostician "$((ITER+1))" "commit"
                 rollback_all
                 echo "- Iter $((ITER+1)): commit failed" >> progress.txt
                 [[ "$LAST_FAIL_GATE" == "commit" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="commit"; }
