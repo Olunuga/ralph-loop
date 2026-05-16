@@ -88,7 +88,7 @@ run_quietly() {
 }
 
 # Max time (seconds) for a single claude -p call before it's killed.
-CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-300}"
+CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-600}"
 
 # Run a Claude agent instance (Sonnet — planning, bootstrap, post-loop gates).
 claude_run() {
