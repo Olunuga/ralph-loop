@@ -390,6 +390,9 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
                                     --title "$ISSUE_TITLE" \
                                     --body "$ISSUE_BODY" \
                                     --label "tech-debt" 2>/dev/null \
+                                || gh issue create \
+                                    --title "$ISSUE_TITLE" \
+                                    --body "$ISSUE_BODY" 2>/dev/null \
                                 && echo "GitHub issue created." \
                                 || echo "Issue creation failed — saved to $PROJECT_ROOT/ralph/deferred_issues.md."
                             fi
@@ -938,6 +941,12 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
             run_gate_with_fix "UI_TESTS" "$UI_TEST_CMD"
             ;;
     esac
+
+    # Commit deferred issues before worktree cleanup so they aren't lost
+    if [[ -f "$PROJECT_ROOT/ralph/deferred_issues.md" ]]; then
+        git add "$PROJECT_ROOT/ralph/deferred_issues.md" 2>/dev/null
+        git -c commit.gpgsign=false commit -m "ralph: record deferred gate issues" 2>/dev/null || true
+    fi
 
     # Gate 4: Open draft PR
     SNAPSHOT_LINE=""
