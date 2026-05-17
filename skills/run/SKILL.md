@@ -108,22 +108,23 @@ cd "$WORKTREE" && loop.sh 10 2>&1
 
 **CRITICAL RULES — do NOT break these:**
 - Do NOT edit any source files in the worktree directly. The build agent handles all code changes.
+- Do NOT manually commit on behalf of the build agent while the loop is still running. The loop has built-in auto-commit logic that handles sandbox-blocked commits. Only commit manually if the loop has exited and left uncommitted work behind.
 - If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
 - **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.
 
-While waiting, check progress by reading files inside the worktree. **Wait at least 60 seconds between checks** — do NOT poll rapidly. Adjust the interval based on context (longer if things are stable, shorter if actively debugging).
+While waiting, check progress by reading files inside the worktree. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes, so rapid polling just creates noise. Only check more frequently if actively debugging a stuck loop.
 
 ```bash
-sleep 60 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
+sleep 180 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 ```
 
 The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
 
 Report progress to the user as iterations complete:
 - If `result` changed to `green`: report — "Iteration N: green. Tasks: D done / T total. Commits: C. (G green, F failed iterations so far)."
-- If `consec_fail` reaches 2: **spawn the diagnostician agent** (`ralph-loop:diagnostician`) to read `$WORKTREE/iteration_context.md` and diagnose. Append its analysis to `$WORKTREE/iteration_context.md`. Report to user.
-- If `consec_fail` reaches 3 or higher: report the diagnostician's analysis. Do NOT ask the user to intervene — the loop handles model escalation automatically.
+- On any failure: the loop automatically runs the diagnostician agent (Sonnet) and appends its analysis to `iteration_context.md`. You do NOT need to spawn a separate diagnostician for in-loop failures.
+- If `consec_fail` reaches 2 or higher: report the current failure pattern and diagnostician analysis to the user. Do NOT ask the user to intervene — the loop handles model escalation automatically.
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
 
 When notified the loop has finished, proceed to Step 4b.
@@ -187,7 +188,7 @@ Each agent receives:
 
 ### Phase 3 monitoring
 
-While agents are running, check each worktree's status. **Wait at least 60 seconds between checks** — adjust based on context:
+While agents are running, check each worktree's status. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes:
 
 ```bash
 for dir in .worktrees/$ref-*/; do
@@ -195,7 +196,7 @@ for dir in .worktrees/$ref-*/; do
 done
 ```
 
-- If any agent shows `consec_fail >= 2`: spawn `ralph-loop:diagnostician` for that worktree
+- The loop automatically runs diagnostician on every failure — no need to spawn separately
 - Report periodic summary to user:
   ```
   Parallel build status:

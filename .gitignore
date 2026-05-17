@@ -3,3 +3,8 @@
 
 # Plugin development
 node_modules/
+
+# Runtime state (written by loop.sh, must not be committed)
+ralph/.loop_status
+ralph/.loop_output
+ralph/.fix_agent.log

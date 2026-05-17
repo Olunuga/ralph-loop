@@ -150,7 +150,7 @@ rollback_all() {
         git reset HEAD~"$agent_commits" 2>/dev/null || true
     fi
     git checkout -- . 2>/dev/null || true
-    git clean -fd 2>/dev/null || true
+    git clean -fd -e 'IMPLEMENTATION_PLAN*.md' -e 'iteration_context.md' -e 'progress.txt' 2>/dev/null || true
 }
 
 # Rollback specific files (gate failures that identify offending files).
@@ -193,7 +193,7 @@ append_failure_context() {
 
     # Cap to last 5 entries
     local count
-    count=$(grep -c "^## Iteration" "$ctx_file" 2>/dev/null || echo 0)
+    count=$(grep -c "^## Iteration" "$ctx_file" 2>/dev/null) || count=0
     if [[ "$count" -gt 5 ]]; then
         # Keep only the last 5 blocks
         python3 -c "
@@ -246,15 +246,41 @@ capture_lesson() {
     echo "LESSON: Captured to $lessons_file"
 }
 
+# Run the diagnostician agent after every failure.
+# Reads iteration_context.md, source files, and writes actionable diagnosis.
+run_diagnostician() {
+    local iter="$1"
+    local gate="$2"
+    echo "  Running diagnostician for $gate failure (iter $iter)..."
+    local diag_prompt
+    diag_prompt=$(awk 'BEGIN{n=0} /^---$/{n++; next} n>=2' "$RALPH_PLUGIN_DIR/agents/diagnostician.md")
+    local diag_output
+    diag_output=$(printf "%s\n\n---\n\nCurrent iteration_context.md:\n%s" \
+        "$diag_prompt" \
+        "$(cat iteration_context.md 2>/dev/null)" \
+    | claude_run 2>/dev/null) || diag_output=""
+
+    if [[ -n "$diag_output" ]]; then
+        {
+            echo ""
+            echo "## Diagnostician (iter $iter, gate: $gate)"
+            echo "$diag_output"
+        } >> iteration_context.md
+        echo "  Diagnostician: analysis appended to iteration_context.md"
+    else
+        echo "  Diagnostician: no output (timeout or error)"
+    fi
+}
+
 # Write structured status for orchestrator to poll.
 write_loop_status() {
     local iter="$1"
-    local total_tasks=$(grep -c '^\- \[' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
-    local tasks_done=$(grep -c '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null || echo 0)
+    local total_tasks; total_tasks=$(grep -c '^\- \[' IMPLEMENTATION_PLAN.md 2>/dev/null) || total_tasks=0
+    local tasks_done; tasks_done=$(grep -c '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null) || tasks_done=0
     local tasks_remaining=$((total_tasks - tasks_done))
     local commits=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
-    local green_iters=$(grep -c ': green$' progress.txt 2>/dev/null || echo 0)
-    local failed_iters=$(grep -c ': \(build\|tests\|gate\|lint\|agent\|commit\) failed\|: gate violation' progress.txt 2>/dev/null || echo 0)
+    local green_iters; green_iters=$(grep -c ': green$' progress.txt 2>/dev/null) || green_iters=0
+    local failed_iters; failed_iters=$(grep -c ': \(build\|tests\|gate\|lint\|agent\|commit\) failed\|: gate violation' progress.txt 2>/dev/null) || failed_iters=0
 
     cat > "$PROJECT_ROOT/ralph/.loop_status" <<STAT
 iteration=$iter
@@ -364,6 +390,9 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
                                     --title "$ISSUE_TITLE" \
                                     --body "$ISSUE_BODY" \
                                     --label "tech-debt" 2>/dev/null \
+                                || gh issue create \
+                                    --title "$ISSUE_TITLE" \
+                                    --body "$ISSUE_BODY" 2>/dev/null \
                                 && echo "GitHub issue created." \
                                 || echo "Issue creation failed — saved to $PROJECT_ROOT/ralph/deferred_issues.md."
                             fi
@@ -564,6 +593,9 @@ if [[ "$MODE" == "build" ]]; then
         exit 1
     }
 
+    # Disable GPG signing in this worktree so commits work without 1Password agent
+    git config commit.gpgsign false 2>/dev/null || true
+
     [[ ! -f "IMPLEMENTATION_PLAN.md" ]] && {
         echo "ERROR: IMPLEMENTATION_PLAN.md not found."
         echo "Run first: loop.sh plan-work \"[feature]\" 3"
@@ -620,10 +652,26 @@ if [[ "$MODE" == "build" ]]; then
         exit 1
     }
     echo "Baseline: OK"
+
+    # Record baseline test failures so pre-existing failures don't trigger rollbacks
+    echo "Checking baseline tests..."
+    BASELINE_TEST_OUTPUT=""
+    BASELINE_TEST_FAILURES=""
+    if ! BASELINE_TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
+        BASELINE_TEST_FAILURES=$(echo "$BASELINE_TEST_OUTPUT" | grep -E 'FAIL|failed|error:' | sort -u || true)
+        echo "WARNING: Baseline tests have pre-existing failures (will not rollback for these):"
+        echo "$BASELINE_TEST_FAILURES" | head -10
+    else
+        echo "Baseline tests: OK"
+    fi
 fi
 
 # ── Build loop ─────────────────────────────────────────────────────────────────
 if [[ "$MODE" == "build" ]]; then
+    # Reset stale state from prior runs to prevent false exits
+    > "$PROJECT_ROOT/ralph/.loop_status"
+    > iteration_context.md
+
     echo "=== Pipeline started: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
 
     # Detect prior progress — if ralph: commits exist, reconcile the plan
@@ -699,6 +747,7 @@ $PROMPT"
             echo "HARD: Build failed — rolling back."
             append_failure_context "build" "$BUILD_OUTPUT" "$((ITER+1))"
             rollback_all
+            run_diagnostician "$((ITER+1))" "build"
             echo "- Iter $((ITER+1)): build failed" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "build" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="build"; }
             write_loop_status "$((ITER+1))"
@@ -708,21 +757,45 @@ $PROMPT"
         # ── 2. Unit tests ─────────────────────────────────────────────────────────
         TEST_OUTPUT=""
         if ! TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
-            echo "HARD: Unit tests failed."
-            append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
-            # Selective rollback: only revert test files, keep passing source changes.
-            # Test files are identified by *Tests/ or *Spec/ directories.
-            TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
-            if [[ -n "$TEST_FILES" ]]; then
-                echo "Rolling back test files only — keeping source changes."
-                rollback_files "$TEST_FILES"
+            # Check if failures are only pre-existing baseline failures
+            CURRENT_FAILURES=$(echo "$TEST_OUTPUT" | grep -E 'FAIL|failed|error:' | sort -u || true)
+            if [[ -n "$BASELINE_TEST_FAILURES" ]]; then
+                NEW_FAILURES=$(comm -23 <(echo "$CURRENT_FAILURES") <(echo "$BASELINE_TEST_FAILURES") || true)
+                if [[ -z "$NEW_FAILURES" ]]; then
+                    echo "Tests failed but only with pre-existing baseline failures — continuing."
+                    echo "- Iter $((ITER+1)): tests failed (pre-existing only, skipped rollback)" >> progress.txt
+                else
+                    echo "HARD: Unit tests failed with NEW failures (beyond baseline)."
+                    append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
+                    run_diagnostician "$((ITER+1))" "tests"
+                    TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
+                    if [[ -n "$TEST_FILES" ]]; then
+                        echo "Rolling back test files only — keeping source changes."
+                        rollback_files "$TEST_FILES"
+                    else
+                        rollback_all
+                    fi
+                    echo "- Iter $((ITER+1)): tests failed" >> progress.txt
+                    [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
+                    write_loop_status "$((ITER+1))"
+                    ITER=$((ITER + 1)) && continue
+                fi
             else
-                rollback_all
+                echo "HARD: Unit tests failed."
+                append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
+                run_diagnostician "$((ITER+1))" "tests"
+                TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
+                if [[ -n "$TEST_FILES" ]]; then
+                    echo "Rolling back test files only — keeping source changes."
+                    rollback_files "$TEST_FILES"
+                else
+                    rollback_all
+                fi
+                echo "- Iter $((ITER+1)): tests failed" >> progress.txt
+                [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
+                write_loop_status "$((ITER+1))"
+                ITER=$((ITER + 1)) && continue
             fi
-            echo "- Iter $((ITER+1)): tests failed" >> progress.txt
-            [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
-            write_loop_status "$((ITER+1))"
-            ITER=$((ITER + 1)) && continue
         fi
 
         # ── 3. Code quality + architecture gates (fast tier) ────────────────────
@@ -748,6 +821,7 @@ $PROMPT"
             fi
 
             append_failure_context "gates" "$GATE_OUTPUT" "$((ITER+1))"
+            run_diagnostician "$((ITER+1))" "gates"
             echo "- Iter $((ITER+1)): gate violation" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "gates" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="gates"; }
             write_loop_status "$((ITER+1))"
@@ -775,6 +849,7 @@ $PROMPT"
             if [[ "$LINT_PASS" == false ]]; then
                 echo "LINT: Could not fix in 4 attempts — rolling back."
                 append_failure_context "lint" "$LINT_OUTPUT" "$((ITER+1))"
+                run_diagnostician "$((ITER+1))" "lint"
                 rollback_all
                 echo "- Iter $((ITER+1)): lint unfixable" >> progress.txt
                 [[ "$LAST_FAIL_GATE" == "lint" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="lint"; }
@@ -785,15 +860,16 @@ $PROMPT"
 
         # ── Verify commit landed ──────────────────────────────────────────────────
         # The build agent should have committed. If there are uncommitted changes,
-        # the commit silently failed (e.g., permission blocked, signing error).
+        # the commit silently failed (e.g., sandbox blocked .git writes in worktree).
         if [[ -n "$(git status --porcelain -- "${SOURCE_DIR:-.}/" 2>/dev/null)" ]]; then
-            echo "HARD: Build agent marked tasks done but did not commit."
-            echo "  Uncommitted changes detected — commit may have been blocked."
-            echo "  Attempting commit on behalf of agent..."
+            echo "WARN: Agent did not commit — committing on its behalf."
+            TASK_DESC=$(grep '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null | tail -1 | sed 's/^\- \[x\] //' | head -c 72)
+            [[ -z "$TASK_DESC" ]] && TASK_DESC="iteration $((ITER+1)) changes"
             git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md "$PROJECT_ROOT/ralph/.loop_status" 2>/dev/null
-            git -c commit.gpgsign=false commit -m "ralph: auto-commit (agent commit was blocked)" 2>/dev/null || {
-                echo "  Auto-commit also failed — rolling back."
-                append_failure_context "commit" "Agent completed tasks but commit failed. Check git/SSH permissions." "$((ITER+1))"
+            git commit -m "ralph: $TASK_DESC" 2>/dev/null || {
+                echo "HARD: Backup commit also failed — rolling back."
+                append_failure_context "commit" "Agent and loop commit both failed. Check git permissions." "$((ITER+1))"
+                run_diagnostician "$((ITER+1))" "commit"
                 rollback_all
                 echo "- Iter $((ITER+1)): commit failed" >> progress.txt
                 [[ "$LAST_FAIL_GATE" == "commit" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="commit"; }
@@ -868,6 +944,12 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
             run_gate_with_fix "UI_TESTS" "$UI_TEST_CMD"
             ;;
     esac
+
+    # Commit deferred issues before worktree cleanup so they aren't lost
+    if [[ -f "$PROJECT_ROOT/ralph/deferred_issues.md" ]]; then
+        git add "$PROJECT_ROOT/ralph/deferred_issues.md" 2>/dev/null
+        git -c commit.gpgsign=false commit -m "ralph: record deferred gate issues" 2>/dev/null || true
+    fi
 
     # Gate 4: Open draft PR
     SNAPSHOT_LINE=""
