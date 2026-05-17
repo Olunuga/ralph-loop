@@ -65,7 +65,7 @@ Detect the planning mode:
 ```bash
 PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
-SPEC_COUNT=$(find "$WORKTREE/ralph/specs" -name "*.md" -not -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
+SPEC_COUNT=$(find "$WORKTREE/ralph/specs" -name "*.md" -not -path "*/done/*" -not -path "*/archive/*" 2>/dev/null | wc -l | tr -d ' ')
 test -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" && echo "SLC_MODE" || echo "NO_SLC"
 echo "SPEC_COUNT=$SPEC_COUNT"
 ```
@@ -112,10 +112,10 @@ cd "$WORKTREE" && loop.sh 10 2>&1
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
 - **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.
 
-While waiting, check progress by reading files inside the worktree. **Wait at least 60 seconds between checks** — do NOT poll rapidly. Adjust the interval based on context (longer if things are stable, shorter if actively debugging).
+While waiting, check progress by reading files inside the worktree. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes, so rapid polling just creates noise. Only check more frequently if actively debugging a stuck loop.
 
 ```bash
-sleep 60 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
+sleep 180 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 ```
 
 The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
@@ -187,7 +187,7 @@ Each agent receives:
 
 ### Phase 3 monitoring
 
-While agents are running, check each worktree's status. **Wait at least 60 seconds between checks** — adjust based on context:
+While agents are running, check each worktree's status. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes:
 
 ```bash
 for dir in .worktrees/$ref-*/; do

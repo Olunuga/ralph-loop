@@ -150,7 +150,7 @@ rollback_all() {
         git reset HEAD~"$agent_commits" 2>/dev/null || true
     fi
     git checkout -- . 2>/dev/null || true
-    git clean -fd 2>/dev/null || true
+    git clean -fd -e 'IMPLEMENTATION_PLAN*.md' -e 'iteration_context.md' -e 'progress.txt' 2>/dev/null || true
 }
 
 # Rollback specific files (gate failures that identify offending files).
@@ -520,7 +520,7 @@ if [[ "$MODE" == "plan-slc" ]]; then
 fi
 
 if [[ "$MODE" == "plan-parallel" ]]; then
-    SPEC_COUNT=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" -not -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
+    SPEC_COUNT=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" -not -path "*/done/*" -not -path "*/archive/*" 2>/dev/null | wc -l | tr -d ' ')
     [[ "$SPEC_COUNT" -lt 2 ]] && {
         echo "ERROR: plan-parallel requires 2+ specs. Found $SPEC_COUNT."
         echo "Use plan-work for single-spec planning."
@@ -646,6 +646,18 @@ if [[ "$MODE" == "build" ]]; then
         exit 1
     }
     echo "Baseline: OK"
+
+    # Record baseline test failures so pre-existing failures don't trigger rollbacks
+    echo "Checking baseline tests..."
+    BASELINE_TEST_OUTPUT=""
+    BASELINE_TEST_FAILURES=""
+    if ! BASELINE_TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
+        BASELINE_TEST_FAILURES=$(echo "$BASELINE_TEST_OUTPUT" | grep -E 'FAIL|failed|error:' | sort -u || true)
+        echo "WARNING: Baseline tests have pre-existing failures (will not rollback for these):"
+        echo "$BASELINE_TEST_FAILURES" | head -10
+    else
+        echo "Baseline tests: OK"
+    fi
 fi
 
 # ── Build loop ─────────────────────────────────────────────────────────────────
@@ -739,22 +751,45 @@ $PROMPT"
         # ── 2. Unit tests ─────────────────────────────────────────────────────────
         TEST_OUTPUT=""
         if ! TEST_OUTPUT=$(eval "$UNIT_TEST_CMD" 2>&1); then
-            echo "HARD: Unit tests failed."
-            append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
-            run_diagnostician "$((ITER+1))" "tests"
-            # Selective rollback: only revert test files, keep passing source changes.
-            # Test files are identified by *Tests/ or *Spec/ directories.
-            TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
-            if [[ -n "$TEST_FILES" ]]; then
-                echo "Rolling back test files only — keeping source changes."
-                rollback_files "$TEST_FILES"
+            # Check if failures are only pre-existing baseline failures
+            CURRENT_FAILURES=$(echo "$TEST_OUTPUT" | grep -E 'FAIL|failed|error:' | sort -u || true)
+            if [[ -n "$BASELINE_TEST_FAILURES" ]]; then
+                NEW_FAILURES=$(comm -23 <(echo "$CURRENT_FAILURES") <(echo "$BASELINE_TEST_FAILURES") || true)
+                if [[ -z "$NEW_FAILURES" ]]; then
+                    echo "Tests failed but only with pre-existing baseline failures — continuing."
+                    echo "- Iter $((ITER+1)): tests failed (pre-existing only, skipped rollback)" >> progress.txt
+                else
+                    echo "HARD: Unit tests failed with NEW failures (beyond baseline)."
+                    append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
+                    run_diagnostician "$((ITER+1))" "tests"
+                    TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
+                    if [[ -n "$TEST_FILES" ]]; then
+                        echo "Rolling back test files only — keeping source changes."
+                        rollback_files "$TEST_FILES"
+                    else
+                        rollback_all
+                    fi
+                    echo "- Iter $((ITER+1)): tests failed" >> progress.txt
+                    [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
+                    write_loop_status "$((ITER+1))"
+                    ITER=$((ITER + 1)) && continue
+                fi
             else
-                rollback_all
+                echo "HARD: Unit tests failed."
+                append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
+                run_diagnostician "$((ITER+1))" "tests"
+                TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
+                if [[ -n "$TEST_FILES" ]]; then
+                    echo "Rolling back test files only — keeping source changes."
+                    rollback_files "$TEST_FILES"
+                else
+                    rollback_all
+                fi
+                echo "- Iter $((ITER+1)): tests failed" >> progress.txt
+                [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
+                write_loop_status "$((ITER+1))"
+                ITER=$((ITER + 1)) && continue
             fi
-            echo "- Iter $((ITER+1)): tests failed" >> progress.txt
-            [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
-            write_loop_status "$((ITER+1))"
-            ITER=$((ITER + 1)) && continue
         fi
 
         # ── 3. Code quality + architecture gates (fast tier) ────────────────────
