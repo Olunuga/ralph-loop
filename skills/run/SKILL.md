@@ -108,7 +108,7 @@ cd "$WORKTREE" && loop.sh 10 2>&1
 
 **CRITICAL RULES — do NOT break these:**
 - Do NOT edit any source files in the worktree directly. The build agent handles all code changes.
-- Do NOT manually commit on behalf of the build agent. The loop has built-in auto-commit logic that handles sandbox-blocked commits automatically. If you see uncommitted changes while the loop is running, **wait for the loop to handle it** — do not intervene.
+- Do NOT manually commit on behalf of the build agent while the loop is still running. The loop has built-in auto-commit logic that handles sandbox-blocked commits. Only commit manually if the loop has exited and left uncommitted work behind.
 - If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
 - **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.

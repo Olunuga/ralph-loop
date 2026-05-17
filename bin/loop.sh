@@ -593,6 +593,9 @@ if [[ "$MODE" == "build" ]]; then
         exit 1
     }
 
+    # Disable GPG signing in this worktree so commits work without 1Password agent
+    git config commit.gpgsign false 2>/dev/null || true
+
     [[ ! -f "IMPLEMENTATION_PLAN.md" ]] && {
         echo "ERROR: IMPLEMENTATION_PLAN.md not found."
         echo "Run first: loop.sh plan-work \"[feature]\" 3"
@@ -857,15 +860,15 @@ $PROMPT"
 
         # ── Verify commit landed ──────────────────────────────────────────────────
         # The build agent should have committed. If there are uncommitted changes,
-        # the commit silently failed (e.g., permission blocked, signing error).
+        # the commit silently failed (e.g., sandbox blocked .git writes in worktree).
         if [[ -n "$(git status --porcelain -- "${SOURCE_DIR:-.}/" 2>/dev/null)" ]]; then
-            echo "HARD: Build agent marked tasks done but did not commit."
-            echo "  Uncommitted changes detected — commit may have been blocked."
-            echo "  Attempting commit on behalf of agent..."
+            echo "WARN: Agent did not commit — committing on its behalf."
+            TASK_DESC=$(grep '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null | tail -1 | sed 's/^\- \[x\] //' | head -c 72)
+            [[ -z "$TASK_DESC" ]] && TASK_DESC="iteration $((ITER+1)) changes"
             git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md "$PROJECT_ROOT/ralph/.loop_status" 2>/dev/null
-            git -c commit.gpgsign=false commit -m "ralph: auto-commit (agent commit was blocked)" 2>/dev/null || {
-                echo "  Auto-commit also failed — rolling back."
-                append_failure_context "commit" "Agent completed tasks but commit failed. Check git/SSH permissions." "$((ITER+1))"
+            git commit -m "ralph: $TASK_DESC" 2>/dev/null || {
+                echo "HARD: Backup commit also failed — rolling back."
+                append_failure_context "commit" "Agent and loop commit both failed. Check git permissions." "$((ITER+1))"
                 run_diagnostician "$((ITER+1))" "commit"
                 rollback_all
                 echo "- Iter $((ITER+1)): commit failed" >> progress.txt
