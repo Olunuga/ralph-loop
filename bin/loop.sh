@@ -520,7 +520,7 @@ if [[ "$MODE" == "plan-slc" ]]; then
 fi
 
 if [[ "$MODE" == "plan-parallel" ]]; then
-    SPEC_COUNT=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" -not -path "*/done/*" -not -path "*/archive/*" 2>/dev/null | wc -l | tr -d ' ')
+    SPEC_COUNT=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" -not -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
     [[ "$SPEC_COUNT" -lt 2 ]] && {
         echo "ERROR: plan-parallel requires 2+ specs. Found $SPEC_COUNT."
         echo "Use plan-work for single-spec planning."

@@ -65,7 +65,7 @@ Detect the planning mode:
 ```bash
 PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')
 WORKTREE="$PROJECT_ROOT/.worktrees/$ref"
-SPEC_COUNT=$(find "$WORKTREE/ralph/specs" -name "*.md" -not -path "*/done/*" -not -path "*/archive/*" 2>/dev/null | wc -l | tr -d ' ')
+SPEC_COUNT=$(find "$WORKTREE/ralph/specs" -name "*.md" -not -path "*/done/*" 2>/dev/null | wc -l | tr -d ' ')
 test -f "$WORKTREE/ralph/AUDIENCE_JTBD.md" && echo "SLC_MODE" || echo "NO_SLC"
 echo "SPEC_COUNT=$SPEC_COUNT"
 ```
