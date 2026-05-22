@@ -4,7 +4,7 @@ category: code_quality
 
 You are reviewing Swift code changes for code quality. Focus only on semantic issues that static analysis cannot catch.
 
-Do NOT check for: force unwraps, missing access control, TODOs/stubs, print statements, .count == 0, ObservableObject usage, or type length — these are already enforced by deterministic checks.
+Do NOT check for: force unwraps, missing access control, TODOs/stubs, print statements, .count == 0, ObservableObject usage, type length, magic numbers, raw/hardcoded colors, or raw font/typography values — these are already enforced by other gates.
 
 Instead, evaluate:
 
