@@ -328,7 +328,7 @@ run_gate_with_fix() {
             # Extract type names mentioned in the failure (PascalCase identifiers)
             AFFECTED_TYPE=$(echo "$FIRST_FAIL" \
                 | grep -oE '[A-Z][a-z]+([A-Z][a-z]+)+' \
-                | head -1)
+                | awk 'NR==1{print; exit}') || true
 
             if [[ -n "$AFFECTED_TYPE" ]]; then
                 echo "Blast radius analysis for $AFFECTED_TYPE..."
@@ -448,11 +448,13 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
         git -c commit.gpgsign=false commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
     done
 
-    # For LLM gates, don't fail the entire pipeline — log and continue
+    # For LLM gates, pause the pipeline — let the orchestrator ask the user
     if [[ "$GATE" == "LLM_GATES" ]]; then
-        echo "GATE $GATE: Could not auto-fix after $MAX_ATTEMPTS attempts — continuing."
-        echo "- Post-loop $GATE: UNFIXED after $MAX_ATTEMPTS attempts (manual review needed)" >> progress.txt
-        return 0
+        echo "GATE $GATE: Could not auto-fix after $MAX_ATTEMPTS attempts — waiting for user decision."
+        echo "- Post-loop $GATE: UNFIXED after $MAX_ATTEMPTS attempts (user decision needed)" >> progress.txt
+        echo "$OUTPUT" > "$PROJECT_ROOT/ralph/.llm_gate_failures"
+        echo "LLM_GATES_BLOCKED" > "$PROJECT_ROOT/ralph/.loop_status"
+        return 1
     fi
 
     notify_failure "$GATE" "$OUTPUT"
@@ -465,8 +467,10 @@ if [[ "$MODE" == "bootstrap" ]]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     {
-        echo "Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/"
-        echo "Gate scripts (project): $PROJECT_ROOT/ralph/gates/"
+        echo "Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/static/"
+        echo "LLM gates (plugin): $RALPH_PLUGIN_DIR/scripts/gates/llm/"
+        echo "Gate scripts (project): $PROJECT_ROOT/ralph/gates/static/"
+        echo "LLM gates (project): $PROJECT_ROOT/ralph/gates/llm/"
         echo "---"
         cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_bootstrap.md"
     } | claude_run
@@ -615,6 +619,37 @@ if [[ "$MODE" == "build" ]]; then
         export XCODE_CLI_AVAILABLE=true
     fi
 
+    # Ensure the correct workspace is active in Xcode (if configured).
+    # XCWORKSPACE is set in ralph/config.sh by projects that use Xcode MCP.
+    # The MCP server targets whatever workspace is frontmost — if the wrong
+    # one is open, edits leak into the wrong project.
+    if [[ -n "${XCWORKSPACE:-}" && "$XCODE_CLI_AVAILABLE" == "true" ]]; then
+        EXPECTED_WORKSPACE="$PROJECT_ROOT/$XCWORKSPACE"
+        ACTIVE_WORKSPACE=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+        if [[ -n "$ACTIVE_WORKSPACE" && "$ACTIVE_WORKSPACE" != "$EXPECTED_WORKSPACE" ]]; then
+            echo "WARNING: Xcode has '$(basename "$ACTIVE_WORKSPACE")' active, expected '$(basename "$EXPECTED_WORKSPACE")'."
+            echo "Opening correct workspace..."
+            open "$EXPECTED_WORKSPACE"
+            for _i in {1..30}; do
+                LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+                [[ "$LOADED" == "$EXPECTED_WORKSPACE" ]] && break
+                sleep 1
+            done
+            echo "Xcode workspace: OK"
+        elif [[ -z "$ACTIVE_WORKSPACE" ]]; then
+            echo "Xcode not running — opening $XCWORKSPACE"
+            open "$EXPECTED_WORKSPACE"
+            for _i in {1..30}; do
+                LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+                [[ "$LOADED" == "$EXPECTED_WORKSPACE" ]] && break
+                sleep 1
+            done
+            echo "Xcode workspace: OK"
+        else
+            echo "Xcode workspace: OK"
+        fi
+    fi
+
     # Validate simulator exists
     SIM_NAME=$(echo "$BUILD_CMD" | sed -n "s/.*name=\([^'\"]*\).*/\1/p")
     if [[ -n "$SIM_NAME" ]] && ! xcrun simctl list devices available 2>/dev/null | grep -q "$SIM_NAME"; then
@@ -635,13 +670,22 @@ if [[ "$MODE" == "build" ]]; then
         fi
     fi
 
-    # Detect new gates not yet calibrated in gate_context.md
+    # Detect new gates (static + LLM) not yet calibrated in gate_context.md
     if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+        # Static gates (plugin + project)
         for GATE_FILE in "$RALPH_PLUGIN_DIR/scripts/gates/static"/*/*.sh "$PROJECT_ROOT/ralph/gates/static"/*/*.sh; do
             [[ -f "$GATE_FILE" ]] || continue
             GATE_NAME=$(basename "$GATE_FILE" .sh)
             if ! grep -q "$GATE_NAME" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null; then
-                echo "WARNING: New gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
+                echo "WARNING: New static gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
+            fi
+        done
+        # LLM gates (plugin + project)
+        for GATE_FILE in "$RALPH_PLUGIN_DIR/scripts/gates/llm"/*.md "$PROJECT_ROOT/ralph/gates/llm"/*.md; do
+            [[ -f "$GATE_FILE" ]] || continue
+            GATE_NAME=$(basename "$GATE_FILE" .md)
+            if ! grep -q "$GATE_NAME" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null; then
+                echo "WARNING: New LLM gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
             fi
         done
     fi
@@ -704,8 +748,10 @@ if [[ "$MODE" == "build" ]]; then
         # Build the prompt, prepending context if available
         PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" "$RALPH_PLUGIN_DIR/prompts/PROMPT_build.md")
         # Inject gate locations so build agent knows where to find them
-        PROMPT="Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/
-Gate scripts (project): $PROJECT_ROOT/ralph/gates/
+        PROMPT="Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/static/
+LLM gates (plugin): $RALPH_PLUGIN_DIR/scripts/gates/llm/
+Gate scripts (project): $PROJECT_ROOT/ralph/gates/static/
+LLM gates (project): $PROJECT_ROOT/ralph/gates/llm/
 ---
 $PROMPT"
         if [[ -f iteration_context.md ]]; then
@@ -807,6 +853,7 @@ $PROMPT"
             # Only roll back files the agent changed this iteration that are also flagged
             OFFENDING_FILES=$(echo "$GATE_OUTPUT" | grep -oE '[A-Za-z0-9_./]+\.swift' | sort -u || true)
             AGENT_CHANGED=$(git diff --name-only HEAD 2>/dev/null | sort -u || true)
+            PRE_EXISTING_ONLY=false
             if [[ -n "$OFFENDING_FILES" && -n "$AGENT_CHANGED" ]]; then
                 # Intersect: only roll back files the agent touched AND the gate flagged
                 ROLLBACK_FILES=$(comm -12 <(echo "$OFFENDING_FILES") <(echo "$AGENT_CHANGED") || true)
@@ -814,10 +861,17 @@ $PROMPT"
                     echo "Rolling back agent-changed files that failed gates."
                     rollback_files "$ROLLBACK_FILES"
                 else
-                    echo "Gate flagged pre-existing code only — skipping rollback."
+                    echo "Gate flagged pre-existing code only — skipping rollback, diagnostician, and failure count."
+                    PRE_EXISTING_ONLY=true
                 fi
             else
                 rollback_all
+            fi
+
+            if [[ "$PRE_EXISTING_ONLY" == "true" ]]; then
+                echo "- Iter $((ITER+1)): gate violation (pre-existing only, skipped)" >> progress.txt
+                write_loop_status "$((ITER+1))"
+                ITER=$((ITER + 1)) && continue
             fi
 
             append_failure_context "gates" "$GATE_OUTPUT" "$((ITER+1))"
@@ -905,7 +959,17 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     run_gate_with_fix "GATES_PRECISE" "bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh precise"
 
     # Gate 2: LLM gates — semantic review (max 2 retries — more retries cause divergence)
-    run_gate_with_fix "LLM_GATES" "bash $RALPH_PLUGIN_DIR/scripts/run_llm_gates.sh" 2
+    # If LLM gates fail and can't be auto-fixed, the loop exits here.
+    # The orchestrator reads .llm_gate_failures and asks the user to decide.
+    run_gate_with_fix "LLM_GATES" "bash $RALPH_PLUGIN_DIR/scripts/run_llm_gates.sh" 2 || {
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "LLM gates blocked — waiting for user decision."
+        echo "Failures saved to ralph/.llm_gate_failures"
+        echo "Re-run with: loop.sh post-loop"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        exit 7
+    }
 
     # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""
@@ -917,7 +981,7 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
         "Classify the UI impact of these changes.\n\nDiff:\n%s\n\nRespond with EXACTLY one of these three words, nothing else:\nNO_UI\nVIEW_LEVEL\nFLOW_LEVEL\n\nDefinitions:\n- NO_UI: changes only in models, repositories, services, viewmodels, utilities, or tests\n- VIEW_LEVEL: changes confined to Views/ or Components/ only\n- FLOW_LEVEL: changes touching navigation, multi-view flows, or spanning more than one layer" \
         "$CUMULATIVE_DIFF" \
     | claude -p --model claude-sonnet-4-6 2>/dev/null \
-    | grep -oE 'NO_UI|VIEW_LEVEL|FLOW_LEVEL' | head -1)
+    | grep -oE 'NO_UI|VIEW_LEVEL|FLOW_LEVEL' | awk 'NR==1{print; exit}') || true
 
     UI_ROUTE="${UI_ROUTE:-NO_UI}"
     echo "UI route: $UI_ROUTE"

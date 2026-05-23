@@ -35,7 +35,13 @@ If the user replies anything other than yes, stop.
 
 Branch the worktree off `spec/$ref` so the spec file is available inside the worktree.
 
-**IMPORTANT:** All `git worktree add` commands below MUST use `dangerouslyDisableSandbox: true` — the sandbox write allowlist does not cover `.worktrees/` and the command will fail with "Operation not permitted" otherwise.
+**IMPORTANT — Sandbox bypass:** The following commands MUST use `dangerouslyDisableSandbox: true` because the OS sandbox blocks writes outside the project root, network access through the sandbox proxy, or process inspection:
+- `git worktree add` / `git worktree remove` (writes to `.worktrees/`)
+- `loop.sh` in any mode (spawns children that write inside the worktree)
+- `git push` / `gh pr create` / `gh issue create` (network access to github.com)
+- `ps aux` (process inspection)
+
+If a command fails with "Operation not permitted" or a TLS/certificate error, retry with `dangerouslyDisableSandbox: true`.
 
 Try these in order, stopping at the first one that succeeds:
 
@@ -259,6 +265,28 @@ cd "$WORKTREE" && loop.sh post-loop 2>&1
 ```
 
 Report each gate outcome to the user.
+
+### LLM gate failures (exit code 7)
+
+If the loop exits with code 7 or `.loop_status` contains `LLM_GATES_BLOCKED`, LLM gates failed and could not be auto-fixed. **Do NOT silently continue.** Instead:
+
+1. Read the failures:
+```bash
+cat "$WORKTREE/ralph/.llm_gate_failures" 2>/dev/null
+```
+
+2. Present them to the user clearly — show which LLM gates failed, the specific findings, and examples from the diff.
+
+3. Ask the user using AskUserQuestion:
+   "LLM gates found issues that couldn't be auto-fixed. Options:
+   1. **Ignore and continue** — proceed to PR with these findings noted
+   2. **Fix manually** — I'll pause while you fix, then re-run post-loop gates
+   3. **Defer as tech debt** — I'll create GitHub issues for each finding and continue"
+
+4. Based on the user's choice:
+   - **Ignore**: Remove `.llm_gate_failures`, note in progress.txt "LLM gates: user accepted", continue to Step 5.
+   - **Fix manually**: Wait for the user to signal they're done, then re-run `cd "$WORKTREE" && loop.sh post-loop 2>&1`.
+   - **Defer**: For each distinct finding, create a GitHub issue (`gh issue create --title "Tech Debt: <gate> — <finding>" --label "tech-debt"`) after checking for duplicates. Then remove `.llm_gate_failures` and continue to Step 5.
 
 ## Step 5 — Verify branch content
 

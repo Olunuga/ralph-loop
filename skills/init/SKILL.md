@@ -51,6 +51,7 @@ ls -d */ 2>/dev/null
 
 From the output, infer:
 - `XCODEPROJ` — the `.xcodeproj` filename
+- `XCWORKSPACE` — the `.xcworkspace` filename (if one exists at the project root)
 - `SCHEME` — the first non-test scheme listed
 - `UNIT_TEST_TARGET` — the target ending in `Tests` (not `UITests`)
 - `UI_TEST_TARGET` — the target ending in `UITests`
@@ -66,6 +67,7 @@ Present everything you discovered to the user in a single AskUserQuestion:
   App name:        <inferred or 'unknown'>
   Description:     <from config.sh or 'unknown'>
   .xcodeproj:      <discovered>
+  .xcworkspace:    <discovered or 'none'>
   Scheme:          <discovered>
   Simulator:       <discovered>
   Unit test target: <discovered>
@@ -90,6 +92,7 @@ APP_NAME="<app_name>"
 APP_DESCRIPTION="<description>"
 
 XCODEPROJ="<xcodeproj>"
+XCWORKSPACE="<xcworkspace>"  # leave empty if no .xcworkspace exists
 PROTOCOLS_DIR="<protocols_dir>"
 SOURCE_DIR="<source_dir>"
 

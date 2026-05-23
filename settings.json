@@ -34,7 +34,16 @@
       "Bash(WORKTREE=*)",
       "Bash(for dir in .worktrees/*)",
       "Bash(cp *)",
-      "Bash(echo *)"
+      "Bash(echo *)",
+      "Bash(ps *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git -c commit.gpgsign=false *)",
+      "Bash(git reset *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(git remote *)",
+      "Bash(open *)"
     ]
   }
 }
