@@ -23,7 +23,7 @@ This is the **plugin source code**, not a target project. When a user runs `clau
 - `cleanup_specs.sh` — archives completed specs to `ralph/specs/done/`, deletes spec branches.
 
 **`agents/` — plugin agents**
-- `diagnostician.md` — Opus-powered diagnostic agent. Spawned by orchestrator at consec_fail=2 to read errors and write targeted diagnosis.
+- `diagnostician.md` — Two-tier diagnostic agent. First pass: lightweight Sonnet call with local context (iteration_context.md) after every failure. Second pass (consec_fail >= 2): loop signals `needs_deep_diagnosis=true` in `.loop_status`, orchestrator spawns the full Opus agent with tool access (Read, Grep, Bash) to investigate source files directly.
 - `spec-builder.md` — Sonnet-powered build agent. Manages one spec's full lifecycle in a worktree (create, loop, gates, report). Spawned during parallel multi-spec builds.
 
 **`scripts/` — internal (called by loop.sh, not on PATH)**
