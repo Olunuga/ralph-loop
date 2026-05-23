@@ -358,3 +358,4 @@ Report to the user:
 - Gates: list which passed
 - What was built: summarise from the Done section of IMPLEMENTATION_PLAN.md
 - If tasks remain: note what's incomplete and suggest re-running `/ralph-loop:run $ref`
+- Remind: "Once the PR is merged, run `/ralph-loop:cleanup $ref` to archive the spec and delete the spec branch."
