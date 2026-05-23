@@ -34,7 +34,8 @@
       "Bash(WORKTREE=*)",
       "Bash(for dir in .worktrees/*)",
       "Bash(cp *)",
-      "Bash(echo *)"
+      "Bash(echo *)",
+      "Bash(ps *)"
     ]
   }
 }
