@@ -185,6 +185,12 @@ ALL `git worktree add` commands must use `dangerouslyDisableSandbox: true`. The 
 ### Monitoring reads from worktree, not $TMPDIR
 `run_in_background` output goes to `$TMPDIR` which the workspace boundary hook blocks. Read `ralph/.loop_status` and `ralph/.loop_output` inside the worktree instead.
 
+### Multi-spec: remove per-spec plan files after agent spawn
+During parallel builds, the orchestrator splits `IMPLEMENTATION_PLAN.md` into `IMPLEMENTATION_PLAN_shared.md` + `IMPLEMENTATION_PLAN_<spec>.md`. The per-spec content is passed inline to each spec-builder agent via `PLAN_CONTENT`. After all agents are spawned, the orchestrator must delete the per-spec files from the main worktree (`rm -f IMPLEMENTATION_PLAN_*.md`). If left in place, the build agent can see them and opportunistically implement tasks from other specs.
+
+### Diff base branch is configurable
+Gates and `prepare_diff.sh` use `DIFF_BASE_BRANCH` (defaults to `main`). When a spec branches from a non-main branch, the spec skill writes the base branch name to `ralph/.diff_base`. `loop.sh` reads this on startup. Without this, gates diff against main and flag all changes from the parent branch as violations.
+
 ## `/ralph-init` and `/ralph-update` Skills
 
 ### Must commit ralph/ after setup/update

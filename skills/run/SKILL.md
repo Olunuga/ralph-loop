@@ -199,6 +199,16 @@ Each agent receives:
 - `WORKTREE` — `.worktrees/$ref-$SPEC_NAME`
 - `PLAN_CONTENT` — the full content of `IMPLEMENTATION_PLAN_<spec-name>.md`
 
+### Phase 3 cleanup: remove per-spec plans from main worktree
+
+After all agents are spawned (their plan content has been passed inline), remove the per-spec plan files from the main worktree so they can't confuse future loop runs:
+
+```bash
+rm -f "$WORKTREE"/IMPLEMENTATION_PLAN_*.md
+```
+
+`IMPLEMENTATION_PLAN.md` (shared deps, already completed) stays — only the per-spec splits are removed.
+
 ### Phase 3 monitoring
 
 While agents are running, check each worktree's status. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes:
