@@ -23,7 +23,7 @@ This is the **plugin source code**, not a target project. When a user runs `clau
 - `cleanup_specs.sh` — archives completed specs to `ralph/specs/done/`, deletes spec branches.
 
 **`agents/` — plugin agents**
-- `diagnostician.md` — Opus-powered diagnostic agent. Spawned by orchestrator at consec_fail=2 to read errors and write targeted diagnosis.
+- `diagnostician.md` — Two-tier diagnostic agent. First pass: lightweight Sonnet call with local context (iteration_context.md) after every failure. Second pass (consec_fail >= 2): loop signals `needs_deep_diagnosis=true` in `.loop_status`, orchestrator spawns the full Opus agent with tool access (Read, Grep, Bash) to investigate source files directly.
 - `spec-builder.md` — Sonnet-powered build agent. Manages one spec's full lifecycle in a worktree (create, loop, gates, report). Spawned during parallel multi-spec builds.
 
 **`scripts/` — internal (called by loop.sh, not on PATH)**
@@ -184,6 +184,12 @@ ALL `git worktree add` commands must use `dangerouslyDisableSandbox: true`. The 
 
 ### Monitoring reads from worktree, not $TMPDIR
 `run_in_background` output goes to `$TMPDIR` which the workspace boundary hook blocks. Read `ralph/.loop_status` and `ralph/.loop_output` inside the worktree instead.
+
+### Multi-spec: remove per-spec plan files after agent spawn
+During parallel builds, the orchestrator splits `IMPLEMENTATION_PLAN.md` into `IMPLEMENTATION_PLAN_shared.md` + `IMPLEMENTATION_PLAN_<spec>.md`. The per-spec content is passed inline to each spec-builder agent via `PLAN_CONTENT`. After all agents are spawned, the orchestrator must delete the per-spec files from the main worktree (`rm -f IMPLEMENTATION_PLAN_*.md`). If left in place, the build agent can see them and opportunistically implement tasks from other specs.
+
+### Diff base branch is configurable
+Gates and `prepare_diff.sh` use `DIFF_BASE_BRANCH` (defaults to `main`). When a spec branches from a non-main branch, the spec skill writes the base branch name to `ralph/.diff_base`. `loop.sh` reads this on startup. Without this, gates diff against main and flag all changes from the parent branch as violations.
 
 ## `/ralph-init` and `/ralph-update` Skills
 

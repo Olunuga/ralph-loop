@@ -192,6 +192,11 @@ git worktree add .worktrees/spec-<slug> spec/<slug> 2>&1
 
 3. If worktree directory already exists, continue — it's ready.
 
+If BASE_BRANCH is not `main`, record it so gates diff against the correct base:
+```bash
+echo "<BASE_BRANCH>" > .worktrees/spec-<slug>/ralph/.diff_base
+```
+
 Write AUDIENCE_JTBD.md first (lives at `.worktrees/spec-<slug>/ralph/AUDIENCE_JTBD.md`, not in specs/) using the Write tool.
 
 Commit (separate Bash calls):

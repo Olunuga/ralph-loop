@@ -125,12 +125,19 @@ While waiting, check progress by reading files inside the worktree. **Wait at le
 sleep 180 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
 ```
 
-The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
+The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `needs_deep_diagnosis`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
 
 Report progress to the user as iterations complete:
 - If `result` changed to `green`: report — "Iteration N: green. Tasks: D done / T total. Commits: C. (G green, F failed iterations so far)."
-- On any failure: the loop automatically runs the diagnostician agent (Sonnet) and appends its analysis to `iteration_context.md`. You do NOT need to spawn a separate diagnostician for in-loop failures.
-- If `consec_fail` reaches 2 or higher: report the current failure pattern and diagnostician analysis to the user. Do NOT ask the user to intervene — the loop handles model escalation automatically.
+- On any failure: the loop automatically runs a lightweight diagnostician (Sonnet, local context only) and appends its analysis to `iteration_context.md`. You do NOT need to spawn a separate diagnostician for first-time failures.
+- If `needs_deep_diagnosis=true`: the lightweight diagnostician has failed to resolve this. **Spawn the full diagnostician agent** using the Agent tool:
+  - Use the `ralph-loop:diagnostician` agent definition
+  - It runs on Opus with full tool access (Read, Grep, Bash)
+  - It can read source files, error logs, specs — everything the Sonnet call couldn't see
+  - Pass it the worktree path so it knows where to look
+  - Its output goes to stdout — append it to `$WORKTREE/iteration_context.md` so the next build iteration can use it
+  - Report the diagnosis to the user
+  - The flag resets automatically at the start of the next iteration
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
 
 When notified the loop has finished, proceed to Step 4b.
@@ -191,6 +198,16 @@ Each agent receives:
 - `BUDGET` — scale based on task count: `max(5, task_count * 2)` iterations per spec
 - `WORKTREE` — `.worktrees/$ref-$SPEC_NAME`
 - `PLAN_CONTENT` — the full content of `IMPLEMENTATION_PLAN_<spec-name>.md`
+
+### Phase 3 cleanup: remove per-spec plans from main worktree
+
+After all agents are spawned (their plan content has been passed inline), remove the per-spec plan files from the main worktree so they can't confuse future loop runs:
+
+```bash
+rm -f "$WORKTREE"/IMPLEMENTATION_PLAN_*.md
+```
+
+`IMPLEMENTATION_PLAN.md` (shared deps, already completed) stays — only the per-spec splits are removed.
 
 ### Phase 3 monitoring
 

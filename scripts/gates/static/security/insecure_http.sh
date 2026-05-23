@@ -6,7 +6,7 @@ gate_category() { echo "security"; }
 gate_tier() { echo "fast"; }
 
 gate_check() {
-    BASE_REF=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+    BASE_REF=$(git merge-base "${DIFF_BASE_BRANCH:-main}" HEAD 2>/dev/null || echo "HEAD~1")
     local src="${SOURCE_DIR:-.}"
     local found=0
 

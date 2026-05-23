@@ -61,6 +61,14 @@ fi
 # ── Runtime state ──────────────────────────────────────────────────────────────
 BRANCH=$(git branch --show-current)
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
+# Base branch for diff comparisons. Resolved in order:
+# 1. DIFF_BASE_BRANCH env var (if already set)
+# 2. ralph/.diff_base file (written by spec skills when branching from non-main)
+# 3. Defaults to main
+if [[ -z "${DIFF_BASE_BRANCH:-}" && -f "$PROJECT_ROOT/ralph/.diff_base" ]]; then
+    DIFF_BASE_BRANCH=$(cat "$PROJECT_ROOT/ralph/.diff_base" | tr -d '[:space:]')
+fi
+export DIFF_BASE_BRANCH="${DIFF_BASE_BRANCH:-main}"
 SPEC_TITLE=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" 2>/dev/null \
     | xargs grep -h "^# " 2>/dev/null | head -1 | sed 's/^# //' \
     || echo "$BRANCH")
@@ -247,10 +255,26 @@ capture_lesson() {
 }
 
 # Run the diagnostician agent after every failure.
-# Reads iteration_context.md, source files, and writes actionable diagnosis.
+# First pass (consec_fail < 2): lightweight Sonnet call with local context only.
+# Second pass (consec_fail >= 2): signal the orchestrator to spawn the full Opus
+# diagnostician agent with tool access (Read, Grep, Bash) for deeper investigation.
 run_diagnostician() {
     local iter="$1"
     local gate="$2"
+
+    if [[ "$CONSEC_FAIL" -ge 2 ]]; then
+        echo "  Sonnet diagnostician failed to resolve after $CONSEC_FAIL attempts — escalating to orchestrator."
+        {
+            echo ""
+            echo "## Deep Diagnosis Needed (iter $iter, gate: $gate)"
+            echo "consec_fail=$CONSEC_FAIL"
+            echo "last_fail_gate=$gate"
+            echo "The lightweight diagnostician has not resolved this. The orchestrator should spawn the full diagnostician agent (Opus, with tool access) to read source files and investigate."
+        } >> iteration_context.md
+        NEEDS_DEEP_DIAGNOSIS=true
+        return
+    fi
+
     echo "  Running diagnostician for $gate failure (iter $iter)..."
     local diag_prompt
     diag_prompt=$(awk 'BEGIN{n=0} /^---$/{n++; next} n>=2' "$RALPH_PLUGIN_DIR/agents/diagnostician.md")
@@ -287,6 +311,7 @@ iteration=$iter
 result=$(tail -1 progress.txt 2>/dev/null | sed 's/^- Iter [0-9]*: //')
 consec_fail=$CONSEC_FAIL
 last_fail_gate=$LAST_FAIL_GATE
+needs_deep_diagnosis=${NEEDS_DEEP_DIAGNOSIS:-false}
 tasks_total=$total_tasks
 tasks_done=$tasks_done
 tasks_remaining=$tasks_remaining
@@ -732,6 +757,7 @@ if [[ "$MODE" == "build" ]]; then
     ITER=0
     CONSEC_FAIL=0
     LAST_FAIL_GATE=""
+    NEEDS_DEEP_DIAGNOSIS=false
 
     while true; do
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
@@ -741,6 +767,9 @@ if [[ "$MODE" == "build" ]]; then
             echo "All tasks in IMPLEMENTATION_PLAN.md are done."
             break
         fi
+
+        # Clear deep diagnosis flag at the start of each iteration
+        NEEDS_DEEP_DIAGNOSIS=false
 
         echo ""
         echo "=== Build iteration $((ITER + 1)) ==="
@@ -974,7 +1003,7 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""
     echo "=== UI routing ==="
-    BASE=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+    BASE=$(git merge-base "$DIFF_BASE_BRANCH" HEAD 2>/dev/null || echo "HEAD~1")
     CUMULATIVE_DIFF=$(git diff "$BASE"...HEAD -- "$SOURCE_DIR/" 2>/dev/null)
 
     UI_ROUTE=$(printf \

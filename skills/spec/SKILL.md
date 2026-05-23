@@ -110,6 +110,11 @@ git worktree add .worktrees/spec-<slug> spec/<slug> 2>&1
 
 3. If worktree directory already exists, continue — it's ready.
 
+If BASE_BRANCH is not `main`, record it so gates diff against the correct base:
+```bash
+echo "<BASE_BRANCH>" > .worktrees/spec-<slug>/ralph/.diff_base
+```
+
 Write the approved spec to `.worktrees/spec-<slug>/ralph/specs/<slug>.md` using the Write tool.
 
 Then commit (each command as a separate Bash call):
