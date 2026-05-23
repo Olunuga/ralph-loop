@@ -465,8 +465,10 @@ if [[ "$MODE" == "bootstrap" ]]; then
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     {
-        echo "Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/"
-        echo "Gate scripts (project): $PROJECT_ROOT/ralph/gates/"
+        echo "Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/static/"
+        echo "LLM gates (plugin): $RALPH_PLUGIN_DIR/scripts/gates/llm/"
+        echo "Gate scripts (project): $PROJECT_ROOT/ralph/gates/static/"
+        echo "LLM gates (project): $PROJECT_ROOT/ralph/gates/llm/"
         echo "---"
         cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_bootstrap.md"
     } | claude_run
@@ -635,13 +637,22 @@ if [[ "$MODE" == "build" ]]; then
         fi
     fi
 
-    # Detect new gates not yet calibrated in gate_context.md
+    # Detect new gates (static + LLM) not yet calibrated in gate_context.md
     if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+        # Static gates (plugin + project)
         for GATE_FILE in "$RALPH_PLUGIN_DIR/scripts/gates/static"/*/*.sh "$PROJECT_ROOT/ralph/gates/static"/*/*.sh; do
             [[ -f "$GATE_FILE" ]] || continue
             GATE_NAME=$(basename "$GATE_FILE" .sh)
             if ! grep -q "$GATE_NAME" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null; then
-                echo "WARNING: New gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
+                echo "WARNING: New static gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
+            fi
+        done
+        # LLM gates (plugin + project)
+        for GATE_FILE in "$RALPH_PLUGIN_DIR/scripts/gates/llm"/*.md "$PROJECT_ROOT/ralph/gates/llm"/*.md; do
+            [[ -f "$GATE_FILE" ]] || continue
+            GATE_NAME=$(basename "$GATE_FILE" .md)
+            if ! grep -q "$GATE_NAME" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null; then
+                echo "WARNING: New LLM gate '$GATE_NAME' not in gate_context.md — build agent will calibrate."
             fi
         done
     fi
@@ -704,8 +715,10 @@ if [[ "$MODE" == "build" ]]; then
         # Build the prompt, prepending context if available
         PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" "$RALPH_PLUGIN_DIR/prompts/PROMPT_build.md")
         # Inject gate locations so build agent knows where to find them
-        PROMPT="Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/
-Gate scripts (project): $PROJECT_ROOT/ralph/gates/
+        PROMPT="Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/static/
+LLM gates (plugin): $RALPH_PLUGIN_DIR/scripts/gates/llm/
+Gate scripts (project): $PROJECT_ROOT/ralph/gates/static/
+LLM gates (project): $PROJECT_ROOT/ralph/gates/llm/
 ---
 $PROMPT"
         if [[ -f iteration_context.md ]]; then
