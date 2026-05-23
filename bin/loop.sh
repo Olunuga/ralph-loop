@@ -328,7 +328,7 @@ run_gate_with_fix() {
             # Extract type names mentioned in the failure (PascalCase identifiers)
             AFFECTED_TYPE=$(echo "$FIRST_FAIL" \
                 | grep -oE '[A-Z][a-z]+([A-Z][a-z]+)+' \
-                | head -1)
+                | awk 'NR==1{print; exit}') || true
 
             if [[ -n "$AFFECTED_TYPE" ]]; then
                 echo "Blast radius analysis for $AFFECTED_TYPE..."
@@ -942,7 +942,7 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
         "Classify the UI impact of these changes.\n\nDiff:\n%s\n\nRespond with EXACTLY one of these three words, nothing else:\nNO_UI\nVIEW_LEVEL\nFLOW_LEVEL\n\nDefinitions:\n- NO_UI: changes only in models, repositories, services, viewmodels, utilities, or tests\n- VIEW_LEVEL: changes confined to Views/ or Components/ only\n- FLOW_LEVEL: changes touching navigation, multi-view flows, or spanning more than one layer" \
         "$CUMULATIVE_DIFF" \
     | claude -p --model claude-sonnet-4-6 2>/dev/null \
-    | grep -oE 'NO_UI|VIEW_LEVEL|FLOW_LEVEL' | head -1)
+    | grep -oE 'NO_UI|VIEW_LEVEL|FLOW_LEVEL' | awk 'NR==1{print; exit}') || true
 
     UI_ROUTE="${UI_ROUTE:-NO_UI}"
     echo "UI route: $UI_ROUTE"
