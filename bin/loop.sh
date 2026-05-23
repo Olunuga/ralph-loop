@@ -61,6 +61,14 @@ fi
 # ── Runtime state ──────────────────────────────────────────────────────────────
 BRANCH=$(git branch --show-current)
 SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
+# Base branch for diff comparisons. Resolved in order:
+# 1. DIFF_BASE_BRANCH env var (if already set)
+# 2. ralph/.diff_base file (written by spec skills when branching from non-main)
+# 3. Defaults to main
+if [[ -z "${DIFF_BASE_BRANCH:-}" && -f "$PROJECT_ROOT/ralph/.diff_base" ]]; then
+    DIFF_BASE_BRANCH=$(cat "$PROJECT_ROOT/ralph/.diff_base" | tr -d '[:space:]')
+fi
+export DIFF_BASE_BRANCH="${DIFF_BASE_BRANCH:-main}"
 SPEC_TITLE=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" 2>/dev/null \
     | xargs grep -h "^# " 2>/dev/null | head -1 | sed 's/^# //' \
     || echo "$BRANCH")
@@ -995,7 +1003,7 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""
     echo "=== UI routing ==="
-    BASE=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+    BASE=$(git merge-base "$DIFF_BASE_BRANCH" HEAD 2>/dev/null || echo "HEAD~1")
     CUMULATIVE_DIFF=$(git diff "$BASE"...HEAD -- "$SOURCE_DIR/" 2>/dev/null)
 
     UI_ROUTE=$(printf \

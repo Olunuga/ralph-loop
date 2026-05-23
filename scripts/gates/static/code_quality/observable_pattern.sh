@@ -7,7 +7,7 @@ gate_tier()  { echo "fast"; }
 
 gate_check() {
     local base_ref
-    base_ref=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+    base_ref=$(git merge-base "${DIFF_BASE_BRANCH:-main}" HEAD 2>/dev/null || echo "HEAD~1")
     local src="${SOURCE_DIR:-.}"
 
     local hits

@@ -24,7 +24,7 @@ PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
 
 SRC="${SOURCE_DIR:-.}"
 
-DIFF_BASE_REF=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+DIFF_BASE_REF=$(git merge-base "${DIFF_BASE_BRANCH:-main}" HEAD 2>/dev/null || echo "HEAD~1")
 
 PREPARED_DIFF=$(git diff "$DIFF_BASE_REF"...HEAD -- "$SRC/" 2>/dev/null || true)
 DIFF_STATS=$(git diff --stat "$DIFF_BASE_REF"...HEAD -- "$SRC/" 2>/dev/null || true)
