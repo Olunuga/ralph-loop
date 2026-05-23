@@ -112,6 +112,14 @@ If the loop exits early (iteration budget exhausted, laptop slept, session ended
 
 The pipeline detects prior `ralph:` commits on the branch, reconciles the plan (marks completed tasks), and continues from where it left off. No work is lost — committed code survives across runs.
 
+### Baseline health check
+
+```
+/ralph-loop:doctor                 # diagnose build, test, and gate failures
+```
+
+Runs the full baseline: build, unit tests, static gates (fast + precise), and LLM gates. Groups findings by root cause and classifies them as **critical** (blocks the pipeline) or **tech debt** (from gate analysis — magic numbers, raw colors, etc.). You pick what to fix, and it delegates to `/ralph-loop:spec` or `/ralph-loop:req-prd` to create the fix specs.
+
 ### Post-merge cleanup
 
 ```
@@ -177,7 +185,7 @@ gate_category() { echo "org"; }
 gate_tier()     { echo "fast"; }
 
 gate_check() {
-    BASE_REF=$(git merge-base main HEAD 2>/dev/null || echo "HEAD~1")
+    BASE_REF=$(git merge-base "${DIFF_BASE_BRANCH:-main}" HEAD 2>/dev/null || echo "HEAD~1")
     # Your check logic — exit 0 = pass, exit 1 = fail
 }
 ```

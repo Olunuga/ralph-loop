@@ -45,6 +45,7 @@ This is the **plugin source code**, not a target project. When a user runs `clau
 - `spec/SKILL.md` — `/ralph-loop:spec` single-feature JTBD conversation → spec on a branch.
 - `req-prd/SKILL.md` — `/ralph-loop:req-prd` PRD-style requirements — decomposes one JTBD into multiple topics of concern, one spec per topic.
 - `req-slc/SKILL.md` — `/ralph-loop:req-slc` SLC-aware requirements — captures audiences, JTBDs, activities with capability depths. Produces AUDIENCE_JTBD.md + activity specs. Full scope upfront; slicing happens at planning time.
+- `doctor/SKILL.md` — `/ralph-loop:doctor` baseline health diagnosis. Runs build, tests, and all gates (static fast/precise + LLM) to surface pre-existing failures and tech debt. Groups findings by root cause, classifies as critical (blocks pipeline) vs tech debt (quality degradation). Lets the user pick what to fix, then delegates to `/ralph-loop:spec` (1 root cause) or `/ralph-loop:req-prd` (2+ root causes) for spec creation.
 - `cleanup/SKILL.md` — `/ralph-loop:cleanup` post-merge archive. Moves completed specs to `ralph/specs/done/`, deletes spec branches.
 - `init/SKILL.md` — `/ralph-loop:init` one-time project setup. Creates `ralph/` shell, copies hook, discovers build config, bootstraps AGENTS.md.
 - `migrate/SKILL.md` — `/ralph-loop:migrate` converts legacy file-copy installations to plugin mode.
