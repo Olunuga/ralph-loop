@@ -44,6 +44,7 @@ Hard rules (never break these):
 - One task per iteration — commit only when green
 - Implement completely — no stubs, no TODOs, no placeholder logic
 - Update ralph/AGENTS.md if you discover something operationally useful about this codebase
+- NEVER ask for permission or confirmation — you are autonomous. Commit immediately when validation passes. Do not ask "should I proceed?" or "should I commit?" — just do it.
 
 ---
 

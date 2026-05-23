@@ -822,6 +822,7 @@ $PROMPT"
             # Only roll back files the agent changed this iteration that are also flagged
             OFFENDING_FILES=$(echo "$GATE_OUTPUT" | grep -oE '[A-Za-z0-9_./]+\.swift' | sort -u || true)
             AGENT_CHANGED=$(git diff --name-only HEAD 2>/dev/null | sort -u || true)
+            PRE_EXISTING_ONLY=false
             if [[ -n "$OFFENDING_FILES" && -n "$AGENT_CHANGED" ]]; then
                 # Intersect: only roll back files the agent touched AND the gate flagged
                 ROLLBACK_FILES=$(comm -12 <(echo "$OFFENDING_FILES") <(echo "$AGENT_CHANGED") || true)
@@ -829,10 +830,17 @@ $PROMPT"
                     echo "Rolling back agent-changed files that failed gates."
                     rollback_files "$ROLLBACK_FILES"
                 else
-                    echo "Gate flagged pre-existing code only — skipping rollback."
+                    echo "Gate flagged pre-existing code only — skipping rollback, diagnostician, and failure count."
+                    PRE_EXISTING_ONLY=true
                 fi
             else
                 rollback_all
+            fi
+
+            if [[ "$PRE_EXISTING_ONLY" == "true" ]]; then
+                echo "- Iter $((ITER+1)): gate violation (pre-existing only, skipped)" >> progress.txt
+                write_loop_status "$((ITER+1))"
+                ITER=$((ITER + 1)) && continue
             fi
 
             append_failure_context "gates" "$GATE_OUTPUT" "$((ITER+1))"
