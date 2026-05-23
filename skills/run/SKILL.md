@@ -35,7 +35,13 @@ If the user replies anything other than yes, stop.
 
 Branch the worktree off `spec/$ref` so the spec file is available inside the worktree.
 
-**IMPORTANT:** All `git worktree add` commands below MUST use `dangerouslyDisableSandbox: true` — the sandbox write allowlist does not cover `.worktrees/` and the command will fail with "Operation not permitted" otherwise.
+**IMPORTANT — Sandbox bypass:** The following commands MUST use `dangerouslyDisableSandbox: true` because the OS sandbox blocks writes outside the project root, network access through the sandbox proxy, or process inspection:
+- `git worktree add` / `git worktree remove` (writes to `.worktrees/`)
+- `loop.sh` in any mode (spawns children that write inside the worktree)
+- `git push` / `gh pr create` / `gh issue create` (network access to github.com)
+- `ps aux` (process inspection)
+
+If a command fails with "Operation not permitted" or a TLS/certificate error, retry with `dangerouslyDisableSandbox: true`.
 
 Try these in order, stopping at the first one that succeeds:
 
