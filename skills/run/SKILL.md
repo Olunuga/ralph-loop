@@ -260,6 +260,28 @@ cd "$WORKTREE" && loop.sh post-loop 2>&1
 
 Report each gate outcome to the user.
 
+### LLM gate failures (exit code 7)
+
+If the loop exits with code 7 or `.loop_status` contains `LLM_GATES_BLOCKED`, LLM gates failed and could not be auto-fixed. **Do NOT silently continue.** Instead:
+
+1. Read the failures:
+```bash
+cat "$WORKTREE/ralph/.llm_gate_failures" 2>/dev/null
+```
+
+2. Present them to the user clearly — show which LLM gates failed, the specific findings, and examples from the diff.
+
+3. Ask the user using AskUserQuestion:
+   "LLM gates found issues that couldn't be auto-fixed. Options:
+   1. **Ignore and continue** — proceed to PR with these findings noted
+   2. **Fix manually** — I'll pause while you fix, then re-run post-loop gates
+   3. **Defer as tech debt** — I'll create GitHub issues for each finding and continue"
+
+4. Based on the user's choice:
+   - **Ignore**: Remove `.llm_gate_failures`, note in progress.txt "LLM gates: user accepted", continue to Step 5.
+   - **Fix manually**: Wait for the user to signal they're done, then re-run `cd "$WORKTREE" && loop.sh post-loop 2>&1`.
+   - **Defer**: For each distinct finding, create a GitHub issue (`gh issue create --title "Tech Debt: <gate> — <finding>" --label "tech-debt"`) after checking for duplicates. Then remove `.llm_gate_failures` and continue to Step 5.
+
 ## Step 5 — Verify branch content
 
 Before cleaning up, verify the branch actually has implementation commits (not just the spec):

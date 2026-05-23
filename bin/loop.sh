@@ -448,11 +448,13 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
         git -c commit.gpgsign=false commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
     done
 
-    # For LLM gates, don't fail the entire pipeline — log and continue
+    # For LLM gates, pause the pipeline — let the orchestrator ask the user
     if [[ "$GATE" == "LLM_GATES" ]]; then
-        echo "GATE $GATE: Could not auto-fix after $MAX_ATTEMPTS attempts — continuing."
-        echo "- Post-loop $GATE: UNFIXED after $MAX_ATTEMPTS attempts (manual review needed)" >> progress.txt
-        return 0
+        echo "GATE $GATE: Could not auto-fix after $MAX_ATTEMPTS attempts — waiting for user decision."
+        echo "- Post-loop $GATE: UNFIXED after $MAX_ATTEMPTS attempts (user decision needed)" >> progress.txt
+        echo "$OUTPUT" > "$PROJECT_ROOT/ralph/.llm_gate_failures"
+        echo "LLM_GATES_BLOCKED" > "$PROJECT_ROOT/ralph/.loop_status"
+        return 1
     fi
 
     notify_failure "$GATE" "$OUTPUT"
@@ -918,7 +920,17 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     run_gate_with_fix "GATES_PRECISE" "bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh precise"
 
     # Gate 2: LLM gates — semantic review (max 2 retries — more retries cause divergence)
-    run_gate_with_fix "LLM_GATES" "bash $RALPH_PLUGIN_DIR/scripts/run_llm_gates.sh" 2
+    # If LLM gates fail and can't be auto-fixed, the loop exits here.
+    # The orchestrator reads .llm_gate_failures and asks the user to decide.
+    run_gate_with_fix "LLM_GATES" "bash $RALPH_PLUGIN_DIR/scripts/run_llm_gates.sh" 2 || {
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "LLM gates blocked — waiting for user decision."
+        echo "Failures saved to ralph/.llm_gate_failures"
+        echo "Re-run with: loop.sh post-loop"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        exit 7
+    }
 
     # Gate 3: UI routing decision (agent classifies the full branch diff)
     echo ""

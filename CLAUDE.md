@@ -154,7 +154,7 @@ Based on the composite score (0-10):
 
 Thresholds are configurable per-project via `ralph/gate_context.md`.
 
-LLM gates that exhaust retries without a fix also don't fail the pipeline — they log for manual review. This prevents architectural suggestions from blocking feature delivery.
+LLM gates that exhaust retries without a fix block the pipeline (exit code 7) and write failures to `ralph/.llm_gate_failures`. The orchestrator reads these, presents them to the user, and asks whether to ignore, fix manually, or defer as tech debt. The user decides — LLM gates are not silently skipped.
 
 Based on Martin's coupling metrics, Google's LSC sharding practice, and Feathers' seam analysis.
 - `run_gate_with_fix` accepts an optional max-attempts parameter
