@@ -619,6 +619,37 @@ if [[ "$MODE" == "build" ]]; then
         export XCODE_CLI_AVAILABLE=true
     fi
 
+    # Ensure the correct workspace is active in Xcode (if configured).
+    # XCWORKSPACE is set in ralph/config.sh by projects that use Xcode MCP.
+    # The MCP server targets whatever workspace is frontmost — if the wrong
+    # one is open, edits leak into the wrong project.
+    if [[ -n "${XCWORKSPACE:-}" && "$XCODE_CLI_AVAILABLE" == "true" ]]; then
+        EXPECTED_WORKSPACE="$PROJECT_ROOT/$XCWORKSPACE"
+        ACTIVE_WORKSPACE=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+        if [[ -n "$ACTIVE_WORKSPACE" && "$ACTIVE_WORKSPACE" != "$EXPECTED_WORKSPACE" ]]; then
+            echo "WARNING: Xcode has '$(basename "$ACTIVE_WORKSPACE")' active, expected '$(basename "$EXPECTED_WORKSPACE")'."
+            echo "Opening correct workspace..."
+            open "$EXPECTED_WORKSPACE"
+            for _i in {1..30}; do
+                LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+                [[ "$LOADED" == "$EXPECTED_WORKSPACE" ]] && break
+                sleep 1
+            done
+            echo "Xcode workspace: OK"
+        elif [[ -z "$ACTIVE_WORKSPACE" ]]; then
+            echo "Xcode not running — opening $XCWORKSPACE"
+            open "$EXPECTED_WORKSPACE"
+            for _i in {1..30}; do
+                LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+                [[ "$LOADED" == "$EXPECTED_WORKSPACE" ]] && break
+                sleep 1
+            done
+            echo "Xcode workspace: OK"
+        else
+            echo "Xcode workspace: OK"
+        fi
+    fi
+
     # Validate simulator exists
     SIM_NAME=$(echo "$BUILD_CMD" | sed -n "s/.*name=\([^'\"]*\).*/\1/p")
     if [[ -n "$SIM_NAME" ]] && ! xcrun simctl list devices available 2>/dev/null | grep -q "$SIM_NAME"; then
