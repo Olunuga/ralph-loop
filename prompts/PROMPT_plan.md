@@ -47,8 +47,8 @@ Rules for tasks:
 - Include the target file path so the build agent knows exactly where to work
 - Include the reference file so the build agent knows exactly what pattern to follow
 
-STEP 4 — Commit:
-git add IMPLEMENTATION_PLAN.md && git -c commit.gpgsign=false commit -m "ralph: generate plan from specs"
+STEP 4 — Commit (best-effort — the file may be gitignored by design):
+git add -f IMPLEMENTATION_PLAN.md 2>/dev/null && git -c commit.gpgsign=false commit -m "ralph: generate plan from specs" 2>/dev/null || true
 
 ---
 

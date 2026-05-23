@@ -52,8 +52,8 @@ Rules:
   how @MainActor ViewModels are tested, and how ModelContext/ModelContainer is set up.
   The build agent will follow this pattern exactly.
 
-STEP 4 — Commit:
-git add IMPLEMENTATION_PLAN.md && git -c commit.gpgsign=false commit -m "ralph: plan — ${WORK_DESCRIPTION}"
+STEP 4 — Commit (best-effort — the file may be gitignored by design):
+git add -f IMPLEMENTATION_PLAN.md 2>/dev/null && git -c commit.gpgsign=false commit -m "ralph: plan — ${WORK_DESCRIPTION}" 2>/dev/null || true
 
 ---
 
