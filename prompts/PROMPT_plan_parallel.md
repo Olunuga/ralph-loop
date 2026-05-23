@@ -72,8 +72,8 @@ Rules:
 - SHARED section only contains tasks needed by 2+ specs — do not over-share
 - Each Per-Spec section is INDEPENDENT — buildable without the other specs (assuming shared deps are done)
 
-STEP 5 — Commit:
-git add IMPLEMENTATION_PLAN.md && git -c commit.gpgsign=false commit -m "ralph: parallel plan from specs"
+STEP 5 — Commit (best-effort — the file may be gitignored by design):
+git add -f IMPLEMENTATION_PLAN.md 2>/dev/null && git -c commit.gpgsign=false commit -m "ralph: parallel plan from specs" 2>/dev/null || true
 
 ---
 
