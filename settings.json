@@ -11,7 +11,7 @@
       "Bash(cd * && bash loop.sh*)",
       "Bash(cleanup_specs.sh*)",
       "Bash(bash cleanup_specs.sh*)",
-      "Bash(sleep * && *)",
+      "Bash(sleep *)",
       "Bash(cat *)",
       "Bash(tail *)",
       "Bash(head *)",
