@@ -27,6 +27,40 @@ export RALPH_PLUGIN_DIR="$(CDPATH= cd "$SCRIPT_SELF/.." && pwd)"
 PROJECT_ROOT="$(pwd)"
 cd "$PROJECT_ROOT"
 
+# ── PID lockfile ──────────────────────────────────────────────────────────────
+# Prevent multiple loop instances from running in the same worktree.
+LOCKFILE="$PROJECT_ROOT/ralph/.loop.pid"
+if [[ -f "$LOCKFILE" ]]; then
+    OLD_PID=$(cat "$LOCKFILE" 2>/dev/null || true)
+    if [[ -n "$OLD_PID" ]] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "ERROR: Another loop.sh (PID $OLD_PID) is already running in this worktree."
+        echo "Kill it first: kill $OLD_PID"
+        exit 1
+    fi
+    # Stale lockfile — previous loop died without cleanup
+    rm -f "$LOCKFILE"
+fi
+echo $$ > "$LOCKFILE"
+
+# Master cleanup function — called on exit, kill, or interrupt.
+# Consolidates all cleanup: lockfile, simulator, Xcode window.
+ralph_cleanup() {
+    rm -f "$LOCKFILE" 2>/dev/null || true
+    [[ -n "${RALPH_SIM_UDID:-}" ]] && xcrun simctl shutdown "$RALPH_SIM_UDID" 2>/dev/null || true
+    if [[ -n "${EXPECTED_XCODE_PATH:-}" ]]; then
+        osascript -e "
+            tell application \"Xcode\"
+                repeat with doc in (every workspace document)
+                    if path of doc contains \"$PROJECT_ROOT\" then
+                        close doc
+                    end if
+                end repeat
+            end tell
+        " 2>/dev/null || true
+    fi
+}
+trap ralph_cleanup EXIT INT TERM
+
 # ── Mode ───────────────────────────────────────────────────────────────────────
 MODE="build"
 MAX_ITERATIONS=0
@@ -150,6 +184,14 @@ notify_failure() {
 # Rollback all changes (build/test failures — can't attribute to single files).
 # Also undoes any uncommitted agent commits from this iteration.
 rollback_all() {
+    # Preserve pipeline state files across rollback — these track progress
+    # and must survive even if they were accidentally tracked by git.
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    for f in IMPLEMENTATION_PLAN*.md iteration_context.md progress.txt; do
+        [[ -f "$f" ]] && cp "$f" "$tmpdir/" 2>/dev/null || true
+    done
+
     # Undo agent commits from this iteration (commits since last known-good state)
     local agent_commits
     agent_commits=$(git log --oneline --grep="^ralph:" --since="5 minutes ago" 2>/dev/null | wc -l | tr -d ' ')
@@ -159,6 +201,12 @@ rollback_all() {
     fi
     git checkout -- . 2>/dev/null || true
     git clean -fd -e 'IMPLEMENTATION_PLAN*.md' -e 'iteration_context.md' -e 'progress.txt' 2>/dev/null || true
+
+    # Restore pipeline state files
+    for f in "$tmpdir"/*; do
+        [[ -f "$f" ]] && cp "$f" . 2>/dev/null || true
+    done
+    rm -rf "$tmpdir"
 }
 
 # Rollback specific files (gate failures that identify offending files).
