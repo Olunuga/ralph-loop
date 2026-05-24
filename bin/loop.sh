@@ -858,14 +858,50 @@ $PROMPT"
             ITER=$((ITER + 1)) && continue
         fi
 
-        # ── 1. Build ─────────────────────────────────────────────────────────────
+        # ── 1. Build (with inline fix attempts) ─────────────────────────────────
+        # Instead of immediately rolling back on build failure, give the agent
+        # up to 2 chances to fix compile errors in-place. Only files the agent
+        # touched this iteration are allowed to be modified.
+        AGENT_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
+        BUILD_PASS=false
         BUILD_OUTPUT=""
-        if ! BUILD_OUTPUT=$(eval "$BUILD_CMD" 2>&1); then
-            echo "HARD: Build failed — rolling back."
+        for BUILD_ATTEMPT in 1 2 3; do
+            if BUILD_OUTPUT=$(eval "$BUILD_CMD" 2>&1); then
+                BUILD_PASS=true
+                break
+            fi
+
+            # First attempt is the original build — attempts 2-3 are fix attempts
+            if [[ "$BUILD_ATTEMPT" -ge 3 ]]; then
+                break
+            fi
+
+            echo "  Build failed (attempt $BUILD_ATTEMPT/3) — attempting inline fix..."
+
+            # Extract error lines for the fix prompt
+            BUILD_ERRORS=$(echo "$BUILD_OUTPUT" | grep -E 'error:|cannot |no member|missing|undeclared|expected ' | head -20 || true)
+
+            # Build the fix prompt — scoped to agent's files only
+            FIX_PROMPT="The build failed with these errors:
+
+$BUILD_ERRORS
+
+You may ONLY modify these files (the ones you changed this iteration):
+$AGENT_FILES
+
+Fix the compile errors. Do NOT modify any other files. Do NOT add new features or refactor.
+Read the error messages carefully — check the actual type signatures and initializers in the source before writing fixes.
+After fixing, do nothing else — the loop will re-run the build."
+
+            echo "$FIX_PROMPT" | claude_run_fast 2>/dev/null || true
+        done
+
+        if [[ "$BUILD_PASS" == false ]]; then
+            echo "HARD: Build failed after 3 attempts — rolling back."
             append_failure_context "build" "$BUILD_OUTPUT" "$((ITER+1))"
             rollback_all
             run_diagnostician "$((ITER+1))" "build"
-            echo "- Iter $((ITER+1)): build failed" >> progress.txt
+            echo "- Iter $((ITER+1)): build failed (3 attempts)" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "build" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="build"; }
             write_loop_status "$((ITER+1))"
             ITER=$((ITER + 1)) && continue
@@ -882,7 +918,69 @@ $PROMPT"
                     echo "Tests failed but only with pre-existing baseline failures — continuing."
                     echo "- Iter $((ITER+1)): tests failed (pre-existing only, skipped rollback)" >> progress.txt
                 else
-                    echo "HARD: Unit tests failed with NEW failures (beyond baseline)."
+                    echo "Unit tests have NEW failures — attempting inline fix..."
+
+                    # Inline test fix: give the agent 1 attempt to fix test failures
+                    # scoped to files it touched this iteration
+                    TEST_ERRORS=$(echo "$NEW_FAILURES" | head -20)
+                    TEST_FIX_PROMPT="Unit tests failed with these NEW errors (not pre-existing):
+
+$TEST_ERRORS
+
+You may ONLY modify these files (the ones you changed this iteration):
+$AGENT_FILES
+
+Fix the test failures. Read the actual method signatures and types before fixing.
+Do NOT modify any other files. Do NOT add new features."
+
+                    echo "$TEST_FIX_PROMPT" | claude_run_fast 2>/dev/null || true
+
+                    # Re-run tests after fix attempt
+                    if TEST_RETRY=$(eval "$UNIT_TEST_CMD" 2>&1); then
+                        echo "  Inline test fix succeeded."
+                    else
+                        RETRY_FAILURES=$(echo "$TEST_RETRY" | grep -E 'FAIL|failed|error:' | sort -u || true)
+                        STILL_NEW=$(comm -23 <(echo "$RETRY_FAILURES") <(echo "$BASELINE_TEST_FAILURES") || true)
+                        if [[ -z "$STILL_NEW" ]]; then
+                            echo "  Inline test fix resolved new failures (pre-existing remain)."
+                        else
+                            echo "HARD: Unit tests still failing after inline fix."
+                            append_failure_context "tests" "$TEST_RETRY" "$((ITER+1))"
+                            run_diagnostician "$((ITER+1))" "tests"
+                            TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
+                            if [[ -n "$TEST_FILES" ]]; then
+                                echo "Rolling back test files only — keeping source changes."
+                                rollback_files "$TEST_FILES"
+                            else
+                                rollback_all
+                            fi
+                            echo "- Iter $((ITER+1)): tests failed (after inline fix)" >> progress.txt
+                            [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
+                            write_loop_status "$((ITER+1))"
+                            ITER=$((ITER + 1)) && continue
+                        fi
+                    fi
+                fi
+            else
+                echo "Unit tests failed — attempting inline fix..."
+
+                TEST_ERRORS=$(echo "$TEST_OUTPUT" | grep -E 'FAIL|failed|error:' | head -20 || true)
+                TEST_FIX_PROMPT="Unit tests failed:
+
+$TEST_ERRORS
+
+You may ONLY modify these files (the ones you changed this iteration):
+$AGENT_FILES
+
+Fix the test failures. Read the actual method signatures and types before fixing.
+Do NOT modify any other files. Do NOT add new features."
+
+                echo "$TEST_FIX_PROMPT" | claude_run_fast 2>/dev/null || true
+
+                if eval "$UNIT_TEST_CMD" >/dev/null 2>&1; then
+                    echo "  Inline test fix succeeded."
+                else
+                    echo "HARD: Unit tests still failing after inline fix."
                     append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
                     run_diagnostician "$((ITER+1))" "tests"
                     TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
@@ -892,26 +990,11 @@ $PROMPT"
                     else
                         rollback_all
                     fi
-                    echo "- Iter $((ITER+1)): tests failed" >> progress.txt
+                    echo "- Iter $((ITER+1)): tests failed (after inline fix)" >> progress.txt
                     [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
                     write_loop_status "$((ITER+1))"
                     ITER=$((ITER + 1)) && continue
                 fi
-            else
-                echo "HARD: Unit tests failed."
-                append_failure_context "tests" "$TEST_OUTPUT" "$((ITER+1))"
-                run_diagnostician "$((ITER+1))" "tests"
-                TEST_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E 'Tests/|Spec/' || true)
-                if [[ -n "$TEST_FILES" ]]; then
-                    echo "Rolling back test files only — keeping source changes."
-                    rollback_files "$TEST_FILES"
-                else
-                    rollback_all
-                fi
-                echo "- Iter $((ITER+1)): tests failed" >> progress.txt
-                [[ "$LAST_FAIL_GATE" == "tests" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="tests"; }
-                write_loop_status "$((ITER+1))"
-                ITER=$((ITER + 1)) && continue
             fi
         fi
 
