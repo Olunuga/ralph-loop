@@ -89,6 +89,7 @@ check_paths() {
         [[ -z "$token" ]] && continue
         [[ "$token" == *'*'* || "$token" == *'?'* ]] && continue  # skip glob patterns
         [[ "${token:1}" != */* ]] && continue  # skip /filename with no directory (e.g. /iteration_context.md)
+        [[ "$token" == /.* ]] && continue  # skip /. paths — relative refs like /.worktrees/, /.git/, /.claude/
         if is_outside_workspace "$token"; then
             block "$label references path outside workspace: '$token'"
         fi
