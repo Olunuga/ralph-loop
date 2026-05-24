@@ -115,6 +115,9 @@ Both can block the same operation for different reasons. When debugging, check w
 ### `set -euo pipefail` kills the loop
 Any uncaught error in a `claude -p` call, `git push`, or API timeout kills the entire script. Agent calls are wrapped with `|| AGENT_OK=false` (build loop) and `|| echo "WARN: ..."` (run_gate_with_fix) to catch failures and continue.
 
+### Inline fix before rollback
+When the build or tests fail, the loop gives the agent up to 2 fix attempts scoped to **only the files it touched this iteration** (`git diff --name-only HEAD`). The fix agent gets the error output + the file list and can only modify those files. If the fix lands (build/tests pass), the iteration continues to gates. If not, normal rollback + diagnostician kicks in. This avoids the expensive rollback → re-read specs → re-implement cycle for simple compile errors like wrong init signatures.
+
 ### Rollback must undo commits, not just uncommitted changes
 The build agent commits its work before gates run. `git checkout HEAD -- <file>` only reverts uncommitted changes — committed code is untouched. `rollback_all` and `rollback_files` now detect agent commits from the current iteration (via `git log --grep="^ralph:" --since="5 minutes ago"`) and `git reset HEAD~N` to undo them before reverting files.
 
