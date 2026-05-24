@@ -155,6 +155,17 @@ Based on the composite score (0-10):
 
 Thresholds are configurable per-project via `ralph/gate_context.md`.
 
+### gate_context.md format
+The gate runner parses `gate_context.md` with `grep -E "^- [a-z_]+: SKIP"`. Each entry must be a markdown list item in this exact format:
+
+```
+- color_only: SKIP — pre-existing violations on this branch
+- missing_labels: SKIP — will fix in accessibility pass
+- large_type: ENFORCE
+```
+
+**Markdown headers (`## color_only SKIP`) are silently ignored.** The runner only reads `- name: SKIP|ENFORCE` lines. This is the most common misconfiguration — the diagnostician has caught it multiple times.
+
 LLM gates that exhaust retries without a fix block the pipeline (exit code 7) and write failures to `ralph/.llm_gate_failures`. The orchestrator reads these, presents them to the user, and asks whether to ignore, fix manually, or defer as tech debt. The user decides — LLM gates are not silently skipped.
 
 Based on Martin's coupling metrics, Google's LSC sharding practice, and Feathers' seam analysis.
