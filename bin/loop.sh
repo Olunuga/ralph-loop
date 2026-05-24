@@ -695,6 +695,38 @@ if [[ "$MODE" == "build" ]]; then
         fi
     fi
 
+    # Pre-boot the simulator so iterations reuse a single instance.
+    # Without this, each xcodebuild call can spawn a new Simulator window.
+    if [[ -n "$SIM_NAME" ]]; then
+        SIM_UDID=$(xcrun simctl list devices available -j 2>/dev/null \
+            | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for runtime, devices in data.get('devices', {}).items():
+    for d in devices:
+        if d.get('name') == '$SIM_NAME' and d.get('isAvailable'):
+            print(d['udid']); sys.exit(0)
+" 2>/dev/null || true)
+        if [[ -n "$SIM_UDID" ]]; then
+            SIM_STATE=$(xcrun simctl list devices -j 2>/dev/null \
+                | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for runtime, devices in data.get('devices', {}).items():
+    for d in devices:
+        if d.get('udid') == '$SIM_UDID':
+            print(d.get('state', 'Unknown')); sys.exit(0)
+" 2>/dev/null || echo "Unknown")
+            if [[ "$SIM_STATE" != "Booted" ]]; then
+                echo "Booting simulator '$SIM_NAME' ($SIM_UDID)..."
+                xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
+            else
+                echo "Simulator '$SIM_NAME' already booted."
+            fi
+            export RALPH_SIM_UDID="$SIM_UDID"
+        fi
+    fi
+
     # Detect new gates (static + LLM) not yet calibrated in gate_context.md
     if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
         # Static gates (plugin + project)
@@ -974,6 +1006,13 @@ $PROMPT"
         write_loop_status "$((ITER+1))"
         ITER=$((ITER + 1))
     done
+fi
+
+# ── Shutdown simulator ─────────────────────────────────────────────────────────
+# Shut down the pre-booted simulator to avoid accumulating open instances.
+if [[ -n "${RALPH_SIM_UDID:-}" ]]; then
+    echo "Shutting down simulator..."
+    xcrun simctl shutdown "$RALPH_SIM_UDID" 2>/dev/null || true
 fi
 
 # ── Post-loop gates ────────────────────────────────────────────────────────────
