@@ -63,6 +63,12 @@ print(os.path.realpath('$path'))
     # spec-builder agents creating sibling worktrees, and orchestrator
     # referencing the main repo from inside a worktree.
     [[ "$resolved" == "$PROJECT_WORKSPACE"* ]] && return 1
+    # Allow paths within the ralph plugin directory (gate scripts, prompts, etc.)
+    # RALPH_PLUGIN_DIR is exported by loop.sh; also check common plugin install paths.
+    [[ -n "${RALPH_PLUGIN_DIR:-}" && "$resolved" == "$RALPH_PLUGIN_DIR"* ]] && return 1
+    [[ "$resolved" == *"/ralph-loop/scripts/"* ]] && return 1
+    [[ "$resolved" == *"/ralph-loop/prompts/"* ]] && return 1
+    [[ "$resolved" == *"/ralph-loop/agents/"* ]] && return 1
     # Outside workspace
     return 0
 }
@@ -83,6 +89,7 @@ check_paths() {
         [[ -z "$token" ]] && continue
         [[ "$token" == *'*'* || "$token" == *'?'* ]] && continue  # skip glob patterns
         [[ "${token:1}" != */* ]] && continue  # skip /filename with no directory (e.g. /iteration_context.md)
+        [[ "$token" == /.* ]] && continue  # skip /. paths — relative refs like /.worktrees/, /.git/, /.claude/
         if is_outside_workspace "$token"; then
             block "$label references path outside workspace: '$token'"
         fi
