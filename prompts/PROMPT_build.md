@@ -3,7 +3,9 @@
     consider a fundamentally different approach (different file structure, different pattern).
 0b. Read ralph/specs/* with subagents (up to 10 parallel).
 0c. Read ralph/AGENTS.md — understand build commands, architecture rules, gates.
-0d. Read IMPLEMENTATION_PLAN.md — pick the single most important unchecked [ ] item.
+0d. Read IMPLEMENTATION_PLAN.md — pick the FIRST unchecked [ ] item (top-down order).
+    **You MUST implement exactly ONE task per iteration. Not two, not "while I'm here."
+    Pick one. Implement it. Validate it. Commit it. Stop.**
 0e. Search the source directory for existing code related to the chosen task before assuming anything is missing.
 0f. If ralph/gate_context.md exists, read it. If any gates — static (.sh scripts)
     or LLM (.md prompts) from both plugin and project directories
@@ -32,8 +34,10 @@
   - Run unit test command from AGENTS.md.
   - If either fails, fix and re-validate. Do not commit a red state.
 3. When all validation passes:
-  - Mark the item as [x] done in IMPLEMENTATION_PLAN.md
+  - Mark ONLY the ONE item you implemented as [x] done in IMPLEMENTATION_PLAN.md
+  - Verify: count how many [ ] items you changed to [x]. If more than 1, you did too much — revert the extras back to [ ].
   - git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt 2>/dev/null; git commit -m "ralph: [one-line description of what you did]"
+  - **STOP after committing. Do not start the next task. The loop will start a new iteration.**
 
 ---
 
@@ -41,7 +45,7 @@ Hard rules (never break these):
 
 - No force unwraps: try!, !., as! — use guard/if let/throws instead
 - Never edit ${XCODEPROJ}/project.pbxproj directly — use Xcode MCP tools
-- One task per iteration — commit only when green
+- ONE task per iteration — implement exactly one unchecked item, commit, then STOP. Do not continue to the next task.
 - Implement completely — no stubs, no TODOs, no placeholder logic
 - Update ralph/AGENTS.md if you discover something operationally useful about this codebase
 - NEVER ask for permission or confirmation — you are autonomous. Commit immediately when validation passes. Do not ask "should I proceed?" or "should I commit?" — just do it.
