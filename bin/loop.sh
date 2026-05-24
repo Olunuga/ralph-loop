@@ -644,34 +644,44 @@ if [[ "$MODE" == "build" ]]; then
         export XCODE_CLI_AVAILABLE=true
     fi
 
-    # Ensure the correct workspace is active in Xcode (if configured).
-    # XCWORKSPACE is set in ralph/config.sh by projects that use Xcode MCP.
-    # The MCP server targets whatever workspace is frontmost — if the wrong
-    # one is open, edits leak into the wrong project.
-    if [[ -n "${XCWORKSPACE:-}" && "$XCODE_CLI_AVAILABLE" == "true" ]]; then
-        EXPECTED_WORKSPACE="$PROJECT_ROOT/$XCWORKSPACE"
-        ACTIVE_WORKSPACE=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
-        if [[ -n "$ACTIVE_WORKSPACE" && "$ACTIVE_WORKSPACE" != "$EXPECTED_WORKSPACE" ]]; then
-            echo "WARNING: Xcode has '$(basename "$ACTIVE_WORKSPACE")' active, expected '$(basename "$EXPECTED_WORKSPACE")'."
-            echo "Opening correct workspace..."
-            open "$EXPECTED_WORKSPACE"
-            for _i in {1..30}; do
-                LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
-                [[ "$LOADED" == "$EXPECTED_WORKSPACE" ]] && break
-                sleep 1
-            done
-            echo "Xcode workspace: OK"
-        elif [[ -z "$ACTIVE_WORKSPACE" ]]; then
-            echo "Xcode not running — opening $XCWORKSPACE"
-            open "$EXPECTED_WORKSPACE"
-            for _i in {1..30}; do
-                LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
-                [[ "$LOADED" == "$EXPECTED_WORKSPACE" ]] && break
-                sleep 1
-            done
-            echo "Xcode workspace: OK"
-        else
-            echo "Xcode workspace: OK"
+    # Ensure Xcode has the correct project open from this directory.
+    # The Xcode MCP server targets whatever project/workspace is frontmost.
+    # If Xcode has the main repo open while we're in a worktree, MCP edits
+    # (add file to target, etc.) go to the wrong project.
+    if [[ "$XCODE_CLI_AVAILABLE" == "true" ]]; then
+        # Determine what to open: workspace if available, otherwise xcodeproj
+        EXPECTED_XCODE_PATH=""
+        if [[ -n "${XCWORKSPACE:-}" && -d "$PROJECT_ROOT/$XCWORKSPACE" ]]; then
+            EXPECTED_XCODE_PATH="$PROJECT_ROOT/$XCWORKSPACE"
+        elif [[ -n "${XCODEPROJ:-}" && -d "$PROJECT_ROOT/$XCODEPROJ" ]]; then
+            EXPECTED_XCODE_PATH="$PROJECT_ROOT/$XCODEPROJ"
+        fi
+
+        if [[ -n "$EXPECTED_XCODE_PATH" ]]; then
+            ACTIVE_WORKSPACE=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+            # Check if the active workspace/project is from our directory
+            if [[ -n "$ACTIVE_WORKSPACE" && "$ACTIVE_WORKSPACE" != *"$PROJECT_ROOT"* ]]; then
+                echo "WARNING: Xcode has '$ACTIVE_WORKSPACE' open, not from $PROJECT_ROOT"
+                echo "Opening correct project..."
+                open "$EXPECTED_XCODE_PATH"
+                for _i in {1..30}; do
+                    LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+                    [[ "$LOADED" == *"$PROJECT_ROOT"* ]] && break
+                    sleep 1
+                done
+                echo "Xcode project: OK"
+            elif [[ -z "$ACTIVE_WORKSPACE" ]]; then
+                echo "Xcode not running — opening $(basename "$EXPECTED_XCODE_PATH")"
+                open "$EXPECTED_XCODE_PATH"
+                for _i in {1..30}; do
+                    LOADED=$(osascript -e 'tell application "Xcode" to get path of active workspace document' 2>/dev/null || true)
+                    [[ -n "$LOADED" ]] && break
+                    sleep 1
+                done
+                echo "Xcode project: OK"
+            else
+                echo "Xcode project: OK"
+            fi
         fi
     fi
 
