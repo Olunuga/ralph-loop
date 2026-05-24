@@ -741,6 +741,23 @@ for runtime, devices in data.get('devices', {}).items():
                 echo "Simulator '$SIM_NAME' already booted."
             fi
             export RALPH_SIM_UDID="$SIM_UDID"
+            # Ensure simulator and Xcode window shut down on exit, kill, or interrupt
+            cleanup_on_exit() {
+                xcrun simctl shutdown "$RALPH_SIM_UDID" 2>/dev/null || true
+                # Close the Xcode window for this worktree's project
+                if [[ -n "${EXPECTED_XCODE_PATH:-}" ]]; then
+                    osascript -e "
+                        tell application \"Xcode\"
+                            repeat with doc in (every workspace document)
+                                if path of doc contains \"$PROJECT_ROOT\" then
+                                    close doc
+                                end if
+                            end repeat
+                        end tell
+                    " 2>/dev/null || true
+                fi
+            }
+            trap cleanup_on_exit EXIT INT TERM
         fi
     fi
 
@@ -1108,11 +1125,22 @@ Do NOT modify any other files. Do NOT add new features."
     done
 fi
 
-# ── Shutdown simulator ─────────────────────────────────────────────────────────
-# Shut down the pre-booted simulator to avoid accumulating open instances.
+# ── Shutdown simulator and close Xcode window ────────────────────────────────
 if [[ -n "${RALPH_SIM_UDID:-}" ]]; then
     echo "Shutting down simulator..."
     xcrun simctl shutdown "$RALPH_SIM_UDID" 2>/dev/null || true
+fi
+if [[ -n "${EXPECTED_XCODE_PATH:-}" ]]; then
+    echo "Closing Xcode window for $(basename "$EXPECTED_XCODE_PATH")..."
+    osascript -e "
+        tell application \"Xcode\"
+            repeat with doc in (every workspace document)
+                if path of doc contains \"$PROJECT_ROOT\" then
+                    close doc
+                end if
+            end repeat
+        end tell
+    " 2>/dev/null || true
 fi
 
 # ── Post-loop gates ────────────────────────────────────────────────────────────

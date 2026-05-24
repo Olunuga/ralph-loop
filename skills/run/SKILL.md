@@ -187,6 +187,11 @@ If no shared deps, still run the gate-fix pass to clean the base, then note HEAD
 
 ### Phase 3: Pre-create worktrees and spawn parallel spec-builder agents
 
+**Shut down all simulators** before spawning a batch to prevent orphan accumulation:
+```bash
+xcrun simctl shutdown all 2>/dev/null || true
+```
+
 **Pre-create all worktrees from the orchestrator** before spawning agents. This avoids workspace boundary hook issues when spec-builder agents try to create their own worktrees.
 
 All `git worktree add` commands MUST use `dangerouslyDisableSandbox: true`.
