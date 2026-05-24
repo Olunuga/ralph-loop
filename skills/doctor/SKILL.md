@@ -1,31 +1,33 @@
 ---
 name: doctor
 description: Diagnose baseline health — build, tests, and gates — then delegate specs for fixes
-arguments: [branch]
+arguments: []
 allowed-tools: Bash Read Write AskUserQuestion Agent
 disable-model-invocation: true
 ---
 
 You are diagnosing pre-existing failures in the project baseline, then delegating to the appropriate spec skill to create fix specs.
 
-Branch: $branch
-
 ## Step 1 — Select branch and load config
 
-If `$branch` is provided, check it out:
-```bash
-git checkout $branch 2>&1
-```
-
-If `$branch` is empty or not provided, ask the user which branch to diagnose:
+List branches and ask the user to select:
 
 ```bash
-echo "Recent branches:" && git branch --sort=-committerdate --format='%(refname:short)' | head -8
+echo "Current branch: $(git branch --show-current)"
+echo ""
+echo "Recent branches:"
+git branch --sort=-committerdate --format='%(refname:short)' | head -10
 ```
 
-Use AskUserQuestion: "Which branch should I diagnose? (default: current branch)"
+Use AskUserQuestion:
+"Which branch should I diagnose?
+[list from above]
+(default: current branch)"
 
-If the user picks a different branch, check it out.
+If the user picks a branch different from the current one, check it out:
+```bash
+git checkout <selected-branch> 2>&1
+```
 
 Load config:
 ```bash
