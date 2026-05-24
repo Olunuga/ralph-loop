@@ -197,7 +197,7 @@ If it does not exist, create `.claude/` and write:
 Ensure the following Ralph pipeline artifacts are gitignored. Check if each entry already exists before appending:
 
 ```bash
-for entry in ".worktrees/" "IMPLEMENTATION_PLAN.md" "progress.txt"; do
+for entry in ".worktrees/" "IMPLEMENTATION_PLAN*.md" "progress.txt" "iteration_context.md" "ralph/.loop_status" "ralph/.loop_output" "ralph/.diff_base" "ralph/.llm_gate_failures" "ralph/.fix_agent.log"; do
     grep -qF "$entry" .gitignore 2>/dev/null || echo "$entry" >> .gitignore
 done
 ```
