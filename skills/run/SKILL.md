@@ -117,27 +117,31 @@ cd "$WORKTREE" && loop.sh 10 2>&1
 - Do NOT manually commit on behalf of the build agent while the loop is still running. The loop has built-in auto-commit logic that handles sandbox-blocked commits. Only commit manually if the loop has exited and left uncommitted work behind.
 - If the loop exits early or gets stuck, diagnose the problem, write your diagnosis to `$WORKTREE/iteration_context.md`, then restart the loop with `cd "$WORKTREE" && loop.sh [remaining-iters] 2>&1`. The build agent reads iteration_context.md as context for the next iteration.
 - Your only roles are: monitoring, diagnosing, writing to iteration_context.md, and restarting the loop.
-- **Blast radius policy:** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`.
+- **NEVER suggest deferring spec tasks.** The spec defines what needs to be built — all tasks in the plan must be completed. Deferral only applies to post-loop LLM gate fixes (see Step 4b).
+- **Blast radius policy (post-loop gate fixes ONLY):** If the user asks you to fix an LLM gate failure directly (after the loop has exited), run `blast_radius.sh <TypeName> ${SOURCE_DIR:-.}` first. If the verdict is `defer`, do NOT attempt the fix — write the issue to `ralph/deferred_issues.md` in the worktree AND create a GitHub issue (`gh issue create --title "Tech Debt: <TypeName> — <reason>" --label "tech-debt"`). Check for duplicates first (`gh issue list --search "Tech Debt: <TypeName>" --state open --limit 1`). Only attempt fixes with verdict `auto`. **This does NOT apply during the build loop — spec tasks are never deferred.**
 
 While waiting, check progress by reading files inside the worktree. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes, so rapid polling just creates noise. Only check more frequently if actively debugging a stuck loop.
 
+Use this **exact command** for polling (do not improvise the format):
 ```bash
-sleep 180 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null
+sleep 180 && cat "$WORKTREE/ralph/.loop_status" 2>/dev/null && echo "---" && tail -3 "$WORKTREE/progress.txt" 2>/dev/null
 ```
 
 The status file contains: `iteration`, `result`, `consec_fail`, `last_fail_gate`, `needs_deep_diagnosis`, `tasks_total`, `tasks_done`, `tasks_remaining`, `commits`, `green_iters`, `failed_iters`.
 
-Report progress to the user as iterations complete:
-- If `result` changed to `green`: report — "Iteration N: green. Tasks: D done / T total. Commits: C. (G green, F failed iterations so far)."
-- On any failure: the loop automatically runs a lightweight diagnostician (Sonnet, local context only) and appends its analysis to `iteration_context.md`. You do NOT need to spawn a separate diagnostician for first-time failures.
-- If `needs_deep_diagnosis=true`: the lightweight diagnostician has failed to resolve this. **Spawn the full diagnostician agent** using the Agent tool:
-  - Use the `ralph-loop:diagnostician` agent definition
-  - It runs on Opus with full tool access (Read, Grep, Bash)
-  - It can read source files, error logs, specs — everything the Sonnet call couldn't see
-  - Pass it the worktree path so it knows where to look
-  - Its output goes to stdout — append it to `$WORKTREE/iteration_context.md` so the next build iteration can use it
-  - Report the diagnosis to the user
-  - The flag resets automatically at the start of the next iteration
+**Report progress in this exact format** (do not improvise — use this structure every time):
+```
+Status: [spec-name or "build loop"]
+  Iteration: N | Tasks: D/T done | Commits: C
+  Result: [green / build failed / tests failed / gate violation]
+  Consecutive failures: F on [gate name]
+  [If needs_deep_diagnosis=true: "Spawning Opus diagnostician..."]
+```
+
+Rules for reporting:
+- If `result` is green: report the status block above.
+- On failure: the loop runs the diagnostician automatically. Report the status block. Do NOT intervene unless `needs_deep_diagnosis=true`.
+- If `needs_deep_diagnosis=true`: **spawn the full diagnostician agent** using the Agent tool. Use `ralph-loop:diagnostician`, pass the worktree path. Append its output to `$WORKTREE/iteration_context.md`. Report the diagnosis to the user. The flag resets on next iteration.
 - If `tasks_remaining` reaches 0: the loop will exit on its own.
 
 When notified the loop has finished, proceed to Step 4b.
@@ -230,22 +234,23 @@ rm -f "$WORKTREE"/IMPLEMENTATION_PLAN_*.md
 
 ### Phase 3 monitoring
 
-While agents are running, check each worktree's status. **Wait at least 3 minutes between checks** — build iterations take 5-10 minutes:
+While agents are running, check each worktree's status. **Wait at least 3 minutes between checks.**
 
+Use this **exact command** (do not improvise):
 ```bash
-for dir in .worktrees/$ref-*/; do
-  echo "=== $(basename $dir) ===" && cat "$dir/ralph/.loop_status" 2>/dev/null
-done
+sleep 180 && for dir in .worktrees/$ref-*/; do echo "=== $(basename $dir) ===" && cat "$dir/ralph/.loop_status" 2>/dev/null && echo "---" && tail -3 "$dir/progress.txt" 2>/dev/null && echo; done
+```
+
+**Report in this exact format** (do not improvise):
+```
+Parallel Build Status:
+  [spec-1]: Iter N | Tasks D/T | Commits C | [green/failed on X]
+  [spec-2]: Iter N | Tasks D/T | Commits C | [green/failed on X]
+  [spec-3]: Iter N | Tasks D/T | Commits C | [green/failed on X]
 ```
 
 - The loop automatically runs diagnostician on every failure — no need to spawn separately
-- Report periodic summary to user:
-  ```
-  Parallel build status:
-    spec-1: iter 3/7, 4/6 tasks done, 2 commits (green)
-    spec-2: iter 5/7, 5/8 tasks done, 3 commits (tests failing)
-    spec-3: iter 2/7, 1/5 tasks done, 1 commit (building)
-  ```
+- Do NOT suggest deferring any spec task — all tasks must be completed
 
 Wait for ALL agents to complete.
 
