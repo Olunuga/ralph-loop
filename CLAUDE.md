@@ -124,6 +124,12 @@ The build agent commits its work before gates run. `git checkout HEAD -- <file>`
 ### Branch must be pushed before PR creation
 The per-iteration push (line ~719) only fires after a green iteration. If gates fail after the agent committed, the branch is never pushed. A `git push` is now added before `gh pr create` in the post-loop section.
 
+### PID lockfile prevents concurrent loops
+`loop.sh` writes its PID to `ralph/.loop.pid` on start and checks for a live process before running. If another loop is active in the same worktree, it refuses to start. The lockfile is cleaned up on exit/kill/interrupt via a trap. Stale lockfiles (from crashed loops) are detected and removed.
+
+### Rollback preserves pipeline state files
+`rollback_all` copies `IMPLEMENTATION_PLAN*.md`, `iteration_context.md`, and `progress.txt` to a temp dir before resetting, then restores them after. This protects plan checkmarks and progress even if the files were accidentally tracked by git.
+
 ### `caffeinate -i` prevents idle sleep
 The script re-execs itself under `caffeinate -i` on macOS to prevent the system from sleeping during long pipeline runs. Uses `RALPH_CAFFEINATED` env var to avoid re-wrapping.
 
