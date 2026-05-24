@@ -185,7 +185,21 @@ git -C "$WORKTREE" rev-parse HEAD
 
 If no shared deps, still run the gate-fix pass to clean the base, then note HEAD.
 
-### Phase 3: Spawn parallel spec-builder agents
+### Phase 3: Pre-create worktrees and spawn parallel spec-builder agents
+
+**Pre-create all worktrees from the orchestrator** before spawning agents. This avoids workspace boundary hook issues when spec-builder agents try to create their own worktrees.
+
+All `git worktree add` commands MUST use `dangerouslyDisableSandbox: true`.
+
+For each spec, create a worktree branched from the shared base:
+```bash
+git worktree add .worktrees/$ref-$SPEC_NAME -b ralph/$ref-$SPEC_NAME $SHARED_BASE 2>&1
+```
+
+If the branch already exists:
+```bash
+git worktree add .worktrees/$ref-$SPEC_NAME ralph/$ref-$SPEC_NAME 2>&1
+```
 
 **Max 4 agents at a time.** If there are more specs, batch them into groups of 4. Run each batch, wait for completion, then start the next batch.
 
@@ -196,7 +210,7 @@ Each agent receives:
 - `REF` — $ref
 - `SHARED_BASE` — commit hash from Phase 2
 - `BUDGET` — scale based on task count: `max(5, task_count * 2)` iterations per spec
-- `WORKTREE` — `.worktrees/$ref-$SPEC_NAME`
+- `WORKTREE` — `.worktrees/$ref-$SPEC_NAME` **(already created — agent should skip worktree creation if it exists)**
 - `PLAN_CONTENT` — the full content of `IMPLEMENTATION_PLAN_<spec-name>.md`
 
 ### Phase 3 cleanup: remove per-spec plans from main worktree

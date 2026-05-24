@@ -558,7 +558,14 @@ if [[ "$MODE" == "plan-parallel" ]]; then
         echo "Use plan-work for single-spec planning."
         exit 1
     }
-    echo "Planning parallel build for $SPEC_COUNT specs..."
+    # Clean stale plan artifacts before planning
+    rm -f IMPLEMENTATION_PLAN*.md 2>/dev/null || true
+
+    # Scale timeout with spec count — planning 10 specs takes much longer than 2
+    PLAN_TIMEOUT=$((SPEC_COUNT * 120))
+    [[ "$PLAN_TIMEOUT" -lt "$CLAUDE_TIMEOUT" ]] && PLAN_TIMEOUT="$CLAUDE_TIMEOUT"
+    echo "Planning parallel build for $SPEC_COUNT specs (timeout: ${PLAN_TIMEOUT}s)..."
+    CLAUDE_TIMEOUT="$PLAN_TIMEOUT"
     ITER=0
     PREV_HASH="none"
     while true; do
