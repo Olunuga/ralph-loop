@@ -10,9 +10,12 @@
 0f. If ralph/gate_context.md exists, read it. If any gates — static (.sh scripts)
     or LLM (.md prompts) from both plugin and project directories
     (see "Gate scripts" and "LLM gates" paths above the --- separator)
-    — are not listed under "Known gates", read those new gates, assess
-    whether they conflict with this project's patterns, and update
-    gate_context.md with the appropriate SKIP/ENFORCE decision and notes.
+    — are not listed under "Known gates", read those new gates and add them
+    to gate_context.md as ENFORCE with a note about what they check.
+    **You MUST NOT add SKIP entries.** Only the user can decide to skip a gate
+    (via /ralph-loop:doctor or manually). If a gate conflicts with the project's
+    patterns, add it as ENFORCE with a note explaining the conflict — the user
+    will decide.
     Commit the update separately before implementing the task.
 
 ---
