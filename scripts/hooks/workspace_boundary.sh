@@ -63,6 +63,12 @@ print(os.path.realpath('$path'))
     # spec-builder agents creating sibling worktrees, and orchestrator
     # referencing the main repo from inside a worktree.
     [[ "$resolved" == "$PROJECT_WORKSPACE"* ]] && return 1
+    # Allow paths within the ralph plugin directory (gate scripts, prompts, etc.)
+    # RALPH_PLUGIN_DIR is exported by loop.sh; also check common plugin install paths.
+    [[ -n "${RALPH_PLUGIN_DIR:-}" && "$resolved" == "$RALPH_PLUGIN_DIR"* ]] && return 1
+    [[ "$resolved" == *"/ralph-loop/scripts/"* ]] && return 1
+    [[ "$resolved" == *"/ralph-loop/prompts/"* ]] && return 1
+    [[ "$resolved" == *"/ralph-loop/agents/"* ]] && return 1
     # Outside workspace
     return 0
 }
