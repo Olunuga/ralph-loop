@@ -42,6 +42,7 @@ STEP 3 — Write IMPLEMENTATION_PLAN.md using this exact format:
 Rules for tasks:
 
 - One atomic task per line — the build loop picks ONE per iteration
+- **Each task must leave the build green on its own.** If a rename touches 15 files, that's one task, not 15. If adding a protocol requires a conformer, both go in the same task. The test: "if the loop stops after this task, does the project still compile and tests still pass?"
 - Order by dependency (things needed by other things go first)
 - Tests are separate tasks from implementation (list them last)
 - Include the target file path so the build agent knows exactly where to work

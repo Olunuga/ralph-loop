@@ -43,7 +43,8 @@ Format:
 Rules:
 
 - Only include tasks relevant to the work scope
-- One atomic task per line
+- One atomic task per line — the build loop picks ONE per iteration
+- **Each task must leave the build green on its own.** If a rename touches 15 files, that's one task, not 15. If adding a protocol requires a conformer, both go in the same task. The test: "if the loop stops after this task, does the project still compile and tests still pass?"
 - Order by dependency
 - Tests after implementation tasks
 - Include target file path and reference pattern per task
