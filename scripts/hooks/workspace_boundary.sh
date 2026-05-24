@@ -58,8 +58,11 @@ print(os.path.realpath('$path'))
 " 2>/dev/null || echo "$path")
     # Allow paths within the workspace itself
     [[ "$resolved" == "$WORKSPACE"* ]] && return 1
-    # Allow paths within worktrees of the same project (sibling .worktrees/)
-    [[ "$resolved" == "$PROJECT_WORKSPACE"/.worktrees/* ]] && return 1
+    # Allow paths within the main project root and its worktrees.
+    # This covers: worktree-to-main operations (git worktree remove),
+    # spec-builder agents creating sibling worktrees, and orchestrator
+    # referencing the main repo from inside a worktree.
+    [[ "$resolved" == "$PROJECT_WORKSPACE"* ]] && return 1
     # Outside workspace
     return 0
 }

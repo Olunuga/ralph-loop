@@ -43,7 +43,10 @@
       "Bash(git merge *)",
       "Bash(git stash *)",
       "Bash(git remote *)",
-      "Bash(open *)"
+      "Bash(open *)",
+      "Bash(xcrun simctl *)",
+      "Bash(rm -f *IMPLEMENTATION_PLAN*)",
+      "Bash(osascript *)"
     ]
   }
 }
