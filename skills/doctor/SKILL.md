@@ -218,6 +218,18 @@ This will use `/ralph-loop:[spec or req-prd] fix-baseline`. Proceed?"
 
 The spec skill handles branch creation, worktree management, and commit.
 
+**IMPORTANT — diff base for baseline-health:** After the spec skill creates the worktree, record the current HEAD as the diff base. This way the loop only sees the fix-baseline changes as "new" — not the entire branch history.
+
+```bash
+BASELINE_COMMIT=$(git -C .worktrees/spec-fix-baseline rev-parse HEAD)
+echo "$BASELINE_COMMIT" > .worktrees/spec-fix-baseline/ralph/.diff_base
+```
+
+This solves both problems:
+- Diffing against the parent branch labels everything "pre-existing, skipped" (wrong — we want to fix those)
+- Diffing against main includes 200+ commits of unrelated work (too large, breaks LLM gates)
+- Diffing against the worktree's starting commit means only the loop's own fixes are "new" — gates check just the fix, not the whole branch
+
 ## Step 6 — Clean up worktree
 
 Remove the doctor worktree. The doctor makes no changes to the branch — it's read-only diagnosis.
