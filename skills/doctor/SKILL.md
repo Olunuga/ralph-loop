@@ -39,29 +39,49 @@ Read `ralph/AGENTS.md` to understand the project architecture.
 
 ## Step 2 — Run baseline checks
 
-Run each check and capture output. Use subagents for parallel execution where possible.
+**IMPORTANT:** The doctor must see ALL violations, including ones marked SKIP in `gate_context.md`. Temporarily disable SKIPs before running gates:
 
-**Build:**
+```bash
+[[ -f ralph/gate_context.md ]] && mv ralph/gate_context.md ralph/gate_context.md.bak
+```
+
+Restore after all gates finish:
+```bash
+[[ -f ralph/gate_context.md.bak ]] && mv ralph/gate_context.md.bak ralph/gate_context.md
+```
+
+Run build and tests sequentially (tests depend on build), then run all gates **in parallel using subagents**:
+
+**Sequential — build first:**
 ```bash
 source ralph/config.sh && eval "$BUILD_CMD" 2>&1 | tail -50
 ```
 
-**Unit tests** (only if build passes):
+**Sequential — unit tests (only if build passes):**
 ```bash
 source ralph/config.sh && eval "$UNIT_TEST_CMD" 2>&1 | tail -100
 ```
 
-**Static gates** (fast + precise tiers):
+**Parallel — run all three gate checks as subagents simultaneously:**
+
+Subagent 1 — static gates (fast):
 ```bash
 source ralph/config.sh && bash scripts/run_static_gates.sh fast 2>&1
 ```
+
+Subagent 2 — static gates (precise):
 ```bash
 source ralph/config.sh && bash scripts/run_static_gates.sh precise 2>&1
 ```
 
-**LLM gates** (semantic review — catches tech debt like magic numbers, raw colors, raw typography):
+Subagent 3 — LLM gates (semantic review — catches tech debt like magic numbers, raw colors, raw typography):
 ```bash
 source ralph/config.sh && bash scripts/run_llm_gates.sh 2>&1
+```
+
+**After all gates complete, restore gate_context.md:**
+```bash
+[[ -f ralph/gate_context.md.bak ]] && mv ralph/gate_context.md.bak ralph/gate_context.md
 ```
 
 If everything passes, tell the user: "Baseline is clean — no pre-existing failures to fix." and stop.
