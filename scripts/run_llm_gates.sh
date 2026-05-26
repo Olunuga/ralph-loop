@@ -12,6 +12,7 @@
 #   [prompt body with structured questions]
 #
 # For each prompt, runs 1 Sonnet call with the branch diff.
+# All gates run in PARALLEL — results collected after all complete.
 # Exit 0 = all passed. Exit 1 = at least one failed.
 
 set -euo pipefail
@@ -54,43 +55,60 @@ if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
     GATE_CONTEXT=$(cat "$PROJECT_ROOT/ralph/gate_context.md")
 fi
 
-FAIL=0
-CHECKED=0
-FAILED_CATEGORIES=""
+# Collect gate prompts (deduplicate: project overrides plugin by basename)
+GATE_FILES=()
 SEEN_GATES=""
-
 for PROMPT_FILE in "$PLUGIN_LLM_DIR"/*.md "$PROJECT_LLM_DIR"/*.md; do
     [[ -f "$PROMPT_FILE" ]] || continue
 
-    # Deduplicate: project gates override plugin gates with same name
     GATE_BASENAME=$(basename "$PROMPT_FILE")
     if echo "$SEEN_GATES" | grep -qx "$GATE_BASENAME" 2>/dev/null; then
         continue
     fi
     SEEN_GATES="$SEEN_GATES"$'\n'"$GATE_BASENAME"
 
-    # Parse frontmatter for category
-    PROMPT_CATEGORY=$(awk '/^---$/ { if (++c == 2) exit } c == 1 && /^category:/ { gsub(/category:\s*/, ""); print }' "$PROMPT_FILE")
-
     # Filter by category if specified
-    if [[ -n "$CATEGORY_FILTER" && "$PROMPT_CATEGORY" != "$CATEGORY_FILTER" ]]; then
-        continue
+    if [[ -n "$CATEGORY_FILTER" ]]; then
+        PROMPT_CATEGORY=$(awk '/^---$/ { if (++c == 2) exit } c == 1 && /^category:/ { gsub(/category:\s*/, ""); print }' "$PROMPT_FILE")
+        [[ "$PROMPT_CATEGORY" != "$CATEGORY_FILTER" ]] && continue
     fi
 
-    CATEGORY_NAME=$(basename "$PROMPT_FILE" .md)
+    GATE_FILES+=("$PROMPT_FILE")
+done
 
-    # Build the full prompt: template body + diff + protocols
-    PROMPT_BODY=$(awk 'BEGIN{c=0} /^---$/{c++;next} c>=2{print}' "$PROMPT_FILE")
+if [[ ${#GATE_FILES[@]} -eq 0 ]]; then
+    echo "LLM gates: No prompts found${CATEGORY_FILTER:+ for category '$CATEGORY_FILTER'}."
+    exit 0
+fi
 
-    # Prepend project context if available
-    CONTEXT_HEADER=""
-    if [[ -n "$GATE_CONTEXT" || -n "${APP_NAME:-}" ]]; then
-        CONTEXT_HEADER="PROJECT CONTEXT:
+echo "LLM gates: launching ${#GATE_FILES[@]} reviews in parallel..."
+
+# Build shared context header once
+CONTEXT_HEADER=""
+if [[ -n "$GATE_CONTEXT" || -n "${APP_NAME:-}" ]]; then
+    CONTEXT_HEADER="PROJECT CONTEXT:
 App: ${APP_NAME:-unknown} — ${APP_DESCRIPTION:-}
 ${GATE_CONTEXT}
 ---
 "
-    fi
+fi
+
+PROTOCOLS_SECTION=""
+if [[ -n "$PROTOCOLS" ]]; then
+    PROTOCOLS_SECTION="
+
+PROTOCOLS (source of truth for data access):
+$PROTOCOLS"
+fi
+
+# Temp dir for parallel results
+RESULTS_DIR=$(mktemp -d)
+
+# Launch all gates in parallel
+PIDS=()
+for PROMPT_FILE in "${GATE_FILES[@]}"; do
+    CATEGORY_NAME=$(basename "$PROMPT_FILE" .md)
+    PROMPT_BODY=$(awk 'BEGIN{c=0} /^---$/{c++;next} c>=2{print}' "$PROMPT_FILE")
 
     FULL_PROMPT="${CONTEXT_HEADER}${PROMPT_BODY}
 
@@ -101,34 +119,53 @@ IMPORTANT — Convergence rules:
 - Be deterministic: the same diff with the same checklist should always produce the same result.
 
 CODE CHANGES:
-$PREPARED_DIFF"
+$PREPARED_DIFF${PROTOCOLS_SECTION}"
 
-    if [[ -n "$PROTOCOLS" ]]; then
-        FULL_PROMPT="$FULL_PROMPT
+    # Run in background — output to temp file
+    (
+        RESULT=$(echo "$FULL_PROMPT" | claude -p --model claude-sonnet-4-6 2>/dev/null || true)
+        if echo "$RESULT" | grep -q "^OVERALL: PASS"; then
+            echo "PASS" > "$RESULTS_DIR/$CATEGORY_NAME.status"
+        else
+            echo "FAIL" > "$RESULTS_DIR/$CATEGORY_NAME.status"
+            echo "$RESULT" > "$RESULTS_DIR/$CATEGORY_NAME.output"
+        fi
+    ) &
+    PIDS+=($!)
+    echo "  [$CATEGORY_NAME] started (PID $!)"
+done
 
-PROTOCOLS (source of truth for data access):
-$PROTOCOLS"
-    fi
+# Wait for all gates to complete
+for pid in "${PIDS[@]}"; do
+    wait "$pid" 2>/dev/null || true
+done
 
-    # Run 1 Sonnet call
-    echo "LLM gate [$CATEGORY_NAME]: reviewing..."
-    RESULT=$(echo "$FULL_PROMPT" | claude -p --model claude-sonnet-4-6 2>/dev/null || true)
+# Collect results
+FAIL=0
+CHECKED=0
+FAILED_CATEGORIES=""
 
-    if echo "$RESULT" | grep -q "^OVERALL: PASS"; then
+for PROMPT_FILE in "${GATE_FILES[@]}"; do
+    CATEGORY_NAME=$(basename "$PROMPT_FILE" .md)
+    CHECKED=$((CHECKED + 1))
+
+    STATUS=$(cat "$RESULTS_DIR/$CATEGORY_NAME.status" 2>/dev/null || echo "ERROR")
+
+    if [[ "$STATUS" == "PASS" ]]; then
         echo "LLM gate [$CATEGORY_NAME]: PASS"
-    else
+    elif [[ "$STATUS" == "FAIL" ]]; then
         echo "LLM gate [$CATEGORY_NAME]: FAIL"
-        echo "$RESULT"
+        cat "$RESULTS_DIR/$CATEGORY_NAME.output" 2>/dev/null
+        FAIL=1
+        FAILED_CATEGORIES="$FAILED_CATEGORIES $CATEGORY_NAME"
+    else
+        echo "LLM gate [$CATEGORY_NAME]: ERROR (no result — timeout or crash)"
         FAIL=1
         FAILED_CATEGORIES="$FAILED_CATEGORIES $CATEGORY_NAME"
     fi
-    CHECKED=$((CHECKED + 1))
 done
 
-if [[ "$CHECKED" -eq 0 ]]; then
-    echo "LLM gates: No prompts found${CATEGORY_FILTER:+ for category '$CATEGORY_FILTER'}."
-    exit 0
-fi
+rm -rf "$RESULTS_DIR"
 
 if [[ "$FAIL" -eq 1 ]]; then
     echo ""
