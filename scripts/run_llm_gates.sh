@@ -104,7 +104,8 @@ fi
 # Temp dir for parallel results
 RESULTS_DIR=$(mktemp -d)
 
-# Launch all gates in parallel
+# Launch gates in parallel with max concurrency
+MAX_CONCURRENT=5
 PIDS=()
 for PROMPT_FILE in "${GATE_FILES[@]}"; do
     CATEGORY_NAME=$(basename "$PROMPT_FILE" .md)
@@ -121,6 +122,19 @@ IMPORTANT — Convergence rules:
 CODE CHANGES:
 $PREPARED_DIFF${PROTOCOLS_SECTION}"
 
+    # Wait if we've hit max concurrency
+    while [[ ${#PIDS[@]} -ge $MAX_CONCURRENT ]]; do
+        # Wait for any one PID to finish, then remove completed ones
+        STILL_RUNNING=()
+        for pid in "${PIDS[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then
+                STILL_RUNNING+=("$pid")
+            fi
+        done
+        PIDS=("${STILL_RUNNING[@]}")
+        [[ ${#PIDS[@]} -ge $MAX_CONCURRENT ]] && sleep 1
+    done
+
     # Run in background — output to temp file
     (
         RESULT=$(echo "$FULL_PROMPT" | claude -p --model claude-sonnet-4-6 2>/dev/null || true)
@@ -135,7 +149,7 @@ $PREPARED_DIFF${PROTOCOLS_SECTION}"
     echo "  [$CATEGORY_NAME] started (PID $!)"
 done
 
-# Wait for all gates to complete
+# Wait for all remaining gates to complete
 for pid in "${PIDS[@]}"; do
     wait "$pid" 2>/dev/null || true
 done
