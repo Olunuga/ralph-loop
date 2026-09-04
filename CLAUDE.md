@@ -139,6 +139,22 @@ Release records live in `ralph/releases/<name>.md`. They are safe from
 header and these live outside `ralph/specs/`. `--status` derives each change's state from
 the filesystem and git rather than reading a stored value, so it cannot go stale.
 
+## Claude Design handoff
+
+`req-slc` writes `ralph/design/SYSTEM_PROMPT.md` from the audiences, jobs, and the full
+activity set. `slice` writes `openspec/changes/<cell-id>/design/SCREEN_PROMPT.md` per cell,
+scoped to that depth, citing `ralph/design/system/` when it exists so Claude Design imports
+the system rather than restating it. The user pastes prompts out and places results back;
+the pipeline never calls Claude Design.
+
+A handoff bundle is not a design reference image. Claude Design writes its README as
+instructions addressed to a coding agent, so `PROMPT_build.md` step 0d2 reads that README
+first and follows what it names. The cap is 4 bundle files per iteration against 2 for
+loose images, because the README bounds what matters.
+
+A committed `.tar` or `.zip` is refused rather than unpacked. Automatic extraction would
+run over content the pipeline did not produce, and an archive in git is opaque to review.
+
 ## Design references
 
 Assets live beside the intent: `ralph/specs/<name>/assets/` for a legacy spec, which makes
