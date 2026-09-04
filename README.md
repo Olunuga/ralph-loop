@@ -8,10 +8,9 @@ Distributed as a **Claude Code plugin**.
 
 1. `/ralph-loop:spec` — structured JTBD conversation produces a spec committed to a `spec/<slug>` branch
 2. `/ralph-loop:run` — orchestrates the pipeline: creates a worktree, plans the work, runs the build loop, gates the output
-3. **Single spec**: build loop in one worktree — Haiku for iterations, Sonnet/Opus on escalation
-4. **Multi-spec (2+ specs)**: parallel pipeline — shared deps built first, then one spec-builder agent per spec runs in parallel, then merge + final gates
-5. Post-loop gates: precise static gates → LLM gates (with blast radius analysis) → UI tests → draft PR
-6. You review the branch and merge
+3. The build loop runs iteration by iteration, one worktree per spec. See **Parallel builds** below when a branch carries two or more specs.
+4. Post-loop gates: precise static gates → LLM gates (with blast radius analysis) → UI tests → draft PR
+5. You review the branch and merge
 
 Human decisions: spec approval and branch review. Everything else is automated.
 
@@ -31,9 +30,11 @@ Each spec-builder agent runs in its own worktree with independent iteration budg
 
 ### Model usage
 
-The Claude Code session you run `/ralph-loop:run` from acts as the **orchestrator** — it finds the spec, creates the worktree, and kicks off `loop.sh`. The build loop and post-loop gates run entirely inside `loop.sh` as a subprocess. The orchestrator monitors the output and only steps in when something goes wrong. Use a capable model for this session (Sonnet or Opus recommended).
-
-The build loop spawns subagents for each iteration using **Haiku** by default — fast and cheap for the repetitive write-build-fix cycle.
+| Role | Model | Runs |
+|---|---|---|
+| Orchestrator | Sonnet or Opus | Your `/ralph-loop:run` session. Finds the spec, creates the worktree, starts `loop.sh`, monitors it |
+| Build iteration | Haiku, escalating to Sonnet then Opus | Inside `loop.sh` |
+| Gates and diagnostics | Sonnet, Opus on deep diagnosis | Inside `loop.sh` |
 
 ---
 
@@ -162,8 +163,6 @@ Runs the full baseline: build, unit tests, static gates (fast + precise), and LL
 /ralph-loop:cleanup my-feature     # archive specs to done/, delete spec branch
 ```
 
-A draft PR is opened automatically when all gates pass. Review the `ralph/my-feature` branch and mark it ready when satisfied.
-
 ---
 
 ## Workspace isolation
@@ -176,12 +175,8 @@ The init skill writes a `PreToolUse` hook into `.claude/settings.json` that bloc
 
 ## Gates
 
-The pipeline enforces quality through **gates** — checks that code must pass before it can be committed or merged. Gates come from two sources:
-
-1. **Plugin gates** — default checks shipped with the plugin (`scripts/gates/`)
-2. **Project gates** — custom checks in your project's `ralph/gates/` directory
-
-Project gates override plugin gates with the same filename.
+Gates are checks code must pass before it lands. They come from two places, and are
+discovered automatically: the plugin's `scripts/gates/`, and your project's `ralph/gates/`.
 
 ### Static gates
 
@@ -192,8 +187,13 @@ scripts/gates/static/
 ├── code_quality/          # force unwraps, @Observable, stubs, access control, print(), etc.
 ├── architecture/          # layer boundaries, dependency direction, modelContext ownership
 ├── security/              # hardcoded secrets, insecure HTTP, NSLog, UserDefaults credentials
-└── accessibility/         # missing labels, hardcoded fonts, color-only differentiation
+├── accessibility/         # missing labels, hardcoded fonts, color-only differentiation
+└── code_quality/missing_tests.sh   # function added with no test change
 ```
+
+`missing_tests` reads `TEST_DIR`, `TEST_FILE_PATTERN`, and `FUNCTION_DECL_PATTERN` from
+`ralph/config.sh`, written by `init`. Leave any empty and the gate passes with a notice
+rather than failing.
 
 ### LLM gates
 
@@ -204,8 +204,12 @@ scripts/gates/llm/
 ├── code_quality.md        # naming clarity, SRP, feature envy, error handling, test quality
 ├── architecture.md        # DI compliance, god objects, pattern consistency
 ├── security.md            # data sensitivity, auth flow correctness, input validation
-└── accessibility.md       # label quality, nav order, custom component a11y
+├── accessibility.md       # label quality, nav order, custom component a11y
+└── test_adequacy.md       # do added tests assert, and call the new behaviour?
 ```
+
+The two test gates enforce test-exists-with-code, not test-first. The loop commits once
+per iteration, so write ordering is not observable.
 
 ### Adding custom gates
 
@@ -239,7 +243,7 @@ Respond with exactly:
 OVERALL: PASS|FAIL
 ```
 
-No changes to any pipeline code needed. The dispatchers auto-discover gates from both directories.
+No pipeline changes needed. A project gate with the same filename as a plugin gate replaces it.
 
 ### Blast radius analysis
 
@@ -261,23 +265,11 @@ The composite score (0-10) determines the action:
 
 Deferred issues are always saved to `ralph/deferred_issues.md` as a backup. Duplicate GitHub issues are detected via search before creation.
 
-All thresholds are configurable per-project via `ralph/gate_context.md`:
+Every threshold is tunable in `ralph/gate_context.md` with keys named
+`blast_radius_fanout_thresholds`, `..._coupling_...`, `..._layer_...`, `..._infra_...`,
+`..._test_...`, plus `blast_radius_auto_max` and `blast_radius_conditional_max`.
 
-```
-blast_radius_fanout_thresholds: 5,15
-blast_radius_coupling_thresholds: 3,10
-blast_radius_layer_thresholds: 1,2
-blast_radius_infra_thresholds: 2,4
-blast_radius_test_thresholds: 1,3
-blast_radius_auto_max: 3
-blast_radius_conditional_max: 6
-```
-
-You can run the analysis manually:
-
-```bash
-blast_radius.sh WorkoutSession Geyns/
-```
+Run it by hand with `blast_radius.sh <TypeName> <source-dir>`.
 
 ---
 

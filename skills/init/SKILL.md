@@ -67,6 +67,10 @@ From the output, infer:
 - `UI_TEST_TARGET` — the target ending in `UITests`
 - `SIMULATOR` — the newest iPhone simulator available (prefer iPhone 16, fallback to highest number)
 - `SOURCE_DIR` — the directory matching the scheme name (or xcodeproj name without extension)
+- `TEST_DIR` — the directory holding the unit test target's files, usually named after `UNIT_TEST_TARGET`
+- `TEST_FILE_PATTERN` — the filename convention for tests in that directory. Infer it from what
+  is actually there: `*Tests.swift`, `test_*.py`, `*.test.ts`, `*_test.go`. If the directory is
+  empty or absent, leave both keys empty rather than guessing.
 
 If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty.
 
@@ -105,6 +109,12 @@ XCODEPROJ="<xcodeproj>"
 XCWORKSPACE="<xcworkspace>"  # leave empty if no .xcworkspace exists
 PROTOCOLS_DIR="<protocols_dir>"
 SOURCE_DIR="<source_dir>"
+
+# Test layout. missing_tests.sh reads these. Leave any of them empty to turn
+# that gate off; it passes with a notice rather than failing.
+TEST_DIR="<test_dir>"
+TEST_FILE_PATTERN="<test_file_pattern>"
+FUNCTION_DECL_PATTERN="^[[:space:]]*((public|private|internal|open|static|final|override)[[:space:]]+)*(func|def|function)[[:space:]]"
 
 BUILD_CMD="xcodebuild \
   -scheme <scheme> \
