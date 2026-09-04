@@ -1,11 +1,22 @@
 0a. If iteration context is provided above the --- separator, read it carefully.
     Do NOT repeat approaches that already failed. If the same task has failed 2+ times,
     consider a fundamentally different approach (different file structure, different pattern).
-0b. Read the feature brief with subagents (up to 10 parallel): every file under $RALPH_BRIEF_DIR (defaults to ralph/specs/).
+0b. Read the feature brief with subagents (up to 10 parallel): every text file under
+    $RALPH_BRIEF_DIR (defaults to ralph/specs/). Skip the assets/ directory here.
 0c. Read ralph/AGENTS.md — understand build commands, architecture rules, gates.
 0d. Read IMPLEMENTATION_PLAN.md — pick the FIRST unchecked [ ] item (top-down order).
     **You MUST implement exactly ONE task per iteration. Not two, not "while I'm here."
     Pick one. Implement it. Validate it. Commit it. Stop.**
+0d2. Design references. If $RALPH_BRIEF_DIR/assets/ exists, read the images YOURSELF with
+    the Read tool. Do NOT delegate this to a subagent: a subagent returns text and cannot
+    pass an image back to you.
+    - Read at most 2 images per iteration. If assets/ holds more, read only the ones your
+      chosen task names, and say which files you skipped.
+    - Name every asset file you read, so the iteration output shows which reference you
+      followed.
+    - If the Read tool cannot render a file (.fig, .sketch, .psd), name it, say you cannot
+      read it, and continue from the text brief. Do not fail the iteration over it.
+    - If assets/ does not exist, say nothing and continue.
 0e. Search the source directory for existing code related to the chosen task before assuming anything is missing.
 0f. If ralph/gate_context.md exists, read it. If any gates — static (.sh scripts)
     or LLM (.md prompts) from both plugin and project directories

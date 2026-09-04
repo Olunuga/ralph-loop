@@ -115,12 +115,42 @@ If BASE_BRANCH is not `main`, record it so gates diff against the correct base:
 echo "<BASE_BRANCH>" > .worktrees/spec-<slug>/ralph/.diff_base
 ```
 
-Write the approved spec to `.worktrees/spec-<slug>/ralph/specs/<slug>.md` using the Write tool.
+### Design reference
 
-Then commit (each command as a separate Bash call):
+If the feature has a visual result, ask the user with AskUserQuestion:
+
+> "Do you have a design reference for this? Give me a path to an image, or say no."
+
+On a path, check it exists:
+```bash
+ls -l "<path>"
+```
+If it does not, say so and ask again. Do not write a spec that cites a missing asset.
+
+Warn above 2 MB and let the user decide:
+```bash
+du -k "<path>" | cut -f1
+```
+
+### Write the spec
+
+**With a design reference**, the spec is a directory:
+```bash
+mkdir -p .worktrees/spec-<slug>/ralph/specs/<slug>/assets
+cp "<path>" .worktrees/spec-<slug>/ralph/specs/<slug>/assets/
+```
+Write the spec to `.worktrees/spec-<slug>/ralph/specs/<slug>/spec.md`. Its text MUST name
+each asset file and say what the reference shows. An image with no explanation does not say
+which part is the target.
+
+**With no design reference**, the spec is a single file, as before. Do not create an empty
+`assets/` directory.
+Write the spec to `.worktrees/spec-<slug>/ralph/specs/<slug>.md`.
+
+Then commit (each command as a separate Bash call). This stages either form:
 
 ```bash
-git -C .worktrees/spec-<slug> add ralph/specs/<slug>.md
+git -C .worktrees/spec-<slug> add ralph/specs/
 ```
 
 ```bash

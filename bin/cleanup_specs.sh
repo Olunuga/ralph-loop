@@ -28,7 +28,8 @@ if [[ -z "$HEADER" ]]; then
     exit 1
 fi
 
-# Parse comma-separated paths, strip leading/trailing whitespace
+# Parse comma-separated paths, strip leading/trailing whitespace.
+# Matches both ralph/specs/<name>.md and ralph/specs/<name>/spec.md.
 SPECS=$(echo "$HEADER" \
     | sed 's/^# Generated from://' \
     | tr ',' '\n' \
@@ -46,7 +47,16 @@ MOVED=0
 MISSING=0
 while IFS= read -r SPEC; do
     [[ -z "$SPEC" ]] && continue
-    if [[ -f "$SPEC" ]]; then
+    # A spec is either ralph/specs/<name>.md or ralph/specs/<name>/ holding
+    # spec.md plus assets/. Move the directory as a unit so assets are not orphaned.
+    SPEC_DIR="${SPEC%/spec.md}"
+    if [[ "$SPEC_DIR" != "$SPEC" && -d "$SPEC_DIR" ]]; then
+        DEST="$DONE_DIR/$(basename "$SPEC_DIR")"
+        rm -rf "$DEST"
+        mv "$SPEC_DIR" "$DEST"
+        echo "archived: $SPEC_DIR → $DEST"
+        MOVED=$((MOVED + 1))
+    elif [[ -f "$SPEC" ]]; then
         DEST="$DONE_DIR/$(basename "$SPEC")"
         mv "$SPEC" "$DEST"
         echo "archived: $SPEC → $DEST"

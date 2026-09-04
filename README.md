@@ -165,6 +165,30 @@ Runs the full baseline: build, unit tests, static gates (fast + precise), and LL
 
 ---
 
+## Design references
+
+A feature with a visual target can carry the target beside its spec. The build agent reads
+the images while implementing.
+
+```
+ralph/specs/<name>/spec.md          legacy spec, now a directory
+ralph/specs/<name>/assets/home.png  the reference
+
+openspec/changes/<name>/assets/     same idea for an OpenSpec change
+```
+
+A spec with no reference stays a single `ralph/specs/<name>.md`, exactly as before.
+
+`/ralph-loop:spec` asks for a reference and places it. The spec text must name each asset
+and say what it shows, so planning can point a task at the right one. Archiving moves the
+directory as a unit, so assets are never orphaned.
+
+The agent reads at most 2 images per iteration. Above that, it reads the ones the current
+task names. Nothing compares the built view against the reference: use snapshot or UI tests
+for that.
+
+---
+
 ## Workspace isolation
 
 Each feature runs in its own **git worktree** (`.worktrees/<slug>`) branched off the spec, keeping all in-progress changes isolated from the main working tree. The worktree is removed automatically after the post-loop gates pass.
