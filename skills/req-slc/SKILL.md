@@ -190,23 +190,9 @@ from what you just captured:
 - `${ACTIVITIES}` every activity in the story map, all depths, because the system has to
   cover the whole product and not one release
 
-Write the filled prompt to `.worktrees/spec-<slug>/ralph/design/SYSTEM_PROMPT.md` and
-include it in the Step 9 commit.
-
-Then tell the user:
-
-```
-Design system prompt: ralph/design/SYSTEM_PROMPT.md
-
-  1. Paste it into Claude Design.
-  2. Export the handoff bundle.
-  3. Unpack it into ralph/design/system/ and commit the contents.
-     Commit the files, not the .tar or .zip. An archive is opaque to review, and the
-     build agent refuses to read one.
-
-Screens are generated later, per release, by /ralph-loop:slice. Those prompts will point
-Claude Design at ralph/design/system/, so screens match what you already built.
-```
+Hold the filled text. Step 9 writes it to
+`.worktrees/spec-<slug>/ralph/design/SYSTEM_PROMPT.md` once the worktree exists, and
+Step 10 tells the user what to do with it.
 
 Do not create `ralph/design/system/` yourself. It exists once the user places a handoff.
 
@@ -245,6 +231,9 @@ echo "<BASE_BRANCH>" > .worktrees/spec-<slug>/ralph/.diff_base
 
 Write AUDIENCE_JTBD.md first (lives at `.worktrees/spec-<slug>/ralph/AUDIENCE_JTBD.md`, not in specs/) using the Write tool.
 
+Then write the Step 8b text to `.worktrees/spec-<slug>/ralph/design/SYSTEM_PROMPT.md` using
+the Write tool. The worktree exists only from this point, so an earlier write lands outside it.
+
 Commit (separate Bash calls):
 ```bash
 git -C .worktrees/spec-<slug> add ralph/AUDIENCE_JTBD.md ralph/design/SYSTEM_PROMPT.md
@@ -277,7 +266,55 @@ After all specs are committed, clean up the worktree (branch is kept):
 git worktree remove .worktrees/spec-<slug> 2>&1
 ```
 
-Do NOT suggest a build order or implementation sequence — that is the planning prompt's job.
+Do NOT suggest a build order or implementation sequence. That is the planning prompt's job.
 
-Confirm: "N activity specs + AUDIENCE_JTBD.md written to branch spec/<slug>.
-SLC slicing happens at planning time — run /ralph-loop:run <slug> when ready."
+---
+
+## Step 10: Report and offer the next step
+
+Detect which build routes are available:
+
+```bash
+command -v openspec >/dev/null && grep -q '^schema: *ralph-bridge' openspec/config.yaml 2>/dev/null \
+  && echo "OPENSPEC_READY" || echo "OPENSPEC_NOT_WIRED"
+```
+
+Report what was written:
+
+```
+N activity specs + AUDIENCE_JTBD.md written to branch spec/<slug>.
+Design system prompt written to ralph/design/SYSTEM_PROMPT.md on that branch.
+```
+
+Then use AskUserQuestion with these options. Include the OpenSpec option only when the
+check printed `OPENSPEC_READY`.
+
+- **Slice into OpenSpec changes**: run `/ralph-loop:slice`. It picks one capability depth
+  per activity and creates one OpenSpec change per cell, each with the five bridge
+  artifacts. Pick this when you want the change reviewed before any code is written.
+- **Run the pipeline directly**: run `/ralph-loop:run <slug>`. The planner slices the story
+  map itself and the build loop starts. Pick this when you want code now.
+- **Hand off the design first**: do the Claude Design steps below, commit the result, then
+  choose a build route. Pick this when the screens have to match a design system.
+- **Stop here**: the branch is complete. Nothing else runs.
+
+When the OpenSpec option is absent, say why in one line: "OpenSpec is not wired. Run
+`/ralph-loop:init --openspec` to add that route."
+
+Whichever option the user picks, print the design handoff steps once:
+
+```
+Design handoff (optional, do it before the screens are built):
+
+  1. Check out spec/<slug>. The worktree is removed, so the file lives on that branch only.
+  2. Paste ralph/design/SYSTEM_PROMPT.md into Claude Design.
+  3. Export the handoff bundle.
+  4. Unpack it into ralph/design/system/ and commit the contents.
+     Commit the files, not the .tar or .zip. An archive is opaque to review, and the
+     build agent refuses to read one.
+
+Screen prompts are generated later, per release, by /ralph-loop:slice. They point Claude
+Design at ralph/design/system/, so screens match the system you already built.
+```
+
+Do not run the chosen command yourself. Name it and stop.
