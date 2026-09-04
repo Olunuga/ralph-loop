@@ -12,7 +12,40 @@ Reference: $ref
 
 **ALWAYS use TaskCreate and TaskUpdate to track pipeline progress.** Create a task for each major phase (plan, shared deps, each spec build, merge, final gates, post-mortem, PR). Mark tasks as `in_progress` when starting and `completed` when done. This gives the user a live progress view throughout the run.
 
-## Step 1 — Find and show the spec
+## Step 0: Resolve the intent source
+
+`<ref>` names either an OpenSpec change or a legacy ralph spec. Check OpenSpec first.
+
+```bash
+openspec status --change "$ref" --json 2>/dev/null
+```
+
+**OpenSpec mode** if that command succeeds:
+- If it reports the change is not apply-ready, stop and name the missing artifacts.
+- If `ralph/specs/$ref*.md` also exists, warn: "Both an OpenSpec change and a legacy spec are named `$ref`. Using the OpenSpec change; the legacy spec is ignored."
+- Load the brief:
+  ```bash
+  openspec instructions apply --change "$ref" --json
+  ```
+  Read every path under `contextFiles` (proposal, specs, design, tasks). If the command exits non-zero or returns unparseable JSON, stop and print the CLI error. Do not start the build loop.
+- Check the schema stamp, and report any warning it prints:
+  ```bash
+  bash "$RALPH_PLUGIN_DIR/scripts/schema_stamp.sh" check "$PROJECT_ROOT"
+  ```
+- Set the two slots for every `loop.sh` call in this run:
+  ```bash
+  export RALPH_BRIEF_DIR="$WORKTREE/openspec/changes/$ref"
+  export RALPH_PLAN_FILE="openspec/changes/$ref/tasks.md"
+  ```
+  `RALPH_PLAN_FILE` is relative to the worktree root, so the loop marks the change's own `tasks.md`. Both lanes share that file: work only the unchecked `- [ ]` items, and never uncheck an item a human already checked.
+
+**Legacy mode** otherwise. Continue to Step 1.
+
+**Never invoke `/opsx:apply`.** It is human-in-loop and pauses to ask. This skill and `apply` are independent executors of the same change.
+
+If neither source exists, stop with: "No OpenSpec change and no ralph spec named '$ref'. Checked openspec/changes/$ref/ and ralph/specs/$ref*.md."
+
+## Step 1: Find and show the spec (legacy mode only)
 
 The spec lives on a `spec/<ref>` branch. Find it:
 ```bash

@@ -1,7 +1,7 @@
 0a. If iteration context is provided above the --- separator, read it carefully.
     Do NOT repeat approaches that already failed. If the same task has failed 2+ times,
     consider a fundamentally different approach (different file structure, different pattern).
-0b. Read ralph/specs/* with subagents (up to 10 parallel).
+0b. Read the feature brief with subagents (up to 10 parallel): every file under $RALPH_BRIEF_DIR (defaults to ralph/specs/).
 0c. Read ralph/AGENTS.md — understand build commands, architecture rules, gates.
 0d. Read IMPLEMENTATION_PLAN.md — pick the FIRST unchecked [ ] item (top-down order).
     **You MUST implement exactly ONE task per iteration. Not two, not "while I'm here."

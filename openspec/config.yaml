@@ -1,0 +1,42 @@
+schema: spec-driven
+
+context: |
+  Prose rules for every artifact in this repo.
+
+  Write plainly. Name a mechanism by what it is, not by a metaphor. Never coin a
+  term for something that already has a plain name: "git hooks running static
+  gates", not "the deterministic floor". Do not editorialize about why a decision
+  matters; state the decision.
+
+  Describe the end state only. Never reference a prior draft, the conversation,
+  or the artifact's own revision history. Do not narrate discovery ("adding X
+  exposed", "it turns out", "one old and one new") and do not argue with a
+  reviewer who is not in the document ("Worse,", "as noted above"). Describing
+  the current state of the system is state, not history, and is correct when the
+  reader can verify it in the code.
+
+  Say a thing once, in one artifact. Do not restate in one document what another
+  already carries. When new information arrives, integrate it into the existing
+  structure: do not append a section to hold it.
+
+  Short sentences, one idea each. Active voice. Present tense. Same word for the
+  same thing every time.
+
+rules:
+  proposal:
+    - 'State what changes. One idea per bullet, no sub-narrative under a bullet.'
+    - 'Put every change in the "What Changes" section. Do not bury a change in "Impact" or under its own heading.'
+    - 'Mechanism, line numbers, and failure modes belong in design.md. Do not repeat them here.'
+    - 'Target 50 lines.'
+  specs:
+    - 'Keep only scenarios that constrain behaviour. Delete any scenario whose removal changes no implementation decision.'
+    - 'A requirement states the rule. The reason belongs in design.md.'
+    - 'No scenario that only restates the requirement in WHEN/THEN form.'
+  design:
+    - 'Lead each decision with the decision. Follow with the reason in plain sentences.'
+    - 'No "Why:" or "Alternative rejected:" or "Cost accepted:" labels. Write the reason as prose.'
+    - 'Include an alternative only when it was genuinely close. Say why it loses in one or two sentences.'
+    - 'Write each risk as one line: the risk, then the mitigation.'
+  tasks:
+    - 'One verifiable action per task. No task that only says "consider" or "review".'
+    - 'Reference the spec a verification task checks, by capability name.'

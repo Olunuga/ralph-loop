@@ -103,6 +103,14 @@ if [[ -z "${DIFF_BASE_BRANCH:-}" && -f "$PROJECT_ROOT/ralph/.diff_base" ]]; then
     DIFF_BASE_BRANCH=$(cat "$PROJECT_ROOT/ralph/.diff_base" | tr -d '[:space:]')
 fi
 export DIFF_BASE_BRANCH="${DIFF_BASE_BRANCH:-main}"
+
+# ── Intent source slots ───────────────────────────────────────────────────────
+# RALPH_BRIEF_DIR = where the build agent reads the feature brief
+# RALPH_PLAN_FILE = the task ledger the loop marks off
+# Both default to the legacy locations. /ralph-loop:run points them at an
+# OpenSpec change when it resolves one.
+export RALPH_BRIEF_DIR="${RALPH_BRIEF_DIR:-$PROJECT_ROOT/ralph/specs}"
+export RALPH_PLAN_FILE="${RALPH_PLAN_FILE:-IMPLEMENTATION_PLAN.md}"
 SPEC_TITLE=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" 2>/dev/null \
     | xargs grep -h "^# " 2>/dev/null | head -1 | sed 's/^# //' \
     || echo "$BRANCH")
@@ -188,8 +196,12 @@ rollback_all() {
     # and must survive even if they were accidentally tracked by git.
     local tmpdir
     tmpdir=$(mktemp -d)
-    for f in IMPLEMENTATION_PLAN*.md iteration_context.md progress.txt; do
-        [[ -f "$f" ]] && cp "$f" "$tmpdir/" 2>/dev/null || true
+    local preserved=()
+    for f in IMPLEMENTATION_PLAN*.md iteration_context.md progress.txt "$RALPH_PLAN_FILE"; do
+        [[ -f "$f" ]] || continue
+        # keep the relative path: RALPH_PLAN_FILE may sit in a subdirectory
+        mkdir -p "$tmpdir/$(dirname "$f")" 2>/dev/null || true
+        cp "$f" "$tmpdir/$f" 2>/dev/null && preserved+=("$f") || true
     done
 
     # Undo agent commits from this iteration (commits since last known-good state)
@@ -200,11 +212,13 @@ rollback_all() {
         git reset HEAD~"$agent_commits" 2>/dev/null || true
     fi
     git checkout -- . 2>/dev/null || true
-    git clean -fd -e 'IMPLEMENTATION_PLAN*.md' -e 'iteration_context.md' -e 'progress.txt' 2>/dev/null || true
+    git clean -fd -e 'IMPLEMENTATION_PLAN*.md' -e 'iteration_context.md' -e 'progress.txt' -e "$RALPH_PLAN_FILE" 2>/dev/null || true
 
-    # Restore pipeline state files
-    for f in "$tmpdir"/*; do
-        [[ -f "$f" ]] && cp "$f" . 2>/dev/null || true
+    # Restore pipeline state files to their original relative paths
+    for f in "${preserved[@]:-}"; do
+        [[ -n "$f" && -f "$tmpdir/$f" ]] || continue
+        mkdir -p "$(dirname "$f")" 2>/dev/null || true
+        cp "$tmpdir/$f" "$f" 2>/dev/null || true
     done
     rm -rf "$tmpdir"
 }
@@ -347,8 +361,8 @@ run_diagnostician() {
 # Write structured status for orchestrator to poll.
 write_loop_status() {
     local iter="$1"
-    local total_tasks; total_tasks=$(grep -c '^\- \[' IMPLEMENTATION_PLAN.md 2>/dev/null) || total_tasks=0
-    local tasks_done; tasks_done=$(grep -c '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null) || tasks_done=0
+    local total_tasks; total_tasks=$(grep -c '^\- \[' "$RALPH_PLAN_FILE" 2>/dev/null) || total_tasks=0
+    local tasks_done; tasks_done=$(grep -c '^\- \[x\]' "$RALPH_PLAN_FILE" 2>/dev/null) || tasks_done=0
     local tasks_remaining=$((total_tasks - tasks_done))
     local commits=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
     local green_iters; green_iters=$(grep -c ': green$' progress.txt 2>/dev/null) || green_iters=0
@@ -500,8 +514,11 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
             | claude_run 2>>"$PROJECT_ROOT/ralph/.fix_agent.log" || echo "WARN: Fix agent call failed (timeout or crash) — retrying."
         fi
 
-        # Ensure the fix didn't break hard gates
-        if ! bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh fast > /dev/null 2>&1; then
+        # Ensure the fix didn't break hard gates.
+        # Both tiers: post-loop Gate 1 runs precise, so fast alone lets a precise
+        # violation through a gate fix and on to the PR.
+        if ! bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh fast > /dev/null 2>&1 \
+           || ! bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh precise > /dev/null 2>&1; then
             echo "Fix broke gates — reverting."
             rollback_all
             continue
@@ -517,8 +534,9 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
             continue
         }
 
-        git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md 2>/dev/null
-        git -c commit.gpgsign=false commit -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null || true
+        git add -A && git reset HEAD $RALPH_PLAN_FILE progress.txt iteration_context.md 2>/dev/null
+        git -c commit.gpgsign=false commit --no-verify -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null \
+            || echo "WARN: commit failed for $GATE fix attempt $ATTEMPT. Changes left staged."
     done
 
     # For LLM gates, pause the pipeline — let the orchestrator ask the user
@@ -620,7 +638,7 @@ if [[ "$MODE" == "plan-parallel" ]]; then
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
         echo "=== Plan-parallel iteration $((ITER + 1)) ==="
         cat "$RALPH_PLUGIN_DIR/prompts/PROMPT_plan_parallel.md" | claude_run
-        NEW_HASH=$(file_hash IMPLEMENTATION_PLAN.md 2>/dev/null || echo "none")
+        NEW_HASH=$(file_hash "$RALPH_PLAN_FILE" 2>/dev/null || echo "none")
         if [[ "$ITER" -ge 1 && "$NEW_HASH" == "$PREV_HASH" ]]; then
             echo "Plan converged after $((ITER + 1)) iterations."
             break
@@ -644,7 +662,7 @@ if [[ "$MODE" == "plan-work" ]]; then
                 | claude_run
         else
             # Subsequent iterations: refine, don't rewrite
-            PREV_PLAN=$(cat IMPLEMENTATION_PLAN.md 2>/dev/null || true)
+            PREV_PLAN=$(cat "$RALPH_PLAN_FILE" 2>/dev/null || true)
             {
                 echo "Previous plan iteration:"
                 echo "$PREV_PLAN"
@@ -657,7 +675,7 @@ if [[ "$MODE" == "plan-work" ]]; then
         fi
 
         # Convergence detection: exit early if plan stopped changing
-        NEW_HASH=$(file_hash IMPLEMENTATION_PLAN.md 2>/dev/null || echo "none")
+        NEW_HASH=$(file_hash "$RALPH_PLAN_FILE" 2>/dev/null || echo "none")
         if [[ "$ITER" -ge 1 && "$NEW_HASH" == "$PREV_HASH" ]]; then
             echo "Plan converged after $((ITER + 1)) iterations."
             break
@@ -680,8 +698,8 @@ if [[ "$MODE" == "build" ]]; then
     # Disable GPG signing in this worktree so commits work without 1Password agent
     git config commit.gpgsign false 2>/dev/null || true
 
-    [[ ! -f "IMPLEMENTATION_PLAN.md" ]] && {
-        echo "ERROR: IMPLEMENTATION_PLAN.md not found."
+    [[ ! -f "$RALPH_PLAN_FILE" ]] && {
+        echo "ERROR: $RALPH_PLAN_FILE not found."
         echo "Run first: loop.sh plan-work \"[feature]\" 3"
         exit 1
     }
@@ -859,11 +877,11 @@ if [[ "$MODE" == "build" ]]; then
 
     # Detect prior progress — if ralph: commits exist, reconcile the plan
     PRIOR_COMMITS=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$PRIOR_COMMITS" -gt 0 && -f "IMPLEMENTATION_PLAN.md" ]]; then
+    if [[ "$PRIOR_COMMITS" -gt 0 && -f "$RALPH_PLAN_FILE" ]]; then
         echo "Detected $PRIOR_COMMITS prior ralph commits — reconciling plan with code state..."
         COMMIT_LOG=$(git log --oneline --grep="^ralph:" 2>/dev/null)
-        printf "These commits have already been made on this branch:\n%s\n\nUpdate IMPLEMENTATION_PLAN.md: mark any task as [x] done if the commit log shows it was implemented. Do not uncheck tasks. Do not change task descriptions. Only update checkboxes.\n\nIMPLEMENTATION_PLAN.md:\n%s" \
-            "$COMMIT_LOG" "$(cat IMPLEMENTATION_PLAN.md)" \
+        printf "These commits have already been made on this branch:\n%s\n\nUpdate $RALPH_PLAN_FILE: mark any task as [x] done if the commit log shows it was implemented. Do not uncheck tasks. Do not change task descriptions. Only update checkboxes.\n\n$RALPH_PLAN_FILE:\n%s" \
+            "$COMMIT_LOG" "$(cat "$RALPH_PLAN_FILE")" \
         | claude_run_fast 2>/dev/null
         echo "Plan reconciled."
     fi
@@ -877,8 +895,8 @@ if [[ "$MODE" == "build" ]]; then
         [[ "$MAX_ITERATIONS" -gt 0 && "$ITER" -ge "$MAX_ITERATIONS" ]] && break
 
         # Stop if all tasks are done
-        if ! grep -q '^\- \[ \]' IMPLEMENTATION_PLAN.md 2>/dev/null; then
-            echo "All tasks in IMPLEMENTATION_PLAN.md are done."
+        if ! grep -q '^\- \[ \]' "$RALPH_PLAN_FILE" 2>/dev/null; then
+            echo "All tasks in $RALPH_PLAN_FILE are done."
             break
         fi
 
@@ -1143,10 +1161,10 @@ Do NOT modify any other files. Do NOT add new features."
         # the commit silently failed (e.g., sandbox blocked .git writes in worktree).
         if [[ -n "$(git status --porcelain -- "${SOURCE_DIR:-.}/" 2>/dev/null)" ]]; then
             echo "WARN: Agent did not commit — committing on its behalf."
-            TASK_DESC=$(grep '^\- \[x\]' IMPLEMENTATION_PLAN.md 2>/dev/null | tail -1 | sed 's/^\- \[x\] //' | head -c 72)
+            TASK_DESC=$(grep '^\- \[x\]' "$RALPH_PLAN_FILE" 2>/dev/null | tail -1 | sed 's/^\- \[x\] //' | head -c 72)
             [[ -z "$TASK_DESC" ]] && TASK_DESC="iteration $((ITER+1)) changes"
-            git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt iteration_context.md "$PROJECT_ROOT/ralph/.loop_status" 2>/dev/null
-            git commit -m "ralph: $TASK_DESC" 2>/dev/null || {
+            git add -A && git reset HEAD $RALPH_PLAN_FILE progress.txt iteration_context.md "$PROJECT_ROOT/ralph/.loop_status" 2>/dev/null
+            git commit --no-verify -m "ralph: $TASK_DESC" 2>/dev/null || {
                 echo "HARD: Backup commit also failed — rolling back."
                 append_failure_context "commit" "Agent and loop commit both failed. Check git permissions." "$((ITER+1))"
                 run_diagnostician "$((ITER+1))" "commit"
@@ -1215,7 +1233,33 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
         exit 7
     }
 
-    # Gate 3: UI routing decision (agent classifies the full branch diff)
+    # Gate 3: Full static sweep over the final tree.
+    # Gates 1 and 2 each ran before the other's fixes landed. A fix applied during
+    # the LLM stage can break a static gate that passed in the static stage, and
+    # nothing else re-checks it. The tree that opens the PR must be the tree that passed.
+    echo ""
+    echo "=== Full static sweep ==="
+    SWEEP_OK=true
+    SWEEP_OUT=$(bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh fast 2>&1) || SWEEP_OK=false
+    if [[ "$SWEEP_OK" == "true" ]]; then
+        SWEEP_OUT=$(bash $RALPH_PLUGIN_DIR/scripts/run_static_gates.sh precise 2>&1) || SWEEP_OK=false
+    fi
+    if [[ "$SWEEP_OK" != "true" ]]; then
+        echo "GATE FULL_SWEEP: FAIL"
+        echo "$SWEEP_OUT"
+        echo "- Post-loop FULL_SWEEP: FAIL (a later fix broke a gate that passed earlier)" >> progress.txt
+        echo "FULL_SWEEP_FAILED" > "$PROJECT_ROOT/ralph/.loop_status"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Full static sweep failed. Not opening a PR."
+        echo "Fix, then run: loop.sh post-loop"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        exit 8
+    fi
+    echo "GATE FULL_SWEEP: PASS"
+    echo "- Post-loop FULL_SWEEP: PASS" >> progress.txt
+
+    # Gate 4: UI routing decision (agent classifies the full branch diff)
     echo ""
     echo "=== UI routing ==="
     BASE=$(git merge-base "$DIFF_BASE_BRANCH" HEAD 2>/dev/null || echo "HEAD~1")
@@ -1256,10 +1300,11 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     # Commit deferred issues before worktree cleanup so they aren't lost
     if [[ -f "$PROJECT_ROOT/ralph/deferred_issues.md" ]]; then
         git add "$PROJECT_ROOT/ralph/deferred_issues.md" 2>/dev/null
-        git -c commit.gpgsign=false commit -m "ralph: record deferred gate issues" 2>/dev/null || true
+        git -c commit.gpgsign=false commit --no-verify -m "ralph: record deferred gate issues" 2>/dev/null \
+            || echo "WARN: could not commit deferred issues. See $PROJECT_ROOT/ralph/deferred_issues.md"
     fi
 
-    # Gate 4: Open draft PR
+    # Gate 5: Open draft PR
     SNAPSHOT_LINE=""
     UI_LINE=""
     [[ "$UI_ROUTE" == "VIEW_LEVEL" && -n "${SNAPSHOT_TEST_CMD:-}" ]] && SNAPSHOT_LINE="- Snapshot tests: PASS"
@@ -1281,6 +1326,7 @@ $(cat progress.txt 2>/dev/null || echo "(no progress log)")
 - Static gates (code quality + architecture + security + accessibility): PASS (per-iteration)
 - Static gates precise: PASS (post-loop)
 - LLM gates (semantic review): PASS (post-loop)
+- Full static sweep: PASS (post-loop, final tree)
 - UI route: $UI_ROUTE
 ${SNAPSHOT_LINE}
 ${UI_LINE}

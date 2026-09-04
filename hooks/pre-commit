@@ -1,0 +1,72 @@
+#!/bin/bash
+# ralph-loop pre-commit: runs the fast static tier and blocks the commit on failure.
+#
+# Installed by /ralph-loop:init --openspec into .git/hooks/pre-commit.
+# bin/loop.sh commits with --no-verify, so this never fires for the autonomous loop.
+# It exists for humans and for commits made outside the loop.
+#
+# Exits 0 with a notice whenever the gate engine cannot run. A missing pipeline
+# must never block a commit.
+#
+# Path resolution is duplicated in pre-push on purpose: each hook is copied into
+# .git/hooks/ on its own and must stand alone.
+
+set -uo pipefail
+
+# ── Resolve the plugin ────────────────────────────────────────────────────────
+if [[ -z "${RALPH_PLUGIN_DIR:-}" ]]; then
+    LOOP_PATH=$(command -v loop.sh 2>/dev/null || true)
+    [[ -n "$LOOP_PATH" ]] && RALPH_PLUGIN_DIR="$(CDPATH= cd "$(dirname "$LOOP_PATH")/.." && pwd)"
+fi
+if [[ -z "${RALPH_PLUGIN_DIR:-}" || ! -d "$RALPH_PLUGIN_DIR/scripts" ]]; then
+    echo "ralph pre-commit: plugin not found on PATH: skipping gates."
+    exit 0
+fi
+export RALPH_PLUGIN_DIR
+
+# ── Resolve the project ───────────────────────────────────────────────────────
+# --git-common-dir, not --show-toplevel: inside a worktree the latter returns the
+# worktree root and produces double-nested paths.
+PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')
+PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
+export PROJECT_ROOT
+
+[[ -d "$PROJECT_ROOT/ralph" ]] || { echo "ralph pre-commit: no ralph/ directory: skipping gates."; exit 0; }
+if [[ ! -f "$PROJECT_ROOT/ralph/config.sh" ]]; then
+    echo "ralph pre-commit: ralph/config.sh missing: skipping gates."
+    exit 0
+fi
+# shellcheck source=/dev/null
+source "$PROJECT_ROOT/ralph/config.sh"
+
+RUNNER="$RALPH_PLUGIN_DIR/scripts/run_static_gates.sh"
+[[ -f "$RUNNER" ]] || { echo "ralph pre-commit: WARN gate runner missing at $RUNNER: skipping gates."; exit 0; }
+
+# ── Diff base ─────────────────────────────────────────────────────────────────
+if [[ -z "${DIFF_BASE_BRANCH:-}" && -f "$PROJECT_ROOT/ralph/.diff_base" ]]; then
+    DIFF_BASE_BRANCH=$(tr -d '[:space:]' < "$PROJECT_ROOT/ralph/.diff_base")
+fi
+export DIFF_BASE_BRANCH="${DIFF_BASE_BRANCH:-main}"
+
+# ── Tier ──────────────────────────────────────────────────────────────────────
+# Shipped default is fast. A project can override with a line in gate_context.md:
+#   - pre_commit_tier: precise
+TIER="fast"
+if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+    OVERRIDE=$(grep -E "^- pre_commit_tier:" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null \
+        | head -1 | sed 's/^- pre_commit_tier:[[:space:]]*//' | tr -d '[:space:]')
+    [[ "$OVERRIDE" == "fast" || "$OVERRIDE" == "precise" ]] && TIER="$OVERRIDE"
+fi
+
+# ── Run ───────────────────────────────────────────────────────────────────────
+OUTPUT=$(bash "$RUNNER" "$TIER" 2>&1) || {
+    echo ""
+    echo "ralph pre-commit: static gates FAILED ($TIER tier)"
+    echo "$OUTPUT"
+    echo ""
+    echo "  Bypass this check with:  git commit --no-verify"
+    echo "  Accept a pattern by adding to ralph/gate_context.md:"
+    echo "      - <gate_name>: SKIP — <reason>"
+    exit 1
+}
+exit 0

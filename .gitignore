@@ -8,3 +8,6 @@ node_modules/
 ralph/.loop_status
 ralph/.loop_output
 ralph/.fix_agent.log
+
+# ralph-bridge schema validation copy (recreate with: cp -R schemas/ralph-bridge openspec/schemas/)
+openspec/schemas/

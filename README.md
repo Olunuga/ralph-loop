@@ -65,6 +65,42 @@ This auto-discovers your Xcode scheme, simulator, and test targets, then writes:
 - `ralph/gates/` — directory for custom project gates
 - `.claude/settings.json` — workspace boundary hook + permissions
 
+### 3. Optional: OpenSpec planning and enforced gates
+
+`ralph-bridge` lets OpenSpec own planning while ralph owns the gates. Planning becomes
+gate-aware, and git hooks enforce the gates for anything the loop did not build.
+
+```bash
+npm i -g openspec
+```
+```
+/ralph-loop:init --openspec
+```
+
+That adds, on top of the normal setup:
+- `openspec/schemas/ralph-bridge/` : planning schema, set active
+- `ralph/gate_context.md` : gate overrides and hook tiers
+- `.git/hooks/pre-commit` : fast static gates
+- `.git/hooks/pre-push` : precise static gates, then LLM gates
+
+The flag is also the upgrade command. Re-run it after `claude plugin update ralph-loop`
+to refresh the schema. It never modifies `ralph/config.sh`, `ralph/gates/`,
+`ralph/gate_context.md`, `.diff_base`, or `ralph/specs/`, so an existing project keeps
+working and existing gate calibration carries over.
+
+Then plan with `/opsx:propose` and build with either `/opsx:apply` (you) or
+`/ralph-loop:run <change-name>` (autonomous). Both mark the same `tasks.md`, so you can
+do part of a change and hand the rest over.
+
+**Bypassing a hook.** `git commit --no-verify` and `git push --no-verify` skip the check.
+When a gate flags something you accept, record it in `ralph/gate_context.md` instead:
+
+```
+- color_only: SKIP — pre-existing violations on this branch
+```
+
+`bin/loop.sh` always commits with `--no-verify`, because it runs the gate engine itself.
+
 ### Migrating from file-copy installation
 
 If you previously used `/ralph-install` to copy pipeline files into `ralph/`:
