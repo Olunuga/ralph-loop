@@ -235,6 +235,38 @@ picture of the system. `/ralph-loop:cleanup` only moves files. A spec directory 
 
 ## Design references
 
+Two forms, both under `assets/` beside the intent: loose images, or an unpacked Claude
+Design handoff bundle in `assets/design/`. The build agent reads a bundle's README first,
+because Claude Design writes it as instructions for a coding agent.
+
+### Working with Claude Design
+
+The pipeline writes the prompts and reads the results. You do both transfers by hand.
+
+```
+/ralph-loop:req-slc my-product     writes ralph/design/SYSTEM_PROMPT.md
+                                   -> paste into Claude Design
+                                   -> unpack the handoff into ralph/design/system/, commit
+
+/ralph-loop:slice                  writes design/SCREEN_PROMPT.md in each change,
+                                   each citing ralph/design/system/
+                                   -> paste into Claude Design
+                                   -> unpack into <change>/assets/design/, commit
+
+/ralph-loop:run <cell-id>          the build agent reads the bundle while implementing
+```
+
+Committing the design system is what closes the loop. Claude Design imports it from the
+repository and checks generated screens against it, so release three's screens match
+release one's.
+
+Commit the unpacked files, never the `.tar` or `.zip`. An archive is opaque to review, and
+the build agent refuses to read one.
+
+Nothing verifies that a built screen matches its design. Use snapshot or UI tests for that.
+
+### Layout
+
 A feature with a visual target can carry the target beside its spec. The build agent reads
 the images while implementing.
 

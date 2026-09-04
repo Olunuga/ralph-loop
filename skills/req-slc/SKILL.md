@@ -179,6 +179,37 @@ Do these look correct? Reply 'yes' to save, or give feedback to revise."
 
 Revise and repeat until the user approves.
 
+## Step 8b — Design system prompt
+
+Read `$RALPH_PLUGIN_DIR/prompts/DESIGN_SYSTEM_PROMPT_TEMPLATE.md` and fill its placeholders
+from what you just captured:
+
+- `${PLATFORM}` from `ralph/config.sh`, or ask if it is not set
+- `${PRODUCT_SUMMARY}` two or three sentences on what the product is
+- `${AUDIENCES}` and `${JOBS_TO_BE_DONE}` from AUDIENCE_JTBD.md
+- `${ACTIVITIES}` every activity in the story map, all depths, because the system has to
+  cover the whole product and not one release
+
+Write the filled prompt to `.worktrees/spec-<slug>/ralph/design/SYSTEM_PROMPT.md` and
+include it in the Step 9 commit.
+
+Then tell the user:
+
+```
+Design system prompt: ralph/design/SYSTEM_PROMPT.md
+
+  1. Paste it into Claude Design.
+  2. Export the handoff bundle.
+  3. Unpack it into ralph/design/system/ and commit the contents.
+     Commit the files, not the .tar or .zip. An archive is opaque to review, and the
+     build agent refuses to read one.
+
+Screens are generated later, per release, by /ralph-loop:slice. Those prompts will point
+Claude Design at ralph/design/system/, so screens match what you already built.
+```
+
+Do not create `ralph/design/system/` yourself. It exists once the user places a handoff.
+
 ## Step 9 — Write to branch
 
 Ask which branch to start from:
@@ -216,7 +247,7 @@ Write AUDIENCE_JTBD.md first (lives at `.worktrees/spec-<slug>/ralph/AUDIENCE_JT
 
 Commit (separate Bash calls):
 ```bash
-git -C .worktrees/spec-<slug> add ralph/AUDIENCE_JTBD.md
+git -C .worktrees/spec-<slug> add ralph/AUDIENCE_JTBD.md ralph/design/SYSTEM_PROMPT.md
 ```
 ```bash
 git -C .worktrees/spec-<slug> -c commit.gpgsign=false commit -m "spec: audience and JTBDs"

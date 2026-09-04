@@ -102,7 +102,28 @@ carry in deeper depths: they belong to later releases.
 Follow the `ralph-bridge` proposal instruction for the format. Name the cell id, the
 release, and the depth in the Why section.
 
-**5d. Record what you created.** Keep the list for Step 7.
+**5d. Write the screen prompt.**
+Read `$RALPH_PLUGIN_DIR/prompts/SCREEN_PROMPT_TEMPLATE.md` and fill it from the activity
+spec, using ONLY this cell's depth:
+
+- `${ACTIVITY}` and `${DEPTH}` from the cell id
+- `${DEPTH_DESCRIPTION}` and `${SUCCESS_CRITERIA}` from that depth's section of the spec
+- `${JOB_TO_BE_DONE}` from the activity spec
+
+For `${DESIGN_SYSTEM_CITATION}`, check whether the design system exists:
+```bash
+[[ -d ralph/design/system ]] && echo HAS_SYSTEM
+```
+- Present: "Import the design system from this repository at `ralph/design/system/`. Use its
+  tokens and components exactly. Do not invent new ones."
+- Absent: "No design system exists yet. Work from the product context in this change's
+  proposal.md, and name the tokens you introduce so they can become the system later."
+
+Write it to `openspec/changes/<cell-id>/design/SCREEN_PROMPT.md`.
+
+Do not describe deeper depths of the same activity. They belong to later releases.
+
+**5e. Record what you created.** Keep the list for Step 7.
 
 ---
 
@@ -155,6 +176,13 @@ Skipped:
   <cell-id> — already has work against it
 
 Release record: ralph/releases/<release>.md
+
+Design prompts, one per change:
+  openspec/changes/<cell-id>/design/SCREEN_PROMPT.md
+
+  Paste each into Claude Design, export the handoff bundle, then unpack it into
+  openspec/changes/<cell-id>/assets/design/ and commit the contents. Commit the files,
+  not the .tar or .zip: the build agent refuses to read an archive.
 
 Next:
   /ralph-loop:run <cell-id>      build a change autonomously
