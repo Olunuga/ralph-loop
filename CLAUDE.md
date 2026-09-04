@@ -119,6 +119,26 @@ The Claude Code sandbox and the workspace boundary hook are different layers:
 
 Both can block the same operation for different reasons. When debugging, check which one fired.
 
+## SLC slicing to OpenSpec changes
+
+`/ralph-loop:req-slc` writes the story map as a table in `ralph/AUDIENCE_JTBD.md`.
+Activities are columns, capability depths are rows, and each cell carries a backticked id
+of the form `<activity-slug>-<depth>`. A cell holding `-` does not exist. `slice` parses
+this table, so the format is load-bearing: prose cannot be enumerated reliably.
+
+`/ralph-loop:slice` proposes one cell per activity, confirms, then creates one OpenSpec
+change per cell named after the cell id. It writes nothing before confirmation, and skips a
+change that already has commits against it rather than overwriting work.
+
+`prompts/PROMPT_slice.md` duplicates the gap analysis and SLC criteria in
+`prompts/PROMPT_plan_slc.md` steps 3 and 4. The two will drift. Extract a shared file once
+the shape settles, not before: the second consumer has to prove the shape first.
+
+Release records live in `ralph/releases/<name>.md`. They are safe from
+`bin/cleanup_specs.sh` by construction, because it moves only paths named in the plan
+header and these live outside `ralph/specs/`. `--status` derives each change's state from
+the filesystem and git rather than reading a stored value, so it cannot go stale.
+
 ## Design references
 
 Assets live beside the intent: `ralph/specs/<name>/assets/` for a legacy spec, which makes

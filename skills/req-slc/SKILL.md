@@ -91,7 +91,22 @@ Use AskUserQuestion:
 
 #### Jobs to Be Done
 - When [trigger], I want to [action], so I [outcome].
+
+## Story Map
+
+Activities are columns. Capability depths are rows. Each cell holds the cell id and what
+that depth delivers. `/ralph-loop:slice` reads this table to enumerate cells, so keep the
+format exact: one table, cell ids in backticks, `-` for a depth an activity does not have.
+
+| Depth | [Activity A] | [Activity B] |
+|---|---|---|
+| **Basic** | `activity-a-basic` single file | `activity-b-basic` top 5 |
+| **Enhanced** | `activity-a-enhanced` bulk upload | `activity-b-enhanced` adjustable count |
+| **Advanced** | `activity-a-advanced` URL import | - |
 ```
+
+The cell id is `<activity-slug>-<depth>`, lowercase and hyphenated. It becomes the OpenSpec
+change name when a slice is materialised, so it must be stable and unique.
 
 ## Step 7 — Draft activity specs
 

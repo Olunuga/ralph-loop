@@ -158,7 +158,47 @@ ask cannot sit inside an autonomous loop.
 /ralph-loop:run my-product         # auto-detects SLC mode, recommends thin slice
 ```
 
-SLC mode captures the **full activity space** upfront (basic → enhanced → advanced depths per activity). Planning then recommends the narrowest **Simple, Lovable, Complete** slice. Deferred activities stay visible as backlog. `ralph/AUDIENCE_JTBD.md` persists across releases — no re-interviews needed.
+SLC mode captures the **full activity space** upfront, then ships a narrow part of it.
+
+`req-slc` builds a story map. Activities are the columns, capability depths are the rows.
+For a photo palette app with one JTBD, "extract a photo's colors so I can reuse them":
+
+| Depth | Upload photo | Extract colors | Save palette |
+|---|---|---|---|
+| **Basic** | single file | top 5 dominant | save to device |
+| **Enhanced** | bulk upload | adjustable count, hex codes | name and tag palettes |
+| **Advanced** | batch plus URL import | perceptual clustering | sync, export ASE |
+
+A **Simple, Lovable, Complete** slice takes one cell per column, cutting vertically so the
+user gets a complete outcome rather than one activity done deeply and the rest missing.
+Here that is basic, basic, basic. The other six cells stay visible as backlog.
+
+The row does not have to be level. If extraction needs adjustable counts to be worth
+shipping, the slice is basic, **enhanced**, basic.
+
+`ralph/AUDIENCE_JTBD.md` holds the table and is never archived, so later releases pick
+deeper cells with no re-interview.
+
+**With OpenSpec**, a slice becomes one change per cell, so each cell gets its own gates and
+its own pull request.
+
+```
+/ralph-loop:req-slc my-product     # once per product, builds the table
+/ralph-loop:slice                  # per release, proposes a slice, you confirm
+                                   #   writes openspec/changes/upload-photo-basic/
+                                   #          openspec/changes/extract-colors-basic/
+                                   #          openspec/changes/save-palette-basic/
+/ralph-loop:run upload-photo-basic # per change, or /opsx:apply for the tricky ones
+/opsx:archive upload-photo-basic   # per change, once merged
+/ralph-loop:slice --status         # is the release shippable yet?
+```
+
+A slice of three cells means three changes and three pull requests. `ralph/releases/<name>.md`
+records which changes form the release, and `--status` calls it complete only when every one
+is archived. Then tag it.
+
+The legacy path stays: `/ralph-loop:run my-product` slices at planning time and builds the
+whole release as one plan, with one pull request.
 
 ### Resuming an incomplete run
 

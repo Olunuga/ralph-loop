@@ -3,7 +3,9 @@
 # Run manually from the project root: bash ralph/scripts/cleanup_specs.sh [slug]
 #
 # Reads IMPLEMENTATION_PLAN.md to find which specs were used in the build,
-# then archives them. AUDIENCE_JTBD.md is never archived — it spans releases.
+# then archives them. AUDIENCE_JTBD.md and ralph/releases/ are never archived:
+# both span releases. They are safe by construction, since only paths named in the
+# plan header are moved, and both live outside ralph/specs/.
 #
 # Optional: pass the slug (ref) to also delete the spec/<slug> branch locally
 # and on the remote.
@@ -76,7 +78,7 @@ fi
 
 echo ""
 echo "Done. $MOVED archived, $MISSING not found."
-echo "Note: AUDIENCE_JTBD.md is kept — it spans releases."
+echo "Note: AUDIENCE_JTBD.md and ralph/releases/ are kept: both span releases."
 
 # Delete spec branch if slug provided
 if [[ -n "$SLUG" ]]; then
