@@ -179,6 +179,27 @@ shipping, the slice is basic, **enhanced**, basic.
 `ralph/AUDIENCE_JTBD.md` holds the table and is never archived, so later releases pick
 deeper cells with no re-interview.
 
+**With OpenSpec**, a slice becomes one change per cell, so each cell gets its own gates and
+its own pull request. Planned, not yet built.
+
+```
+/ralph-loop:req-slc my-product     # once per product, builds the table
+/ralph-loop:slice                  # per release, proposes a slice, you confirm
+                                   #   writes openspec/changes/upload-photo-basic/
+                                   #          openspec/changes/extract-colors-basic/
+                                   #          openspec/changes/save-palette-basic/
+/ralph-loop:run upload-photo-basic # per change, or /opsx:apply for the tricky ones
+/opsx:archive upload-photo-basic   # per change, once merged
+/ralph-loop:slice --status         # is the release shippable yet?
+```
+
+A slice of three cells means three changes and three pull requests. `ralph/releases/<name>.md`
+records which changes form the release, and `--status` calls it complete only when every one
+is archived. Then tag it.
+
+The legacy path stays: `/ralph-loop:run my-product` slices at planning time and builds the
+whole release as one plan, with one pull request.
+
 ### Resuming an incomplete run
 
 If the loop exits early (iteration budget exhausted, laptop slept, session ended), re-run the same command:
