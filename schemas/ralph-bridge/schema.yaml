@@ -103,8 +103,13 @@ artifacts:
       **Gate rule**: a task that adds a construct a gate covers MUST carry the
       gate-satisfying work in the same task or an immediately following subtask.
       A task that adds a UI element covered by an accessibility gate carries the
-      accessibility work with it. A task must never leave the tree in a state a
-      gate rejects.
+      accessibility work with it. A task that adds behaviour carries its test the
+      same way: the test goes in that task or the next subtask, never in a
+      separate "add tests" group at the end. A task must never leave the tree in
+      a state a gate rejects.
+
+      A task that only renames, moves, or reformats code adds no behaviour and
+      needs no test subtask.
 
       If `ralph/gate_context.md` does not exist, proceed from the gate definitions alone.
 

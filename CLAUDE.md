@@ -119,6 +119,22 @@ The Claude Code sandbox and the workspace boundary hook are different layers:
 
 Both can block the same operation for different reasons. When debugging, check which one fired.
 
+## Test enforcement
+
+The pipeline enforces test-exists-with-code, not test-first. `bin/loop.sh` commits once
+per iteration, so the order of writes inside an iteration is not observable by any gate.
+Two gates cover it:
+
+- `scripts/gates/static/code_quality/missing_tests.sh`, fast tier, diff-scoped. Fails when
+  the diff adds a function declaration outside `TEST_DIR` and no file matching
+  `TEST_FILE_PATTERN` changed. Reads `TEST_DIR`, `TEST_FILE_PATTERN`, and
+  `FUNCTION_DECL_PATTERN` from `ralph/config.sh`, and passes with a notice when any is
+  unset. Failing closed would block every project that updates the plugin before
+  re-running `init`.
+- `scripts/gates/llm/test_adequacy.md` judges whether the added tests assert anything and
+  call the behaviour they name. It also covers the case the static gate misses: an edit to
+  an existing function body adds behaviour but declares no function.
+
 ## Intent source slots
 
 `bin/loop.sh` reads a brief and tracks a task ledger. Both paths are environment
