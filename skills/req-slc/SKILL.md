@@ -270,7 +270,46 @@ Do NOT suggest a build order or implementation sequence. That is the planning pr
 
 ---
 
-## Step 10: Report and offer the next step
+## Step 10: Report, then get the branch into the working tree
+
+Every downstream command reads the checked-out working tree, not the branch. The specs
+are on `spec/<slug>` and the worktree is gone, so nothing sees them yet. Say this first.
+
+```bash
+git rev-parse --abbrev-ref HEAD
+```
+
+That is `<CURRENT_BRANCH>`. Report what was written:
+
+```
+N activity specs + AUDIENCE_JTBD.md written to branch spec/<slug>.
+Design system prompt written to ralph/design/SYSTEM_PROMPT.md on that branch.
+
+Nothing reads them yet. /ralph-loop:slice and /ralph-loop:run both read the checked-out
+working tree, and this tree is still on <CURRENT_BRANCH>.
+```
+
+Use AskUserQuestion: "Bring the specs into this working tree now?" with these options.
+
+- **Merge into <CURRENT_BRANCH>**: run `git merge --no-ff spec/<slug>`. Pick this when the
+  specs belong on the branch you are on.
+- **Check out spec/<slug>**: run `git checkout spec/<slug>`. Pick this to work on the spec
+  branch itself.
+- **Leave it**: do neither. Say plainly that `slice` and `run` will not find the story map
+  until one of the two is done.
+
+Run the command the user picks, then confirm `ralph/AUDIENCE_JTBD.md` is present:
+
+```bash
+[[ -f ralph/AUDIENCE_JTBD.md ]] && echo READY || echo NOT_IN_TREE
+```
+
+---
+
+## Step 11: Offer the next command
+
+Skip this step when Step 10 printed `NOT_IN_TREE`. Say instead: "Bring the branch into
+this tree first, then run `/ralph-loop:slice` or `/ralph-loop:run <activity-slug>`."
 
 Detect which build routes are available:
 
@@ -279,24 +318,18 @@ command -v openspec >/dev/null && grep -q '^schema: *ralph-bridge' openspec/conf
   && echo "OPENSPEC_READY" || echo "OPENSPEC_NOT_WIRED"
 ```
 
-Report what was written:
-
-```
-N activity specs + AUDIENCE_JTBD.md written to branch spec/<slug>.
-Design system prompt written to ralph/design/SYSTEM_PROMPT.md on that branch.
-```
-
-Then use AskUserQuestion with these options. Include the OpenSpec option only when the
-check printed `OPENSPEC_READY`.
+Use AskUserQuestion with these options. Include the OpenSpec option only when the check
+printed `OPENSPEC_READY`.
 
 - **Slice into OpenSpec changes**: run `/ralph-loop:slice`. It picks one capability depth
   per activity and creates one OpenSpec change per cell, each with the five bridge
   artifacts. Pick this when you want the change reviewed before any code is written.
-- **Run the pipeline directly**: run `/ralph-loop:run <slug>`. The planner slices the story
-  map itself and the build loop starts. Pick this when you want code now.
-- **Hand off the design first**: do the Claude Design steps below, commit the result, then
-  choose a build route. Pick this when the screens have to match a design system.
-- **Stop here**: the branch is complete. Nothing else runs.
+- **Build one activity now**: run `/ralph-loop:run <activity-slug>`, naming one file in
+  `ralph/specs/`. `run` takes a single spec name or OpenSpec change name. It does not take
+  the product slug and it does not take a branch name. List the activity slugs so the user
+  can pick one.
+- **Hand off the design first**: do the Claude Design steps below, then choose a build
+  route. Pick this when the screens have to match a design system.
 
 When the OpenSpec option is absent, say why in one line: "OpenSpec is not wired. Run
 `/ralph-loop:init --openspec` to add that route."
@@ -306,10 +339,11 @@ Whichever option the user picks, print the design handoff steps once:
 ```
 Design handoff (optional, do it before the screens are built):
 
-  1. Check out spec/<slug>. The worktree is removed, so the file lives on that branch only.
-  2. Paste ralph/design/SYSTEM_PROMPT.md into Claude Design.
-  3. Export the handoff bundle.
-  4. Unpack it into ralph/design/system/ and commit the contents.
+  1. Paste ralph/design/SYSTEM_PROMPT.md into Claude Design.
+  2. Export the handoff bundle.
+  3. Unpack it into ralph/design/system/ and commit the contents.
+     The directory name must be exactly ralph/design/system. Claude Design unpacks to its
+     own name, so rename it. /ralph-loop:slice reads that path only.
      Commit the files, not the .tar or .zip. An archive is opaque to review, and the
      build agent refuses to read one.
 
@@ -317,4 +351,4 @@ Screen prompts are generated later, per release, by /ralph-loop:slice. They poin
 Design at ralph/design/system/, so screens match the system you already built.
 ```
 
-Do not run the chosen command yourself. Name it and stop.
+Do not run the chosen build command yourself. Name it and stop.
