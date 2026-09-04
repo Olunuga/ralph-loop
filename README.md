@@ -180,7 +180,7 @@ shipping, the slice is basic, **enhanced**, basic.
 deeper cells with no re-interview.
 
 **With OpenSpec**, a slice becomes one change per cell, so each cell gets its own gates and
-its own pull request. Planned, not yet built.
+its own pull request.
 
 ```
 /ralph-loop:req-slc my-product     # once per product, builds the table
