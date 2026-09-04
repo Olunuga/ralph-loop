@@ -112,12 +112,20 @@ spec, using ONLY this cell's depth:
 
 For `${DESIGN_SYSTEM_CITATION}`, check whether the design system exists:
 ```bash
-[[ -d ralph/design/system ]] && echo HAS_SYSTEM
+if [[ -d ralph/design/system ]]; then
+  echo HAS_SYSTEM
+else
+  find ralph/design -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's/^/UNNAMED: /'
+fi
 ```
-- Present: "Import the design system from this repository at `ralph/design/system/`. Use its
+- `HAS_SYSTEM`: "Import the design system from this repository at `ralph/design/system/`. Use its
   tokens and components exactly. Do not invent new ones."
-- Absent: "No design system exists yet. Work from the product context in this change's
-  proposal.md, and name the tokens you introduce so they can become the system later."
+- One or more `UNNAMED:` lines: stop the whole skill and tell the user, naming each path
+  found: "A design handoff is in `<path>`, but the pipeline reads `ralph/design/system/`
+  only. Rename it with `git mv <path> ralph/design/system`, commit, then re-run
+  `/ralph-loop:slice`." Create nothing.
+- No output at all: "No design system exists yet. Work from the product context in this
+  change's proposal.md, and name the tokens you introduce so they can become the system later."
 
 Write it to `openspec/changes/<cell-id>/design/SCREEN_PROMPT.md`.
 

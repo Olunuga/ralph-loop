@@ -134,6 +134,12 @@ change that already has commits against it rather than overwriting work.
 `prompts/PROMPT_plan_slc.md` steps 3 and 4. The two will drift. Extract a shared file once
 the shape settles, not before: the second consumer has to prove the shape first.
 
+Every skill downstream of `req-slc` reads the checked-out working tree, not a branch.
+`req-slc` commits to `spec/<slug>` and removes its worktree, so its last step merges or
+checks out that branch before it names the next command. `run` takes one activity spec
+name from `ralph/specs/` or one OpenSpec change name. It never takes the product slug or a
+branch name.
+
 Release records live in `ralph/releases/<name>.md`. They are safe from
 `bin/cleanup_specs.sh` by construction, because it moves only paths named in the plan
 header and these live outside `ralph/specs/`. `--status` derives each change's state from
@@ -151,6 +157,10 @@ A handoff bundle is not a design reference image. Claude Design writes its READM
 instructions addressed to a coding agent, so `PROMPT_build.md` step 0d2 reads that README
 first and follows what it names. The cap is 4 bundle files per iteration against 2 for
 loose images, because the README bounds what matters.
+
+The handoff directory name is exact. `skills/slice/SKILL.md` reads `ralph/design/system/`
+and nothing else. Claude Design unpacks to its own name, so slice stops and asks for a
+rename when it finds a directory under `ralph/design/` that is not `system`.
 
 A committed `.tar` or `.zip` is refused rather than unpacked. Automatic extraction would
 run over content the pipeline did not produce, and an archive in git is opaque to review.
@@ -275,6 +285,12 @@ Based on the composite score (0-10):
 - **Score 7-10**: Defer — create GitHub issue as tech debt, don't fail the gate
 
 Thresholds are configurable per-project via `ralph/gate_context.md`.
+
+### Bootstrap writes gate_context.md, not init Step 7g
+`prompts/PROMPT_bootstrap.md` writes the file during init Step 6. Step 7g then finds it and
+preserves it, which is correct. The hook tier lines therefore have to come from the
+bootstrap template, and they do. `hooks/pre-commit` and `hooks/pre-push` parse them with
+`grep -E "^- pre_commit_tier:"` and fall back to their defaults when absent.
 
 ### gate_context.md format
 The gate runner parses `gate_context.md` with `grep -E "^- [a-z_]+: SKIP"`. Each entry must be a markdown list item in this exact format:
