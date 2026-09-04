@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ralph-loop",
+  "description": "Autonomous development pipeline for Claude Code",
+  "owner": {
+    "name": "Mayowa Olunuga",
+    "url": "https://github.com/Olunuga/ralph-loop"
+  },
+  "plugins": [
+    {
+      "name": "ralph-loop",
+      "description": "Autonomous development pipeline — plans, builds, tests, and gates code changes with zero human intervention",
+      "author": {
+        "name": "Mayowa Olunuga",
+        "url": "https://github.com/Olunuga/ralph-loop"
+      },
+      "category": "development",
+      "source": "./",
+      "homepage": "https://github.com/Olunuga/ralph-loop"
+    }
+  ]
+}
