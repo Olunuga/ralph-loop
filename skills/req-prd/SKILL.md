@@ -43,6 +43,15 @@ Do not ask the user about implementation details — structs, classes, methods, 
 Based on the behavioral descriptions, AGENTS.md patterns, and existing codebase, write one spec
 per topic. Infer the appropriate implementation approach yourself.
 
+### Design references
+
+Ask whether any topic has a design reference. For each one supplied, verify the path exists,
+warn above 2 MB, then write that spec as a directory instead of a single file:
+`ralph/specs/<slug>/spec.md` with the image in `ralph/specs/<slug>/assets/`. The spec text
+MUST name each asset and say what it shows. A spec with no reference stays a single file,
+and gets no empty `assets/` directory.
+
+
 ```markdown
 # <ref>/<topic-slug> — [Topic Name]
 

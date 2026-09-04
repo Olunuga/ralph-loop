@@ -119,6 +119,22 @@ The Claude Code sandbox and the workspace boundary hook are different layers:
 
 Both can block the same operation for different reasons. When debugging, check which one fired.
 
+## Design references
+
+Assets live beside the intent: `ralph/specs/<name>/assets/` for a legacy spec, which makes
+that spec a directory holding `spec.md`, and `openspec/changes/<name>/assets/` for an
+OpenSpec change. A single-file `ralph/specs/<name>.md` keeps working.
+
+`prompts/PROMPT_build.md` step 0d2 reads them. The main agent must do this itself. The
+brief read at 0b uses parallel subagents, and a subagent returns text, so it cannot pass an
+image back. The step runs after 0d because it uses the chosen task to decide which images
+to read when `assets/` holds more than the per-iteration cap of 2.
+
+`bin/cleanup_specs.sh` moves a spec directory as a unit, so assets archive with the spec.
+
+Nothing verifies the built view against the reference. The agent sees the reference while
+implementing; correctness is left to snapshot and UI tests.
+
 ## Test enforcement
 
 The pipeline enforces test-exists-with-code, not test-first. `bin/loop.sh` commits once

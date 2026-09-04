@@ -111,6 +111,10 @@ artifacts:
       A task that only renames, moves, or reformats code adds no behaviour and
       needs no test subtask.
 
+      **Design references**: when the change has an `assets/` directory, a task whose
+      result is visual MUST name the asset file it has to match. Without that, the build
+      agent cannot tell which reference applies to which task.
+
       If `ralph/gate_context.md` does not exist, proceed from the gate definitions alone.
 
       **Format: the apply phase parses this, so follow it exactly:**

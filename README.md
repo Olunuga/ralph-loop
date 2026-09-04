@@ -89,9 +89,7 @@ to refresh the schema. It never modifies `ralph/config.sh`, `ralph/gates/`,
 `ralph/gate_context.md`, `.diff_base`, or `ralph/specs/`, so an existing project keeps
 working and existing gate calibration carries over.
 
-Then plan with `/opsx:propose` and build with either `/opsx:apply` (you) or
-`/ralph-loop:run <change-name>` (autonomous). Both mark the same `tasks.md`, so you can
-do part of a change and hand the rest over.
+See **OpenSpec change** under Workflows for how to use it.
 
 **Bypassing a hook.** `git commit --no-verify` and `git push --no-verify` skip the check.
 When a gate flags something you accept, record it in `ralph/gate_context.md` instead:
@@ -122,6 +120,29 @@ This preserves your config, AGENTS.md, and specs, moves any custom gates to `ral
 /ralph-loop:spec my-feature        # describe what to build, get a spec
 /ralph-loop:run my-feature         # run the pipeline autonomously
 ```
+
+### OpenSpec change (gate-aware planning)
+
+Needs `/ralph-loop:init --openspec`. See Setup step 3.
+
+```
+/opsx:propose my-feature           # proposal, specs, design, tasks. Reads your gate definitions
+/ralph-loop:run my-feature         # run the pipeline against the change
+```
+
+`propose` produces `openspec/changes/my-feature/`. Because it reads `ralph/gate_context.md`
+and your gate scripts, the plan it writes does not propose work a gate rejects.
+
+You can also build it yourself, or split the work:
+
+```
+/opsx:apply my-feature             # you implement, in your session, pausing on blockers
+/ralph-loop:run my-feature         # hand the rest to the loop
+```
+
+Both mark the same `tasks.md`. Do the two tricky tasks with `apply`, then let `run` finish
+the remaining unchecked ones. `run` never calls `apply`, because a command that pauses to
+ask cannot sit inside an autonomous loop.
 
 ### Multi-topic PRD (multiple specs from one JTBD)
 
@@ -159,9 +180,40 @@ Runs the full baseline: build, unit tests, static gates (fast + precise), and LL
 
 ### Post-merge cleanup
 
+Use the command that matches where the intent came from.
+
 ```
-/ralph-loop:cleanup my-feature     # archive specs to done/, delete spec branch
+/ralph-loop:cleanup my-feature     # legacy spec: move to ralph/specs/done/, delete spec branch
+/opsx:archive my-feature           # OpenSpec change: fold deltas into openspec/specs/, archive the change
 ```
+
+`/opsx:archive` also updates your main specs, so `openspec/specs/` stays the current
+picture of the system. `/ralph-loop:cleanup` only moves files. A spec directory with an
+`assets/` folder moves as a unit, so design references archive with their spec.
+
+---
+
+## Design references
+
+A feature with a visual target can carry the target beside its spec. The build agent reads
+the images while implementing.
+
+```
+ralph/specs/<name>/spec.md          legacy spec, now a directory
+ralph/specs/<name>/assets/home.png  the reference
+
+openspec/changes/<name>/assets/     same idea for an OpenSpec change
+```
+
+A spec with no reference stays a single `ralph/specs/<name>.md`, exactly as before.
+
+`/ralph-loop:spec` asks for a reference and places it. The spec text must name each asset
+and say what it shows, so planning can point a task at the right one. Archiving moves the
+directory as a unit, so assets are never orphaned.
+
+The agent reads at most 2 images per iteration. Above that, it reads the ones the current
+task names. Nothing compares the built view against the reference: use snapshot or UI tests
+for that.
 
 ---
 
