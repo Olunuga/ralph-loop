@@ -1,0 +1,89 @@
+#!/bin/bash
+# ralph-loop pre-push: runs the precise static tier, then the LLM gates.
+#
+# Installed by /ralph-loop:init --openspec into .git/hooks/pre-push.
+# bin/loop.sh pushes and commits with --no-verify, so this never fires for the
+# autonomous loop. It exists for humans and for pushes made outside the loop.
+#
+# The static tier runs first, so a cheap deterministic failure stops the push
+# before any model call.
+#
+# Exits 0 with a notice whenever the gate engine cannot run. A missing pipeline
+# must never block a push.
+#
+# Path resolution is duplicated in pre-commit on purpose: each hook is copied
+# into .git/hooks/ on its own and must stand alone.
+
+set -uo pipefail
+
+# git feeds the ref list on stdin. Drain it so the hook never blocks.
+cat > /dev/null 2>&1 || true
+
+# ── Resolve the plugin ────────────────────────────────────────────────────────
+if [[ -z "${RALPH_PLUGIN_DIR:-}" ]]; then
+    LOOP_PATH=$(command -v loop.sh 2>/dev/null || true)
+    [[ -n "$LOOP_PATH" ]] && RALPH_PLUGIN_DIR="$(CDPATH= cd "$(dirname "$LOOP_PATH")/.." && pwd)"
+fi
+if [[ -z "${RALPH_PLUGIN_DIR:-}" || ! -d "$RALPH_PLUGIN_DIR/scripts" ]]; then
+    echo "ralph pre-push: plugin not found on PATH: skipping gates."
+    exit 0
+fi
+export RALPH_PLUGIN_DIR
+
+# ── Resolve the project ───────────────────────────────────────────────────────
+PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')
+PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
+export PROJECT_ROOT
+
+[[ -d "$PROJECT_ROOT/ralph" ]] || { echo "ralph pre-push: no ralph/ directory: skipping gates."; exit 0; }
+if [[ ! -f "$PROJECT_ROOT/ralph/config.sh" ]]; then
+    echo "ralph pre-push: ralph/config.sh missing: skipping gates."
+    exit 0
+fi
+# shellcheck source=/dev/null
+source "$PROJECT_ROOT/ralph/config.sh"
+
+STATIC_RUNNER="$RALPH_PLUGIN_DIR/scripts/run_static_gates.sh"
+LLM_RUNNER="$RALPH_PLUGIN_DIR/scripts/run_llm_gates.sh"
+[[ -f "$STATIC_RUNNER" ]] || { echo "ralph pre-push: WARN gate runner missing at $STATIC_RUNNER: skipping gates."; exit 0; }
+
+# ── Diff base ─────────────────────────────────────────────────────────────────
+if [[ -z "${DIFF_BASE_BRANCH:-}" && -f "$PROJECT_ROOT/ralph/.diff_base" ]]; then
+    DIFF_BASE_BRANCH=$(tr -d '[:space:]' < "$PROJECT_ROOT/ralph/.diff_base")
+fi
+export DIFF_BASE_BRANCH="${DIFF_BASE_BRANCH:-main}"
+
+BYPASS_NOTE() {
+    echo ""
+    echo "  Bypass this check with:  git push --no-verify"
+    echo "  Accept a pattern by adding to ralph/gate_context.md:"
+    echo "      - <gate_name>: SKIP — <reason>"
+}
+
+# ── 1. Precise static tier, before any model call ────────────────────────────
+TIER="precise"
+if [[ -f "$PROJECT_ROOT/ralph/gate_context.md" ]]; then
+    OVERRIDE=$(grep -E "^- pre_push_tier:" "$PROJECT_ROOT/ralph/gate_context.md" 2>/dev/null \
+        | head -1 | sed 's/^- pre_push_tier:[[:space:]]*//' | tr -d '[:space:]')
+    [[ "$OVERRIDE" == "fast" || "$OVERRIDE" == "precise" ]] && TIER="$OVERRIDE"
+fi
+
+OUTPUT=$(bash "$STATIC_RUNNER" "$TIER" 2>&1) || {
+    echo ""
+    echo "ralph pre-push: static gates FAILED ($TIER tier): no LLM gate was run."
+    echo "$OUTPUT"
+    BYPASS_NOTE
+    exit 1
+}
+
+# ── 2. LLM gates ──────────────────────────────────────────────────────────────
+[[ -f "$LLM_RUNNER" ]] || { echo "ralph pre-push: WARN LLM runner missing at $LLM_RUNNER: static gates passed, allowing push."; exit 0; }
+
+OUTPUT=$(bash "$LLM_RUNNER" 2>&1) || {
+    echo ""
+    echo "ralph pre-push: LLM gates FAILED"
+    echo "$OUTPUT"
+    BYPASS_NOTE
+    exit 1
+}
+exit 0

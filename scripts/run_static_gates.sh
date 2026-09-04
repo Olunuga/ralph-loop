@@ -48,8 +48,9 @@ CHECKED=0
 FAILED_NAMES=""
 SEEN_GATES=""
 
-# Scan plugin gates first, then project gates (project overrides plugin by basename)
-for CHECK_FILE in "$PLUGIN_GATES_DIR"/*/*.sh "$PROJECT_GATES_DIR"/*/*.sh; do
+# Scan project gates first, then plugin gates. Dedup keeps the FIRST occurrence,
+# so scanning project-first is what makes a project gate override the plugin one.
+for CHECK_FILE in "$PROJECT_GATES_DIR"/*/*.sh "$PLUGIN_GATES_DIR"/*/*.sh; do
     [[ -f "$CHECK_FILE" ]] || continue
 
     # Deduplicate: if we've already seen this gate name, skip (project overrides plugin)

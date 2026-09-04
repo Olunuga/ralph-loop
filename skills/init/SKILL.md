@@ -9,6 +9,16 @@ You are setting up the Ralph autonomous development pipeline for this project.
 
 Run each step in order. Tell the user which step you are on.
 
+## Arguments
+
+`--openspec` turns on the OpenSpec wiring in Step 7. Without it, Step 7 is skipped
+entirely: no `openspec/` directory is created and no git hooks are written.
+
+`/ralph-loop:init --openspec` is also the upgrade command. It is idempotent. Run it
+again after `claude plugin update ralph-loop` to refresh the installed schema. It never
+modifies `ralph/config.sh`, `ralph/gates/`, `ralph/gate_context.md`, `ralph/.diff_base`,
+or anything under `ralph/specs/`.
+
 ---
 
 ## Step 1 — Create project directories
@@ -220,12 +230,96 @@ Apply any corrections the user requests, then save.
 
 ---
 
-## Step 7 — Commit ralph/ to git
+## Step 7: OpenSpec wiring (only with `--openspec`)
+
+Skip this entire step if the user did not pass `--openspec`.
+
+**7a. Require the CLI.**
+```bash
+command -v openspec >/dev/null || echo "MISSING"
+```
+If missing, tell the user: "OpenSpec is not installed. Run `npm i -g openspec`, then
+re-run `/ralph-loop:init --openspec`." Skip the rest of this step and continue to Step 8.
+The ralph setup from Steps 1 to 6 stays in place.
+
+**7b. Require a supported CLI version.**
+```bash
+bash "$PLUGIN_DIR/scripts/schema_stamp.sh" require-min
+```
+Exit 1 means the CLI is too old. The script names the installed version and the minimum.
+Report it, skip the rest of this step, and continue to Step 8.
+
+**7c. Initialise OpenSpec if absent.**
+`--tools` is required. Without it, `openspec init` prints the tool list and creates nothing.
+```bash
+[[ -f openspec/config.yaml ]] || openspec init --tools claude
+```
+This also writes `.claude/commands/` and `.claude/skills/` for the opsx commands.
+
+**7d. Install the schema bundle.**
+```bash
+mkdir -p openspec/schemas
+cp -R "$PLUGIN_DIR/schemas/ralph-bridge" openspec/schemas/
+```
+This overwrites any previous copy, which is what makes a re-run refresh the bundle.
+
+**7e. Set the active schema.**
+Read `schema:` in `openspec/config.yaml`.
+- Absent, or already `ralph-bridge`: set it to `ralph-bridge`.
+- Any other value: use AskUserQuestion to ask whether to switch. Leave it alone on a no.
+Never modify anything under `openspec/changes/` or `openspec/specs/`.
+
+**7f. Stamp the install.**
+```bash
+bash "$PLUGIN_DIR/scripts/schema_stamp.sh" write "$(pwd)"
+```
+
+**7g. Seed the gate context.**
+Only when `ralph/gate_context.md` does not exist. If it does, tell the user
+"Existing gate calibration preserved" and do not touch it.
+```markdown
+# Gate context
+
+Accepted patterns and gate overrides for this project. One entry per line, in this
+exact format. The gate runner parses these lines; markdown headers are ignored.
+
+- example_gate: SKIP — pre-existing violations on this branch
+- another_gate: ENFORCE
+
+Hook tiers. Defaults are fast on pre-commit and precise on pre-push.
+
+- pre_commit_tier: fast
+- pre_push_tier: precise
+```
+
+**7h. Install the git hooks.**
+For each of `pre-commit` and `pre-push`:
+- If `.git/hooks/<name>` does not exist, copy `$PLUGIN_DIR/hooks/<name>` there and `chmod +x`.
+- If it exists and its first lines name ralph, overwrite it.
+- If it exists and is not a ralph hook, do NOT overwrite. Write the template to
+  `.git/hooks/<name>.ralph` and tell the user to merge the two by hand.
+
+**7i. Offer the Stop hook.**
+Use AskUserQuestion: "Register the in-session gate check? It runs the fast static tier
+after every Claude turn and makes no model call." Register it in `.claude/settings.json`
+only on an explicit yes, pointing at `$PLUGIN_DIR/hooks/stop_gate_check.sh`.
+
+**7j. Validate.**
+```bash
+openspec schema validate ralph-bridge
+```
+A non-zero exit means the bundle does not work with this CLI version. Report it now
+rather than leaving it to surface at the next propose.
+
+---
+
+## Step 8: Commit ralph/ to git
 
 Ralph project files must be tracked in git so that worktrees include them.
 
 ```bash
 git add ralph/ .claude/settings.json .gitignore
+[[ -d openspec ]] && git add openspec/
 git -c commit.gpgsign=false commit -m "chore: configure ralph autonomous pipeline"
 ```
 
@@ -241,9 +335,18 @@ Tell the user:
 - .claude/settings.json — workspace boundary hook active
 - ralph/AGENTS.md — codebase architecture documented
 
+<If --openspec was used, also list:>
+- openspec/schemas/ralph-bridge/ : gate-aware planning schema, set active
+- ralph/gate_context.md : gate overrides and hook tiers
+- .git/hooks/pre-commit : fast static gates
+- .git/hooks/pre-push : precise static gates, then LLM gates
+
 Next steps:
-  /ralph-loop:spec TICKET-001   — describe a feature, get a spec
-  /ralph-loop:run TICKET-001    — run the autonomous pipeline
+  /ralph-loop:spec TICKET-001   : describe a feature, get a spec
+  /ralph-loop:run TICKET-001    : run the autonomous pipeline
+
+Bypass a hook with --no-verify. Record an accepted pattern in ralph/gate_context.md
+as: - <gate_name>: SKIP — <reason>
 
 To add custom gates, drop .sh files into ralph/gates/static/<category>/
 or .md files into ralph/gates/llm/. See the plugin README for details."

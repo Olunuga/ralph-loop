@@ -1,0 +1,166 @@
+name: ralph-bridge
+version: 1
+description: Gate-aware spec-driven workflow - proposal → specs → design → tasks → gate-report
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: What changes and why
+    template: proposal.md
+    instruction: |
+      Create the proposal that establishes WHY this change is needed.
+
+      Sections:
+      - **Why**: 1-2 sentences on the problem. What does this solve? Why now?
+      - **What Changes**: One idea per bullet. Mark breaking changes with **BREAKING**.
+      - **Capabilities**: Which specs get created or modified.
+        - **New Capabilities**: kebab-case names. Each becomes `specs/<name>/spec.md`.
+        - **Modified Capabilities**: existing capabilities whose REQUIREMENTS change.
+          Check `openspec/specs/` for existing names. Leave empty if no requirement changes.
+      - **Impact**: affected code, APIs, dependencies.
+
+      The Capabilities section is the contract between this artifact and the specs.
+      Research existing specs before filling it in.
+
+      Prose rules:
+      - Put every change in "What Changes". Do not bury a change in "Impact" or under its own heading.
+      - Mechanism, line numbers, and failure modes belong in design.md. Do not repeat them here.
+      - Name a mechanism by what it is. Never coin a term for something that already has a plain name.
+      - Target 50 lines.
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Requirements and scenarios per capability
+    template: spec.md
+    instruction: |
+      Create one spec file per capability listed in the proposal.
+      New capabilities: `specs/<capability>/spec.md` using the proposal's kebab-case name.
+      Modified capabilities: use the existing folder name from `openspec/specs/<capability>/`.
+
+      Delta operations (## headers):
+      - **ADDED Requirements**, **MODIFIED Requirements** (include full updated content),
+        **REMOVED Requirements** (include **Reason** and **Migration**), **RENAMED Requirements**.
+
+      Format:
+      - `### Requirement: <name>` then the rule, using SHALL/MUST.
+      - `#### Scenario: <name>` with WHEN/THEN bullets.
+      - **CRITICAL**: scenarios need exactly 4 hashtags. Three fails silently.
+      - Every requirement needs at least one scenario.
+
+      Prose rules:
+      - Keep only scenarios that constrain behaviour. Delete any scenario whose removal
+        changes no implementation decision.
+      - A requirement states the rule. The reason belongs in design.md.
+      - No scenario that only restates the requirement in WHEN/THEN form.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Technical decisions, risks, migration
+    template: design.md
+    instruction: |
+      Create the design that explains HOW to implement the change.
+
+      **Read before writing:**
+      1. `ralph/gate_context.md`: accepted patterns and `- <gate_name>: SKIP|ENFORCE` entries.
+      2. `scripts/gates/static/` in the ralph-loop plugin: the default static gates.
+      3. `ralph/gates/static/` and `ralph/gates/llm/`: this project's own gates and overrides.
+
+      The design MUST NOT propose an approach that a gate rejects. When a gate and the
+      obvious approach conflict, either pick a different approach or record the conflict
+      as a decision with its reason.
+
+      If `ralph/gate_context.md` does not exist, proceed from the gate definitions alone
+      and record its absence under Open Questions.
+
+      Sections:
+      - **Context**: current state, constraints.
+      - **Goals / Non-Goals**.
+      - **Decisions**: each keyed and titled by the decision itself.
+      - **Risks / Trade-offs**: one line each: the risk, then the mitigation.
+      - **Migration Plan**: deploy steps and rollback.
+      - **Open Questions**.
+
+      Prose rules:
+      - Lead each decision with the decision. Follow with the reason in plain sentences.
+      - No "Why:" / "Alternative rejected:" / "Cost accepted:" labels. Write the reason as prose.
+      - Include an alternative only when it was genuinely close. Say why it loses in one or two sentences.
+      - Name a mechanism by what it is. Never coin a term for something that already has a plain name.
+    requires:
+      - proposal
+
+  - id: tasks
+    generates: tasks.md
+    description: Implementation checklist
+    template: tasks.md
+    instruction: |
+      Break the implementation into trackable tasks.
+
+      **Read before writing:** `ralph/gate_context.md`, `scripts/gates/static/`,
+      `ralph/gates/static/`, `ralph/gates/llm/`.
+
+      **Gate rule**: a task that adds a construct a gate covers MUST carry the
+      gate-satisfying work in the same task or an immediately following subtask.
+      A task that adds a UI element covered by an accessibility gate carries the
+      accessibility work with it. A task must never leave the tree in a state a
+      gate rejects.
+
+      If `ralph/gate_context.md` does not exist, proceed from the gate definitions alone.
+
+      **Format: the apply phase parses this, so follow it exactly:**
+      - Group under `## <n>. <title>` headings.
+      - Every task is `- [ ] X.Y Description`. Tasks not using `- [ ]` are not tracked.
+      - Order by dependency.
+
+      Prose rules:
+      - One verifiable action per task. No task that only says "consider" or "review".
+      - Reference the spec a verification task checks, by capability name.
+    requires:
+      - specs
+      - design
+
+  - id: gate-report
+    generates: gate-report.md
+    description: Gate evidence - baseline, post-implementation, delta verdict
+    template: gate-report.md
+    instruction: |
+      Record the gate evidence for this change. Write this after implementation,
+      from the two gate runs the apply phase performed.
+
+      Sections:
+      - **Baseline**: the gate result captured before any task was implemented.
+      - **Post-implementation**: the gate result after the last task.
+      - **Delta**: post minus baseline. This is the verdict: green or red.
+      - **Suppressed**: each `- <gate_name>: SKIP` entry in `ralph/gate_context.md`
+        that removed a gate from the comparison.
+      - **Deferred**: each violation left unfixed, with the gate name, the reason,
+        and the issue or ticket reference.
+
+      A violation present in both runs is inherited and does not fail the change.
+      A violation absent from the baseline is introduced and does fail it.
+    requires:
+      - tasks
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Read the context files, then implement in three steps.
+
+    **1. Baseline before any code changes.**
+    Run the static gates and record the result. This is what the change is judged against.
+    Do not skip this, without it, inherited violations look like new ones.
+
+    **2. Implement the pending tasks.**
+    Mark each `- [ ]` as `- [x]` only after that task's work is complete.
+    Pause on blockers rather than guessing.
+
+    **3. Post-implementation gates and delta verdict.**
+    Run the static gates, then the LLM gates. The verdict is post minus baseline.
+    - A violation in both runs is inherited. It does not fail the change.
+    - A violation absent from the baseline is introduced. It fails the change.
+    - A gate named in a `- <gate_name>: SKIP` line in `ralph/gate_context.md` is
+      excluded from the comparison entirely.
+
+    Write the result to `gate-report.md`.

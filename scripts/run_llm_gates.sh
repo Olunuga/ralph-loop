@@ -58,7 +58,9 @@ fi
 # Collect gate prompts (deduplicate: project overrides plugin by basename)
 GATE_FILES=()
 SEEN_GATES=""
-for PROMPT_FILE in "$PLUGIN_LLM_DIR"/*.md "$PROJECT_LLM_DIR"/*.md; do
+# Project first, then plugin: dedup keeps the first occurrence, so this is what
+# makes a project prompt override the plugin one.
+for PROMPT_FILE in "$PROJECT_LLM_DIR"/*.md "$PLUGIN_LLM_DIR"/*.md; do
     [[ -f "$PROMPT_FILE" ]] || continue
 
     GATE_BASENAME=$(basename "$PROMPT_FILE")
