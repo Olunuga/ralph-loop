@@ -57,7 +57,15 @@ DEFERRED
 - <cell-id> | needs <cell-id> | <one-line reason>
 ...
 
+BUILD ORDER
+1. <cell-id> | <what it needs first, or "nothing">
+2. <cell-id> | needs <cell-id>
+...
+
 RATIONALE
 <Two or three sentences: what job this slice completes, and why it is lovable at this scope.>
+
+Order every cell in PROPOSED SLICE, using the dependencies from STEP 3. A cell comes after
+every cell it needs. Two cells that need nothing from each other keep story map order.
 
 If ALREADY DONE or DEFERRED is empty, print the heading and "none".

@@ -134,6 +134,21 @@ change that already has commits against it rather than overwriting work.
 `prompts/PROMPT_plan_slc.md` steps 3 and 4. The two will drift. Extract a shared file once
 the shape settles, not before: the second consumer has to prove the shape first.
 
+`slice` writes four of the five bridge artifacts per cell: proposal, specs, design, tasks.
+It calls `openspec instructions <artifact> --change <cell-id>` for each and follows what
+comes back, then checks `openspec status --change --json`. Both build routes refuse a
+change that is not apply-ready, so a proposal-only change is a dead end.
+`gate-report.md` is written after implementation.
+
+The proposal holds no technical detail. The Step 2 gap analysis in `prompts/PROMPT_slice.md`
+finds file paths and layers; those go in design.md, where an implementation decision is
+being made. The generic OpenSpec proposal template asks for "affected code, APIs" under
+Impact, which is why this has to be said in the skill.
+
+`prompts/PROMPT_slice.md` prints a BUILD ORDER section derived from its own STEP 3
+dependency pass. The release record carries it as an Order column, and `--status` names the
+first change that is not archived. Without it the dependency work was computed and dropped.
+
 Every skill downstream of `req-slc` reads the checked-out working tree, not a branch.
 `req-slc` commits to `spec/<slug>` and removes its worktree, so its last step merges or
 checks out that branch before it names the next command. `run` takes one activity spec
