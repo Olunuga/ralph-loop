@@ -79,8 +79,19 @@ Pick the first line that is true. This is the single thing the user does next.
 3. No release record : run `/ralph-loop:slice`
 4. A change is **missing** : re-run `/ralph-loop:slice`, or remove it from the release record
 5. A change is **not planned yet** : run `/ralph-loop:slice` again to finish writing it
-6. A change is **in progress** : run `/ralph-loop:run <cell-id>` to continue it
-7. A change is **ready to build**, lowest Order first : run `/ralph-loop:run <cell-id>`
+6. A change is **in progress** : build it, continuing from where it stopped
+7. A change is **ready to build**, lowest Order first : build it
+
+For 6 and 7 the action is one thing, building that change, and there are two ways to do it.
+Print both, with the change named:
+
+```
+    /ralph-loop:run <cell-id>      the pipeline builds it and opens a pull request
+    /opsx:apply <cell-id>          you build it, and it stops to ask
+```
+
+Both work through the same `tasks.md`, so a change started one way can be finished the
+other. Neither undoes the other's checked items.
 8. A change is **built, waiting to be archived** : merge its pull request, then run `/ralph-loop:cleanup`
 9. Every change is **done** : run `/ralph-loop:slice` for the next release
 
@@ -110,7 +121,8 @@ Rules for the text:
 - Plain words. No jargon. No file paths except the ones the user types or opens.
 - A `Done` line says what the person now has, not what a command did.
 - One line per item. No paragraph.
-- Never more than one thing under **Do this next**.
+- Never more than one thing under **Do this next**. Two commands for the same action are
+  one thing, so a build step may print both.
 - Say the date it was written, so a stale file is obvious.
 
 ```markdown
@@ -146,7 +158,8 @@ Worked example of the tone:
 Build the first release slice. Start with adding a task, because reviewing a list
 needs it first.
 
-    /ralph-loop:run capture-basic
+    /ralph-loop:run capture-basic      the pipeline builds it and opens a pull request
+    /opsx:apply capture-basic          you build it, and it stops to ask
 
 ## Done
 

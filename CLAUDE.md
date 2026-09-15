@@ -167,6 +167,10 @@ Every fact is derived from the filesystem and git at write time, so the file can
 but never wrong about a step that was skipped. It names exactly one next action, and
 `req-slc`, `slice`, `run`, and `cleanup` each end by pointing at it.
 
+A build step in `ralph/NEXT.md` names both `/ralph-loop:run` and `/opsx:apply`. They are
+independent executors of the same change and share `tasks.md` as the ledger, so a change
+started one way can be finished the other.
+
 Design is never the next action in `ralph/NEXT.md`, but it always carries its destination
 path. The system and each change's screens are independent: the system can be in place while
 a change still has a screen prompt and no `assets/design/`. A user holding a finished design
