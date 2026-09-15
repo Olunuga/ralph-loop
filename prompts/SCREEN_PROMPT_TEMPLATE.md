@@ -35,22 +35,28 @@ what is missing rather than inventing a one-off.
 
 ## How I will take this away
 
-I will use Export, then the handoff bundle. Write the bundle README as instructions to a
-coding agent that has never seen this conversation: name each screen file, say which state
-it shows, and say which screen comes first. A coding agent reads that README first and
-follows what it names. Keep the README under one screen of text: the agent reads only a few
-files per pass, and the README decides which ones.
+I export this project as HTML and commit the files into a codebase. Two consequences.
 
-Keep in the bundle: the screen files, a screenshot of every state, and the chat. Leave out
-PDF and slide exports.
+Put every screen and every state into the project itself. Anything that exists only as an
+answer in this chat is lost when I export.
+
+Write a page called README that a coding agent reads first. Address it to an agent that has
+never seen this conversation. Name each screen file, say which state it shows, and say
+which screen comes first. Keep it under one screen of text: the agent opens only a few
+files per pass, and this page decides which ones.
 
 ---
 
 ## After you paste it
 
-Once Claude Design gives you the bundle:
+Once Claude Design has built the screens:
 
-1. Press Export, then pick the handoff bundle. "Download as .zip" gives you the files.
-2. Unpack it into `openspec/changes/${CHANGE_ID}/assets/design/`. That exact path.
+1. Press the share button, then under Export pick **Project HTML**, then **Download**.
+   Choose the .zip, not standalone.
+2. Unpack the .zip into `openspec/changes/${CHANGE_ID}/assets/design/`. That exact path.
 3. Commit the files, not the .zip. The build agent refuses to read an archive.
-4. Keep the README. The build agent reads it first and uses it to choose what else to open.
+4. Check a README came out with it. The build agent reads that file first and uses it to
+   choose what else to open.
+
+The **Claude Code / Send** option sends the design to a connected Claude Code destination.
+It does not put files at the path above, so it does not feed this pipeline.

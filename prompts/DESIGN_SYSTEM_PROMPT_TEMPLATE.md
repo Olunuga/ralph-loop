@@ -47,26 +47,35 @@ express, tell me what is missing rather than designing around it.
 
 ## How I will take this away
 
-I will use Export, then the handoff bundle. Write the bundle README as instructions to a
-coding agent that has never seen this conversation: name which files hold the tokens, which
-hold the components, and what to do with each. A coding agent reads that README first and
-follows what it names.
+I export this project as HTML and commit the files into a codebase. Two consequences.
 
-Keep in the bundle: the token definitions, the component files with their states, the
-screenshots, and the chat. Leave out PDF and slide exports. The agent cannot read a token
-value out of a picture of a slide.
+Put the whole system into files that survive that export. The tokens, the type scale, the
+spacing scale, and every component with all its states have to be in the project itself.
+Anything that exists only as an answer in this chat is lost when I export.
+
+Write a page called README that a coding agent reads first. Address it to an agent that has
+never seen this conversation. Name each file, say what it holds, and say what to do with
+it. Say which file holds the token definitions. Keep it under one screen: the agent opens
+only a few files per pass, and this page decides which ones.
+
+Give me the token values as text I can copy, not only as colour swatches. A hex value
+inside a picture is unusable.
 
 ---
 
 ## After you paste it
 
-Once Claude Design gives you the bundle:
+Once Claude Design has built the system:
 
-1. Press Export, then pick the handoff bundle. "Download as .zip" gives you the files.
-   "Send to local coding agent" delivers them to wherever that agent runs, which is not
-   this project, so you still have to move them.
-2. Unpack it, then put the contents in `ralph/design/system/`. That exact directory name.
-   Claude Design unpacks under its own name, so rename it.
+1. Press the share button, then under Export pick **Project HTML**, then **Download**.
+   Choose the .zip, not standalone.
+2. Unpack the .zip and put its contents in `ralph/design/system/`. That exact directory
+   name. The .zip unpacks under its own name, so rename it.
 3. Commit the files, not the .zip. The build agent refuses to read an archive, and an
    archive in git cannot be reviewed.
-4. Keep the README. The build agent reads it before anything else in the bundle.
+4. Check a README came out with it. The build agent reads that file before anything else.
+   If there is none, ask Claude Design to add one and export again.
+
+The **Claude Code / Send** option in that menu sends the design to a connected Claude Code
+destination. It does not put files at the path above, so it does not feed this pipeline.
+PNG, PowerPoint, PDF, and MP4 are for sharing with people, not for the build agent.
