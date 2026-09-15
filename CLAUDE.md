@@ -184,6 +184,16 @@ scoped to that depth, citing `ralph/design/system/` when it exists so Claude Des
 the system rather than restating it. The user pastes prompts out and places results back;
 the pipeline never calls Claude Design.
 
+Both prompt templates state the return format, because Claude Design decides what goes in
+the bundle from what the prompt asks for. The bundle carries the design files, the chat, and
+a README written as instructions to a coding agent. The prompts ask for the README to name
+which file holds what, ask for token definitions and per-state screenshots, and refuse PDF
+and slide exports: a token value cannot be read out of a picture of a slide. Each template
+is split by two lines of dashes. Only the middle block goes to Claude Design.
+
+"Send to local coding agent" delivers the bundle to wherever that agent runs, which is not
+the project directory. The .zip route is the one the templates name.
+
 A handoff bundle is not a design reference image. Claude Design writes its README as
 instructions addressed to a coding agent, so `PROMPT_build.md` step 0d2 reads that README
 first and follows what it names. The cap is 4 bundle files per iteration against 2 for

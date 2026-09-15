@@ -149,6 +149,7 @@ spec, using ONLY this cell's depth:
 - `${ACTIVITY}` and `${DEPTH}` from the cell id
 - `${DEPTH_DESCRIPTION}` and `${SUCCESS_CRITERIA}` from that depth's section of the spec
 - `${JOB_TO_BE_DONE}` from the activity spec
+- `${CHANGE_ID}` the cell id, so the handoff steps name the real path
 
 For `${DESIGN_SYSTEM_CITATION}`, check whether the design system exists:
 ```bash

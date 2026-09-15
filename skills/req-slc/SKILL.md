@@ -339,7 +339,8 @@ Whichever option the user picks, print the design handoff steps once:
 ```
 Design handoff (optional, do it before the screens are built):
 
-  1. Paste ralph/design/SYSTEM_PROMPT.md into Claude Design.
+  1. Paste the marked block of ralph/design/SYSTEM_PROMPT.md into Claude Design.
+     The file also holds the steps for handling what comes back.
   2. Export the handoff bundle.
   3. Unpack it into ralph/design/system/ and commit the contents.
      The directory name must be exactly ralph/design/system. Claude Design unpacks to its

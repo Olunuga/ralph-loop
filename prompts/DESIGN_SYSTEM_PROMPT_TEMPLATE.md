@@ -1,4 +1,5 @@
-Paste everything below into Claude Design.
+Paste the block between the two lines of dashes into Claude Design. The steps after
+the second line are for you, not for Claude Design.
 
 ---
 
@@ -43,3 +44,29 @@ and readable in source.
 
 Do not design individual screens. If an activity above needs something the system cannot
 express, tell me what is missing rather than designing around it.
+
+## How I will take this away
+
+I will use Export, then the handoff bundle. Write the bundle README as instructions to a
+coding agent that has never seen this conversation: name which files hold the tokens, which
+hold the components, and what to do with each. A coding agent reads that README first and
+follows what it names.
+
+Keep in the bundle: the token definitions, the component files with their states, the
+screenshots, and the chat. Leave out PDF and slide exports. The agent cannot read a token
+value out of a picture of a slide.
+
+---
+
+## After you paste it
+
+Once Claude Design gives you the bundle:
+
+1. Press Export, then pick the handoff bundle. "Download as .zip" gives you the files.
+   "Send to local coding agent" delivers them to wherever that agent runs, which is not
+   this project, so you still have to move them.
+2. Unpack it, then put the contents in `ralph/design/system/`. That exact directory name.
+   Claude Design unpacks under its own name, so rename it.
+3. Commit the files, not the .zip. The build agent refuses to read an archive, and an
+   archive in git cannot be reviewed.
+4. Keep the README. The build agent reads it before anything else in the bundle.
