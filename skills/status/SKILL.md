@@ -58,10 +58,15 @@ For each change that still exists, also check its design files:
 ```bash
 [[ -f "openspec/changes/$ID/design/SCREEN_PROMPT.md" ]] && echo "$ID has a screen prompt"
 [[ -d "openspec/changes/$ID/assets/design" ]] && echo "$ID has screen designs"
+[[ -d "openspec/changes/$ID/assets/design/design_system" ]] && echo "$ID has a duplicate system"
 ```
 
 A change with a screen prompt and no `assets/design/` has a design waiting to be made.
 Report it under Optional with its exact path.
+
+A change with a duplicate system has a copy of `ralph/design/system/` inside its own design
+files. Claude Design puts it there to make a bundle self-contained. Report it under Optional
+with the command to remove it: two copies of the same tokens drift apart.
 
 ---
 
@@ -74,8 +79,19 @@ Pick the first line that is true. This is the single thing the user does next.
 3. No release record : run `/ralph-loop:slice`
 4. A change is **missing** : re-run `/ralph-loop:slice`, or remove it from the release record
 5. A change is **not planned yet** : run `/ralph-loop:slice` again to finish writing it
-6. A change is **in progress** : run `/ralph-loop:run <cell-id>` to continue it
-7. A change is **ready to build**, lowest Order first : run `/ralph-loop:run <cell-id>`
+6. A change is **in progress** : build it, continuing from where it stopped
+7. A change is **ready to build**, lowest Order first : build it
+
+For 6 and 7 the action is one thing, building that change, and there are two ways to do it.
+Print both, with the change named:
+
+```
+    /ralph-loop:run <cell-id>      the pipeline builds it and opens a pull request
+    /opsx:apply <cell-id>          you build it, and it stops to ask
+```
+
+Both work through the same `tasks.md`, so a change started one way can be finished the
+other. Neither undoes the other's checked items.
 8. A change is **built, waiting to be archived** : merge its pull request, then run `/ralph-loop:cleanup`
 9. Every change is **done** : run `/ralph-loop:slice` for the next release
 
@@ -87,7 +103,9 @@ Two design items can be outstanding, and they are independent:
 
 - The system, when `DESIGN: no` and `DESIGN_PROMPT: yes`. Files go in `ralph/design/system/`.
 - One change's screens, when it has a screen prompt and no `assets/design/`. Files go in
-  `openspec/changes/<cell-id>/assets/design/`.
+  `openspec/changes/<cell-id>/assets/design/`, and the bundle's own `design_system/`
+  directory is deleted before committing.
+- A duplicate system already committed under a change's `assets/design/design_system/`.
 
 When `DESIGN: yes`, say so under Done. The user then knows the system is in place, and that
 any remaining design work is per change.
@@ -103,7 +121,8 @@ Rules for the text:
 - Plain words. No jargon. No file paths except the ones the user types or opens.
 - A `Done` line says what the person now has, not what a command did.
 - One line per item. No paragraph.
-- Never more than one thing under **Do this next**.
+- Never more than one thing under **Do this next**. Two commands for the same action are
+  one thing, so a build step may print both.
 - Say the date it was written, so a stale file is obvious.
 
 ```markdown
@@ -139,7 +158,8 @@ Worked example of the tone:
 Build the first release slice. Start with adding a task, because reviewing a list
 needs it first.
 
-    /ralph-loop:run capture-basic
+    /ralph-loop:run capture-basic      the pipeline builds it and opens a pull request
+    /opsx:apply capture-basic          you build it, and it stops to ask
 
 ## Done
 
@@ -159,7 +179,12 @@ needs it first.
 - Screens for adding a task are not drawn yet. Paste the marked block of
   openspec/changes/capture-basic/design/SCREEN_PROMPT.md into Claude Design, ask it
   for a handoff bundle, then put the files in
-  openspec/changes/capture-basic/assets/design/ and commit them.
+  openspec/changes/capture-basic/assets/design/ and commit them. Delete the bundle's
+  own design_system/ directory first: the system is already in ralph/design/system/.
+- The screens for reviewing the week carry a second copy of the design system.
+  Remove it, so the two cannot drift apart:
+
+      git rm -r openspec/changes/review-basic/assets/design/design_system
 ```
 
 The same shape covers a missing design system, with `ralph/design/SYSTEM_PROMPT.md` as the

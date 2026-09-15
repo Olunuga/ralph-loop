@@ -167,6 +167,10 @@ Every fact is derived from the filesystem and git at write time, so the file can
 but never wrong about a step that was skipped. It names exactly one next action, and
 `req-slc`, `slice`, `run`, and `cleanup` each end by pointing at it.
 
+A build step in `ralph/NEXT.md` names both `/ralph-loop:run` and `/opsx:apply`. They are
+independent executors of the same change and share `tasks.md` as the ledger, so a change
+started one way can be finished the other.
+
 Design is never the next action in `ralph/NEXT.md`, but it always carries its destination
 path. The system and each change's screens are independent: the system can be in place while
 a change still has a screen prompt and no `assets/design/`. A user holding a finished design
@@ -197,6 +201,11 @@ contents, because Claude Design decides what goes in from what the prompt asked 
 An observed system bundle holds `README.md` addressed to a coding agent, `tokens.json` as
 the machine-readable source of truth, the spec document as `.dc.html`, and the source
 system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
+
+A screen bundle embeds a copy of the design system under `design_system/`, so the bundle is
+self-contained. The copy is byte-identical to what `ralph/design/system/` holds. Delete it
+before committing: a second copy of the tokens drifts, and the bundle README already cites
+the committed path.
 
 A single `.dc.html` downloaded from Export is not a bundle. It carries token names in its
 annotation prose but raw hex in its markup, with zero CSS variables, and it references
