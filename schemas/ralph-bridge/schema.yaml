@@ -22,10 +22,15 @@ artifacts:
       Research existing specs before filling it in.
 
       Prose rules:
+      - Write it for someone who will use the product and does not work on the code.
+        Plain words, short sentences, one idea each. If a sentence needs the codebase to
+        parse, it belongs in design.md.
+      - No jargon. No type names, class names, file paths, framework names, or protocol
+        names. Say what the person can do, not what the code provides.
       - Put every change in "What Changes". Do not bury a change in "Impact" or under its own heading.
       - Mechanism, line numbers, and failure modes belong in design.md. Do not repeat them here.
       - Name a mechanism by what it is. Never coin a term for something that already has a plain name.
-      - Target 50 lines.
+      - Target 30 lines. A proposal past 50 is describing the design.
     requires: []
 
   - id: specs
@@ -48,10 +53,17 @@ artifacts:
       - Every requirement needs at least one scenario.
 
       Prose rules:
+      - Write each requirement and scenario in plain words a user would recognise. SHALL,
+        MUST, WHEN, and THEN are required keywords and stay. Everything around them is
+        ordinary language.
+      - No jargon. Name the thing the person sees, not the type behind it. Write "the saved
+        list" and not "the cached entity array".
+      - One sentence per requirement. One line per WHEN or THEN bullet.
       - Keep only scenarios that constrain behaviour. Delete any scenario whose removal
         changes no implementation decision.
       - A requirement states the rule. The reason belongs in design.md.
       - No scenario that only restates the requirement in WHEN/THEN form.
+      - Target 40 lines per capability file.
     requires:
       - proposal
 
@@ -83,10 +95,15 @@ artifacts:
       - **Open Questions**.
 
       Prose rules:
+      - Technical is correct here. Name types, files, and layers. Keep the sentences plain
+        so a reader outside this change can follow the approach.
+      - Write enough that someone can implement it. Stop there. No code listings, no full
+        signatures, no step-by-step walkthrough. tasks.md carries the steps.
       - Lead each decision with the decision. Follow with the reason in plain sentences.
       - No "Why:" / "Alternative rejected:" / "Cost accepted:" labels. Write the reason as prose.
       - Include an alternative only when it was genuinely close. Say why it loses in one or two sentences.
       - Name a mechanism by what it is. Never coin a term for something that already has a plain name.
+      - Target 80 lines.
     requires:
       - proposal
 

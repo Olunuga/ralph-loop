@@ -18,6 +18,8 @@ The pipeline writes the prompts and reads the results. You do both transfers by 
 /ralph-loop:req-slc my-product     writes ralph/design/SYSTEM_PROMPT.md
                                    -> paste into Claude Design
                                    -> unpack the handoff into ralph/design/system/, commit
+                                      (rename it: Claude Design unpacks to its own name,
+                                       and slice reads ralph/design/system/ only)
 
 /ralph-loop:slice                  writes design/SCREEN_PROMPT.md in each change,
                                    each citing ralph/design/system/

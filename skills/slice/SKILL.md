@@ -49,7 +49,8 @@ produce its report. Do this in your own context: it needs codebase searches and 
 
 ## Step 3: Confirm
 
-Show the user the PROPOSED SLICE, ALREADY DONE, DEFERRED, and RATIONALE sections in full.
+Show the user the PROPOSED SLICE, ALREADY DONE, DEFERRED, BUILD ORDER, and RATIONALE
+sections in full.
 
 Then use AskUserQuestion:
 
@@ -57,8 +58,8 @@ Then use AskUserQuestion:
 
 Options: **Yes, create the changes** / **Let me edit the slice first** / **Cancel**.
 
-On edit, ask which cells to remove and which deferred cells to add, then show the revised
-slice and ask again. A user may add a deferred cell: warn that its dependency is unmet, and
+On edit, ask which cells to remove and which deferred cells to add, then recompute BUILD
+ORDER, show the revised slice, and ask again. The user may also correct the order directly. A user may add a deferred cell: warn that its dependency is unmet, and
 proceed if they still want it.
 
 On cancel, stop. Create nothing.
@@ -77,7 +78,8 @@ Slugify the answer. Refuse a name that already exists in `ralph/releases/` and a
 
 ## Step 5: Materialise
 
-For each confirmed cell, in order:
+Work through the confirmed cells in BUILD ORDER. Every change is created, whatever its
+position: the order decides the build sequence, not what gets written.
 
 **5a. Check for an existing change.**
 ```bash
@@ -94,15 +96,53 @@ git log --oneline --all --grep="<cell-id>" | head -1
 openspec new change "<cell-id>" --schema ralph-bridge
 ```
 
-**5c. Seed the proposal.**
-Write `openspec/changes/<cell-id>/proposal.md` from the activity's spec, using ONLY that
-depth. Take the job to be done, the activity, and that depth's success criteria. Do not
-carry in deeper depths: they belong to later releases.
+**5c. Write the proposal.**
+```bash
+openspec instructions proposal --change "<cell-id>"
+```
+Follow what it returns. Fill it from the activity's spec, using ONLY that depth: the job to
+be done, the activity, and that depth's success criteria. Do not carry in deeper depths,
+they belong to later releases. Name the cell id, the release, and the depth in the Why
+section.
 
-Follow the `ralph-bridge` proposal instruction for the format. Name the cell id, the
-release, and the depth in the Why section.
+Keep the proposal free of technical detail. The Impact section names affected capabilities,
+not file paths, types, APIs, or layers. The gap analysis in Step 2 found where the code
+would live; that belongs in design.md at 5e, where an implementation decision is actually
+being made. A proposal that names a file has decided the design before anyone reviewed it.
 
-**5d. Write the screen prompt.**
+**5d. Write the specs.**
+```bash
+openspec instructions specs --change "<cell-id>"
+```
+One file per capability named in the proposal. Turn that depth's success criteria into
+requirements and scenarios. Scenarios take exactly four hashtags: three fails silently.
+
+**5e. Write the design.**
+```bash
+openspec instructions design --change "<cell-id>"
+```
+The instruction names `ralph/gate_context.md` and the gate directories as required reads.
+Read them. A design that a gate rejects wastes a whole build loop. Put the file paths and
+layers from the Step 2 gap analysis here.
+
+**5f. Write the tasks.**
+```bash
+openspec instructions tasks --change "<cell-id>"
+```
+Order tasks by dependency. Every task is `- [ ] X.Y Description`, because the apply phase
+and `bin/loop.sh` both parse that exact form.
+
+**5g. Confirm the change is apply-ready.**
+```bash
+openspec status --change "<cell-id>" --json
+```
+Not apply-ready means an artifact is missing or malformed. Name the missing artifact and
+stop. `/ralph-loop:run` and `/opsx:apply` both refuse a change that is not apply-ready, so
+reporting success here would send the user into a dead end.
+
+`gate-report.md` is written after implementation, not now.
+
+**5h. Write the screen prompt.**
 Read `$RALPH_PLUGIN_DIR/prompts/SCREEN_PROMPT_TEMPLATE.md` and fill it from the activity
 spec, using ONLY this cell's depth:
 
@@ -112,18 +152,26 @@ spec, using ONLY this cell's depth:
 
 For `${DESIGN_SYSTEM_CITATION}`, check whether the design system exists:
 ```bash
-[[ -d ralph/design/system ]] && echo HAS_SYSTEM
+if [[ -d ralph/design/system ]]; then
+  echo HAS_SYSTEM
+else
+  find ralph/design -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's/^/UNNAMED: /'
+fi
 ```
-- Present: "Import the design system from this repository at `ralph/design/system/`. Use its
+- `HAS_SYSTEM`: "Import the design system from this repository at `ralph/design/system/`. Use its
   tokens and components exactly. Do not invent new ones."
-- Absent: "No design system exists yet. Work from the product context in this change's
-  proposal.md, and name the tokens you introduce so they can become the system later."
+- One or more `UNNAMED:` lines: stop the whole skill and tell the user, naming each path
+  found: "A design handoff is in `<path>`, but the pipeline reads `ralph/design/system/`
+  only. Rename it with `git mv <path> ralph/design/system`, commit, then re-run
+  `/ralph-loop:slice`." Create nothing.
+- No output at all: "No design system exists yet. Work from the product context in this
+  change's proposal.md, and name the tokens you introduce so they can become the system later."
 
 Write it to `openspec/changes/<cell-id>/design/SCREEN_PROMPT.md`.
 
 Do not describe deeper depths of the same activity. They belong to later releases.
 
-**5e. Record what you created.** Keep the list for Step 7.
+**5i. Record what you created.** Keep the list and its build order for Step 7.
 
 ---
 
@@ -136,10 +184,13 @@ Do not describe deeper depths of the same activity. They belong to later release
 
 Sliced: <date>
 
-| Cell | Change | Activity | Depth |
-|---|---|---|---|
-| `<cell-id>` | `openspec/changes/<cell-id>` | <activity> | <depth> |
+| Order | Cell | Change | Activity | Depth | Needs first |
+|---|---|---|---|---|---|
+| 1 | `<cell-id>` | `openspec/changes/<cell-id>` | <activity> | <depth> | none |
 ```
+
+The Order column is the confirmed BUILD ORDER. `--status` reports against it, so a reader
+can see which change is next without re-deriving the dependencies.
 
 Never modify an existing release record. Each slice adds a new file.
 
@@ -157,8 +208,9 @@ git log --oneline --all --grep="<cell-id>" | head -1
 - change exists, no commits: **pending**
 - neither: **missing**
 
-Report each change on its own line. Call a release complete only when every change in it is
-archived, and then say it is ready to tag. When `ralph/releases/` is absent or empty, say
+Report each change on its own line, in the record's Order column. Name the first change
+that is not archived as the next one to build. Call a release complete only when every
+change in it is archived, and then say it is ready to tag. When `ralph/releases/` is absent or empty, say
 "No release has been sliced yet." and stop.
 
 ---
@@ -168,9 +220,9 @@ archived, and then say it is ready to tag. When `ralph/releases/` is absent or e
 Tell the user:
 
 ```
-Created <N> changes for release <release>:
-  openspec/changes/<cell-id>/
-  ...
+Created <N> changes for release <release>, in build order:
+  1. openspec/changes/<cell-id>/    proposal, specs, design, tasks
+  2. ...                            needs <cell-id>
 
 Skipped:
   <cell-id> — already has work against it
@@ -184,10 +236,12 @@ Design prompts, one per change:
   openspec/changes/<cell-id>/assets/design/ and commit the contents. Commit the files,
   not the .tar or .zip: the build agent refuses to read an archive.
 
-Next:
+Next, starting with change 1:
   /ralph-loop:run <cell-id>      build a change autonomously
   /opsx:apply <cell-id>          build it yourself
   /ralph-loop:slice --status     check the release
+
+Build them in the order above. A later change depends on an earlier one.
 
 To undo this slice:
   rm -rf openspec/changes/<cell-id> ... ralph/releases/<release>.md

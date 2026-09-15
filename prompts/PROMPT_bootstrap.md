@@ -102,7 +102,15 @@ Write `ralph/gate_context.md`:
 - [Project-specific conventions the LLM reviewer should know]
 - [Patterns that look like anti-patterns but are intentional]
 - [Domain constraints that affect code review judgment]
+
+## Hook tiers
+- pre_commit_tier: fast
+- pre_push_tier: precise
 ```
+
+Write the two hook tier lines exactly as shown. The git hooks parse them with
+`grep -E "^- pre_commit_tier:"`. Without them the hooks fall back to their built-in
+defaults and the file cannot change the tier.
 
 STEP 6 — Commit:
 git add ralph/AGENTS.md ralph/gate_context.md && git -c commit.gpgsign=false commit -m "ralph: bootstrap AGENTS.md and gate_context.md"
