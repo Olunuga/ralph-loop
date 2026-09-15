@@ -161,6 +161,16 @@ checks out that branch before it names the next command. `run` takes one activit
 name from `ralph/specs/` or one OpenSpec change name. It never takes the product slug or a
 branch name.
 
+`/ralph-loop:status` writes `ralph/NEXT.md`: what the user has, what to do next, in plain
+words. An SLC product runs for weeks, so the state has to survive the session that made it.
+Every fact is derived from the filesystem and git at write time, so the file can be stale
+but never wrong about a step that was skipped. It names exactly one next action, and
+`req-slc`, `slice`, `run`, and `cleanup` each end by pointing at it.
+
+`slice --status` reports one release in detail and stays. The two overlap on per-change
+state. Fold `slice --status` into the status skill once the plain-language format has been
+used on a real project, not before.
+
 Release records live in `ralph/releases/<name>.md`. They are safe from
 `bin/cleanup_specs.sh` by construction, because it moves only paths named in the plan
 header and these live outside `ralph/specs/`. `--status` derives each change's state from

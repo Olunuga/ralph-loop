@@ -354,6 +354,9 @@ Tell the user:
 Next steps:
   /ralph-loop:spec TICKET-001   : describe a feature, get a spec
   /ralph-loop:run TICKET-001    : run the autonomous pipeline
+  /ralph-loop:req-slc <product> : describe a whole product, get a story map
+
+  /ralph-loop:status            : what is done and what to do next, any time
 
 Bypass a hook with --no-verify. Record an accepted pattern in ralph/gate_context.md
 as: - <gate_name>: SKIP — <reason>
