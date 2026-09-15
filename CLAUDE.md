@@ -167,6 +167,11 @@ Every fact is derived from the filesystem and git at write time, so the file can
 but never wrong about a step that was skipped. It names exactly one next action, and
 `req-slc`, `slice`, `run`, and `cleanup` each end by pointing at it.
 
+Design is never the next action in `ralph/NEXT.md`, but it always carries its destination
+path. The system and each change's screens are independent: the system can be in place while
+a change still has a screen prompt and no `assets/design/`. A user holding a finished design
+with no path for it is stuck for no reason.
+
 `slice --status` reports one release in detail and stays. The two overlap on per-change
 state. Fold `slice --status` into the status skill once the plain-language format has been
 used on a real project, not before.
@@ -183,6 +188,20 @@ activity set. `slice` writes `openspec/changes/<cell-id>/design/SCREEN_PROMPT.md
 scoped to that depth, citing `ralph/design/system/` when it exists so Claude Design imports
 the system rather than restating it. The user pastes prompts out and places results back;
 the pipeline never calls Claude Design.
+
+A handoff bundle is produced by asking for it in the Claude Design chat. The Export menu
+has no such item: it offers PNG, Project HTML, Claude Code, PowerPoint, PDF, and MP4. Both
+prompt templates therefore ask for the bundle inside the pasted block, and specify its
+contents, because Claude Design decides what goes in from what the prompt asked for.
+
+An observed system bundle holds `README.md` addressed to a coding agent, `tokens.json` as
+the machine-readable source of truth, the spec document as `.dc.html`, and the source
+system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
+
+A single `.dc.html` downloaded from Export is not a bundle. It carries token names in its
+annotation prose but raw hex in its markup, with zero CSS variables, and it references
+sibling files the single download leaves behind. An exported PNG is worth committing beside
+a bundle, because the build agent reads images.
 
 A handoff bundle is not a design reference image. Claude Design writes its README as
 instructions addressed to a coding agent, so `PROMPT_build.md` step 0d2 reads that README
