@@ -247,5 +247,9 @@ To undo this slice:
   rm -rf openspec/changes/<cell-id> ... ralph/releases/<release>.md
 ```
 
+Then run `/ralph-loop:status` so `ralph/NEXT.md` names the first change to build.
+`--status` here reports one release in detail. `/ralph-loop:status` covers the whole
+project in plain words.
+
 Print the removal command with every path spelled out. A user who sliced wrongly must be
 able to copy one line.

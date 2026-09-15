@@ -51,3 +51,5 @@ cleanup_specs.sh "$ref"
 Report the output: how many specs were archived, whether the spec branch was deleted.
 
 Remind the user: "Run `git branch -d ralph/$ref` (and `git push origin --delete ralph/$ref` if needed) once you've closed the PR."
+
+Finally, run `/ralph-loop:status` to refresh `ralph/NEXT.md`.

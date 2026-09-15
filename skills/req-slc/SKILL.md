@@ -351,4 +351,8 @@ Screen prompts are generated later, per release, by /ralph-loop:slice. They poin
 Design at ralph/design/system/, so screens match the system you already built.
 ```
 
+Then run `/ralph-loop:status`. It writes `ralph/NEXT.md`, which says in plain words what
+is done and what to do next. An SLC product runs for weeks, so that file is how the user
+picks the work back up.
+
 Do not run the chosen build command yourself. Name it and stop.
