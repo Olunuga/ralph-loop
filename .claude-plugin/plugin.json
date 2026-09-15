@@ -1,7 +1,7 @@
 {
   "name": "ralph-loop",
-  "description": "Autonomous iOS development pipeline — plans, builds, tests, and gates code changes with zero human intervention",
-  "version": "1.0.0",
+  "description": "Autonomous development pipeline: plans, builds, tests, and gates code changes with zero human intervention",
+  "version": "1.1.0",
   "author": {
     "name": "Mayowa Olunuga",
     "url": "https://github.com/Olunuga/ralph-loop"
