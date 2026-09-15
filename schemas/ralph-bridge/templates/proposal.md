@@ -20,4 +20,5 @@
 
 ## Impact
 
-<!-- Affected code, APIs, dependencies, systems -->
+<!-- Which capabilities this touches, in plain words. No file paths, type names, or
+     framework names: those belong in design.md. -->

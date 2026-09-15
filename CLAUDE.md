@@ -140,6 +140,12 @@ comes back, then checks `openspec status --change --json`. Both build routes ref
 change that is not apply-ready, so a proposal-only change is a dead end.
 `gate-report.md` is written after implementation.
 
+Each artifact has a reading level, set in the schema instructions. The proposal and the
+specs are written for someone who uses the product and does not read the code: plain words,
+no type or file names. SHALL, MUST, WHEN, and THEN stay, because OpenSpec parses them.
+design.md is technical and names types, files, and layers, but stops at what a person needs
+to implement: no code listings, no walkthrough. Targets are 30, 40, and 80 lines.
+
 The proposal holds no technical detail. The Step 2 gap analysis in `prompts/PROMPT_slice.md`
 finds file paths and layers; those go in design.md, where an implementation decision is
 being made. The generic OpenSpec proposal template asks for "affected code, APIs" under
