@@ -58,10 +58,15 @@ For each change that still exists, also check its design files:
 ```bash
 [[ -f "openspec/changes/$ID/design/SCREEN_PROMPT.md" ]] && echo "$ID has a screen prompt"
 [[ -d "openspec/changes/$ID/assets/design" ]] && echo "$ID has screen designs"
+[[ -d "openspec/changes/$ID/assets/design/design_system" ]] && echo "$ID has a duplicate system"
 ```
 
 A change with a screen prompt and no `assets/design/` has a design waiting to be made.
 Report it under Optional with its exact path.
+
+A change with a duplicate system has a copy of `ralph/design/system/` inside its own design
+files. Claude Design puts it there to make a bundle self-contained. Report it under Optional
+with the command to remove it: two copies of the same tokens drift apart.
 
 ---
 
@@ -87,7 +92,9 @@ Two design items can be outstanding, and they are independent:
 
 - The system, when `DESIGN: no` and `DESIGN_PROMPT: yes`. Files go in `ralph/design/system/`.
 - One change's screens, when it has a screen prompt and no `assets/design/`. Files go in
-  `openspec/changes/<cell-id>/assets/design/`.
+  `openspec/changes/<cell-id>/assets/design/`, and the bundle's own `design_system/`
+  directory is deleted before committing.
+- A duplicate system already committed under a change's `assets/design/design_system/`.
 
 When `DESIGN: yes`, say so under Done. The user then knows the system is in place, and that
 any remaining design work is per change.
@@ -159,7 +166,12 @@ needs it first.
 - Screens for adding a task are not drawn yet. Paste the marked block of
   openspec/changes/capture-basic/design/SCREEN_PROMPT.md into Claude Design, ask it
   for a handoff bundle, then put the files in
-  openspec/changes/capture-basic/assets/design/ and commit them.
+  openspec/changes/capture-basic/assets/design/ and commit them. Delete the bundle's
+  own design_system/ directory first: the system is already in ralph/design/system/.
+- The screens for reviewing the week carry a second copy of the design system.
+  Remove it, so the two cannot drift apart:
+
+      git rm -r openspec/changes/review-basic/assets/design/design_system
 ```
 
 The same shape covers a missing design system, with `ralph/design/SYSTEM_PROMPT.md` as the
