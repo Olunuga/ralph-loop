@@ -13,6 +13,9 @@ Run each step in order. Tell the user which step you are on.
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
 
+`--add-theme` adds the theme to a release that was sliced without one, and slices nothing
+new. If the user passed it, run Step 1, then skip to Step 1b.
+
 ---
 
 ## Step 1: Check the inputs
@@ -36,6 +39,50 @@ grep -c '^| ' ralph/AUDIENCE_JTBD.md
 Zero means the file predates the table format. Tell the user: "This story map has no table.
 Re-run `/ralph-loop:req-slc`, or add a `## Story Map` table by hand. See the req-slc skill
 for the format." Stop.
+
+---
+
+## Step 1b: A release sliced without the theme
+
+Run this whenever `ralph/releases/` holds a record. It repairs a release made before the
+theme step existed, and it creates no new release.
+
+```bash
+NEWEST=$(ls -t ralph/releases/*.md 2>/dev/null | head -1)
+[[ -n "$NEWEST" ]] && echo "$NEWEST"
+grep -rq 'theme-foundation' ralph/releases/ 2>/dev/null && echo THEME_IN_A_RELEASE
+[[ -d openspec/changes/archive/theme-foundation ]] && echo THEME_DONE
+[[ -d ralph/design/system ]] || echo NO_SYSTEM
+```
+
+Skip this step, saying nothing, when any of `THEME_IN_A_RELEASE`, `THEME_DONE`, or
+`NO_SYSTEM` printed, or when there is no release record. Only a release with a design system
+and no theme needs repair.
+
+Otherwise ask the theme question from Step 4b. On **Yes, it exists**, record the answer so
+you do not ask again: append `<!-- theme: already in the codebase -->` to the newest release
+record and skip.
+
+On **No, build it first**:
+
+1. Create the change exactly as Step 5 does for `theme-foundation`, with
+   `ralph/design/system/README.md` and `tokens.json` as the source. Skip 5h.
+2. Insert a `theme-foundation` row at Order 1 in the newest release record and renumber the
+   rows below it. Set `Needs first` to `theme-foundation` on every row that had `none`.
+3. Tell the user:
+
+```
+Added theme-foundation to release <release> as change 1.
+Every other change in that release now needs it first.
+
+    /ralph-loop:run theme-foundation      the pipeline builds it and opens a pull request
+    /opsx:apply theme-foundation          you build it, and it stops to ask
+```
+
+Then run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
+
+This is the one case that edits an existing release record. It inserts the theme row and
+renumbers; it never removes or reorders a cell.
 
 ---
 
@@ -88,7 +135,8 @@ nothing to build a theme from.
 grep -rl 'theme-foundation' ralph/releases/ 2>/dev/null | head -1
 ```
 
-`DONE`, or the change already named in a release record: the theme is handled. Skip.
+`DONE`, or the change already named in a release record, or a release record carrying
+`<!-- theme: already in the codebase -->`: the theme is handled. Skip.
 
 Otherwise ask the user, because no reliable check tells you whether a codebase already holds
 its colours, type sizes and spacing in one place:
@@ -248,7 +296,8 @@ Include the `theme-foundation` row only when Step 4b created it.
 The Order column is the confirmed BUILD ORDER. `--status` reports against it, so a reader
 can see which change is next without re-deriving the dependencies.
 
-Never modify an existing release record. Each slice adds a new file.
+Never modify an existing release record. Each slice adds a new file. Step 1b is the one
+exception: it inserts the theme row and renumbers below it.
 
 **When `--status` was passed**, read every file in `ralph/releases/`. For each change named
 in each record, derive its state rather than reading a stored value:

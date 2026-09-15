@@ -141,6 +141,13 @@ built without a theme fails both and the build agent invents one inside a change
 proposal never mentioned it. Its source is `ralph/design/system/README.md` and `tokens.json`
 rather than an activity spec, and it skips the screen prompt.
 
+A release sliced before that step existed is repaired by `slice` Step 1b, or by
+`/ralph-loop:slice --add-theme`. It inserts the theme row at Order 1, renumbers below it, and
+creates no new release. That is the one case that edits an existing release record. A user
+who answers that the codebase already has a theme gets
+`<!-- theme: already in the codebase -->` written into the record, so the question is asked
+once.
+
 The step asks rather than detects. No reliable check tells you whether a codebase already
 holds its colours, type sizes and spacing in one place.
 
