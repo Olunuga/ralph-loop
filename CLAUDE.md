@@ -239,6 +239,12 @@ rollback.
 
 ## Build Loop (`loop.sh`)
 
+### A plugin change reaches users only after a version bump
+`claude plugin update` compares `version` in `.claude-plugin/plugin.json`. It refreshes the
+marketplace clone either way, but leaves the cache copy Claude Code loads
+(`~/.claude/plugins/cache/ralph-loop/`) untouched when the version is unchanged. Merging to
+main is not release. Bump the version in the same PR as the change.
+
 ### `/ralph-loop:init --openspec` is both setup and upgrade
 It is idempotent. Re-running it refreshes the installed schema copy after
 `claude plugin update ralph-loop`, and never touches `ralph/config.sh`, `ralph/gates/`,
