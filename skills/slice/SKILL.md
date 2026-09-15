@@ -13,6 +13,9 @@ Run each step in order. Tell the user which step you are on.
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
 
+`--add-theme` adds the theme to a release that was sliced without one, and slices nothing
+new. If the user passed it, run Step 1, then skip to Step 1b.
+
 ---
 
 ## Step 1: Check the inputs
@@ -36,6 +39,50 @@ grep -c '^| ' ralph/AUDIENCE_JTBD.md
 Zero means the file predates the table format. Tell the user: "This story map has no table.
 Re-run `/ralph-loop:req-slc`, or add a `## Story Map` table by hand. See the req-slc skill
 for the format." Stop.
+
+---
+
+## Step 1b: A release sliced without the theme
+
+Run this whenever `ralph/releases/` holds a record. It repairs a release made before the
+theme step existed, and it creates no new release.
+
+```bash
+NEWEST=$(ls -t ralph/releases/*.md 2>/dev/null | head -1)
+[[ -n "$NEWEST" ]] && echo "$NEWEST"
+grep -rq 'theme-foundation' ralph/releases/ 2>/dev/null && echo THEME_IN_A_RELEASE
+[[ -d openspec/changes/archive/theme-foundation ]] && echo THEME_DONE
+[[ -d ralph/design/system ]] || echo NO_SYSTEM
+```
+
+Skip this step, saying nothing, when any of `THEME_IN_A_RELEASE`, `THEME_DONE`, or
+`NO_SYSTEM` printed, or when there is no release record. Only a release with a design system
+and no theme needs repair.
+
+Otherwise ask the theme question from Step 4b. On **Yes, it exists**, record the answer so
+you do not ask again: append `<!-- theme: already in the codebase -->` to the newest release
+record and skip.
+
+On **No, build it first**:
+
+1. Create the change exactly as Step 5 does for `theme-foundation`, with
+   `ralph/design/system/README.md` and `tokens.json` as the source. Skip 5h.
+2. Insert a `theme-foundation` row at Order 1 in the newest release record and renumber the
+   rows below it. Set `Needs first` to `theme-foundation` on every row that had `none`.
+3. Tell the user:
+
+```
+Added theme-foundation to release <release> as change 1.
+Every other change in that release now needs it first.
+
+    /ralph-loop:run theme-foundation      the pipeline builds it and opens a pull request
+    /opsx:apply theme-foundation          you build it, and it stops to ask
+```
+
+Then run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
+
+This is the one case that edits an existing release record. It inserts the theme row and
+renumbers; it never removes or reorders a cell.
 
 ---
 
@@ -76,10 +123,63 @@ Slugify the answer. Refuse a name that already exists in `ralph/releases/` and a
 
 ---
 
+## Step 4b: The theme, when the codebase has none
+
+Skip this step when `ralph/design/system/` does not exist. Without a design system there is
+nothing to build a theme from.
+
+```bash
+[[ -d ralph/design/system ]] || echo NO_SYSTEM
+[[ -d openspec/changes/theme-foundation ]] && echo EXISTS
+[[ -d openspec/changes/archive/theme-foundation ]] && echo DONE
+grep -rl 'theme-foundation' ralph/releases/ 2>/dev/null | head -1
+```
+
+`DONE`, or the change already named in a release record, or a release record carrying
+`<!-- theme: already in the codebase -->`: the theme is handled. Skip.
+
+Otherwise ask the user, because no reliable check tells you whether a codebase already holds
+its colours, type sizes and spacing in one place:
+
+> "Does this codebase already have a theme: one place holding the colours, type sizes and
+> spacing that every screen reads from?"
+
+Options: **No, build it first** / **Yes, it exists** / **Not sure, show me**.
+
+On **Not sure**, read `ralph/design/system/README.md` for the conventions it names, look for
+them in `${SOURCE_DIR}`, report what you found in one line, and ask again.
+
+On **Yes**, skip the rest of this step.
+
+On **No**, add `theme-foundation` to this release as the first change. It takes Order 1 and
+every cell needs it first. It is built the same way as any other change, in Step 5, with one
+difference: its content comes from `ralph/design/system/`, not from an activity spec.
+
+**Why this is a change of its own.** The gates require it. `scripts/gates/llm/theme_colors.md`
+flags a raw colour value and asks for a theme token; `hardcoded_fonts.sh` flags a fixed font
+size. The first screen built without a theme fails both, and the build agent then invents a
+theme inside a change whose proposal never mentioned one.
+
+Its proposal is still written for a product user. It says that every screen will use the
+same colours, type and spacing, from one place, and that without it each screen invents its
+own and they drift. Name the capability `design-tokens`.
+
+Its design and tasks are technical and come from `ralph/design/system/README.md` and
+`tokens.json`: the README names the conventions the codebase should use, and `tokens.json`
+holds every token with its value in each appearance. Do not restate token values in the
+proposal or the specs.
+
+---
+
 ## Step 5: Materialise
 
-Work through the confirmed cells in BUILD ORDER. Every change is created, whatever its
-position: the order decides the build sequence, not what gets written.
+Work through the confirmed cells in BUILD ORDER, starting with `theme-foundation` when Step
+4b created it. Every change is created, whatever its position: the order decides the build
+sequence, not what gets written.
+
+For `theme-foundation`, 5c to 5g run the same way, with `ralph/design/system/README.md` and
+`tokens.json` as the source in place of an activity spec, and 5h is skipped: a theme has no
+screens to design.
 
 **5a. Check for an existing change.**
 ```bash
@@ -187,13 +287,17 @@ Sliced: <date>
 
 | Order | Cell | Change | Activity | Depth | Needs first |
 |---|---|---|---|---|---|
-| 1 | `<cell-id>` | `openspec/changes/<cell-id>` | <activity> | <depth> | none |
+| 1 | `theme-foundation` | `openspec/changes/theme-foundation` | (the theme) | n/a | none |
+| 2 | `<cell-id>` | `openspec/changes/<cell-id>` | <activity> | <depth> | `theme-foundation` |
 ```
+
+Include the `theme-foundation` row only when Step 4b created it.
 
 The Order column is the confirmed BUILD ORDER. `--status` reports against it, so a reader
 can see which change is next without re-deriving the dependencies.
 
-Never modify an existing release record. Each slice adds a new file.
+Never modify an existing release record. Each slice adds a new file. Step 1b is the one
+exception: it inserts the theme row and renumbers below it.
 
 **When `--status` was passed**, read every file in `ralph/releases/`. For each change named
 in each record, derive its state rather than reading a stored value:
@@ -222,8 +326,9 @@ Tell the user:
 
 ```
 Created <N> changes for release <release>, in build order:
-  1. openspec/changes/<cell-id>/    proposal, specs, design, tasks
-  2. ...                            needs <cell-id>
+  1. openspec/changes/theme-foundation/   the theme every screen reads from
+  2. openspec/changes/<cell-id>/          proposal, specs, design, tasks
+  3. ...                                  needs <cell-id>
 
 Skipped:
   <cell-id> — already has work against it
