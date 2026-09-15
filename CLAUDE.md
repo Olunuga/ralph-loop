@@ -184,19 +184,19 @@ scoped to that depth, citing `ralph/design/system/` when it exists so Claude Des
 the system rather than restating it. The user pastes prompts out and places results back;
 the pipeline never calls Claude Design.
 
-The route into the pipeline is Export, then **Project HTML**, then **Download**, then the
-.zip. There is no export item called a handoff bundle: the menu offers PNG, Project HTML,
-Claude Code, PowerPoint, PDF, and MP4. Claude Code sends to a connected destination and
-places no files at the pipeline's path, so it does not feed the build agent.
+A handoff bundle is produced by asking for it in the Claude Design chat. The Export menu
+has no such item: it offers PNG, Project HTML, Claude Code, PowerPoint, PDF, and MP4. Both
+prompt templates therefore ask for the bundle inside the pasted block, and specify its
+contents, because Claude Design decides what goes in from what the prompt asked for.
 
-The export carries the project, so both prompt templates tell Claude Design to put the whole
-system into the project files and to write a README addressed to a coding agent. Anything
-that exists only as a chat answer is lost on export, and a hex value inside a picture cannot
-be read. The README is requested, not guaranteed, which is why `PROMPT_build.md` step 0d2
-handles a bundle without one.
+An observed system bundle holds `README.md` addressed to a coding agent, `tokens.json` as
+the machine-readable source of truth, the spec document as `.dc.html`, and the source
+system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
 
-Each template is split by two lines of dashes. Only the middle block goes to Claude Design;
-the steps after it are for the user.
+A single `.dc.html` downloaded from Export is not a bundle. It carries token names in its
+annotation prose but raw hex in its markup, with zero CSS variables, and it references
+sibling files the single download leaves behind. An exported PNG is worth committing beside
+a bundle, because the build agent reads images.
 
 A handoff bundle is not a design reference image. Claude Design writes its README as
 instructions addressed to a coding agent, so `PROMPT_build.md` step 0d2 reads that README

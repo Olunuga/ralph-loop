@@ -35,28 +35,35 @@ what is missing rather than inventing a one-off.
 
 ## How I will take this away
 
-I export this project as HTML and commit the files into a codebase. Two consequences.
+When the screens are finished, ask me to confirm them, then produce a handoff bundle for a
+coding agent. The Export menu does not offer one, so I am asking for it here.
 
-Put every screen and every state into the project itself. Anything that exists only as an
-answer in this chat is lost when I export.
+The bundle must hold:
 
-Write a page called README that a coding agent reads first. Address it to an agent that has
-never seen this conversation. Name each screen file, say which state it shows, and say
-which screen comes first. Keep it under one screen of text: the agent opens only a few
-files per pass, and this page decides which ones.
+1. `README.md`, written to a coding agent that has never seen this conversation. Name each
+   screen file, say which state it shows, say which screen comes first, and say which
+   tokens the screens use from the system. Keep it to one screen of text: the agent opens
+   only a few files per pass, and this file decides which ones.
+2. The screen documents, with every state drawn.
+3. Any file the documents need in order to open.
+
+Cite the system by token name. Do not restate the system's values here: a copied hex value
+goes stale the moment the system changes.
 
 ---
 
 ## After you paste it
 
-Once Claude Design has built the screens:
+1. When Claude Design says the screens are done, ask it for the handoff bundle. The Export
+   menu has no such item; the bundle is produced on request in the chat.
+2. Download the bundle folder.
+3. Put its contents in `openspec/changes/${CHANGE_ID}/assets/design/`. That exact path.
+4. Commit the files, not the .zip. The build agent refuses to read an archive.
+5. Check `README.md` is there. The build agent reads it first and uses it to choose what
+   else to open.
 
-1. Press the share button, then under Export pick **Project HTML**, then **Download**.
-   Choose the .zip, not standalone.
-2. Unpack the .zip into `openspec/changes/${CHANGE_ID}/assets/design/`. That exact path.
-3. Commit the files, not the .zip. The build agent refuses to read an archive.
-4. Check a README came out with it. The build agent reads that file first and uses it to
-   choose what else to open.
+A single `.dc.html` downloaded on its own is not enough. It needs sibling files that the
+single download leaves behind, and it has no README to tell the agent where to start.
 
-The **Claude Code / Send** option sends the design to a connected Claude Code destination.
-It does not put files at the path above, so it does not feed this pipeline.
+An exported PNG of the screens is worth committing beside the bundle. The build agent reads
+images, and a picture of every state in one frame is quick for it to take in.

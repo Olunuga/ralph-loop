@@ -47,35 +47,38 @@ express, tell me what is missing rather than designing around it.
 
 ## How I will take this away
 
-I export this project as HTML and commit the files into a codebase. Two consequences.
+When the system is finished, ask me to confirm it, then produce a handoff bundle for a
+coding agent. The Export menu does not offer one, so I am asking for it here.
 
-Put the whole system into files that survive that export. The tokens, the type scale, the
-spacing scale, and every component with all its states have to be in the project itself.
-Anything that exists only as an answer in this chat is lost when I export.
+The bundle must hold:
 
-Write a page called README that a coding agent reads first. Address it to an agent that has
-never seen this conversation. Name each file, say what it holds, and say what to do with
-it. Say which file holds the token definitions. Keep it under one screen: the agent opens
-only a few files per pass, and this page decides which ones.
+1. `README.md`, written to a coding agent that has never seen this conversation. Say what
+   the bundle is, say the HTML is a reference and not production code, state the fidelity,
+   list every file and what it holds, and put the component states in a table. Keep it to
+   what an agent needs to start work.
+2. `tokens.json`, the machine-readable source of truth. Every token with its value in each
+   appearance and the rule for when it applies. Flat dot-namespaced names I can commit into
+   source as they are.
+3. The spec document, with a live specimen of every component state.
+4. Any stylesheet needed to trace a value back to its source ramp.
 
-Give me the token values as text I can copy, not only as colour swatches. A hex value
-inside a picture is unusable.
+Every value has to reach me as text. A hex value that exists only inside a picture, or only
+as an answer in this chat, is lost. Name every token, and keep the names stable.
 
 ---
 
 ## After you paste it
 
-Once Claude Design has built the system:
-
-1. Press the share button, then under Export pick **Project HTML**, then **Download**.
-   Choose the .zip, not standalone.
-2. Unpack the .zip and put its contents in `ralph/design/system/`. That exact directory
-   name. The .zip unpacks under its own name, so rename it.
-3. Commit the files, not the .zip. The build agent refuses to read an archive, and an
+1. When Claude Design says the system is done, ask it for the handoff bundle. The Export
+   menu has no such item; the bundle is produced on request in the chat.
+2. Download the bundle folder.
+3. Put its contents in `ralph/design/system/`. That exact directory name. The download
+   arrives under its own name, so rename it.
+4. Commit the files, not the .zip. The build agent refuses to read an archive, and an
    archive in git cannot be reviewed.
-4. Check a README came out with it. The build agent reads that file before anything else.
-   If there is none, ask Claude Design to add one and export again.
+5. Check `README.md` and `tokens.json` are both there. The build agent reads the README
+   before anything else, and `tokens.json` is the only machine-readable record of the values.
 
-The **Claude Code / Send** option in that menu sends the design to a connected Claude Code
-destination. It does not put files at the path above, so it does not feed this pipeline.
-PNG, PowerPoint, PDF, and MP4 are for sharing with people, not for the build agent.
+A single `.dc.html` downloaded on its own is not enough. It carries token names in its
+notes but raw hex in its markup, and it needs sibling files that the single download leaves
+behind.
