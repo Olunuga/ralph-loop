@@ -53,6 +53,16 @@ git log --oneline --all --grep="$ID" | head -1
 - no task checked and no commits: **ready to build**
 - directory absent but named in a release: **missing**
 
+For each change that still exists, also check its design files:
+
+```bash
+[[ -f "openspec/changes/$ID/design/SCREEN_PROMPT.md" ]] && echo "$ID has a screen prompt"
+[[ -d "openspec/changes/$ID/assets/design" ]] && echo "$ID has screen designs"
+```
+
+A change with a screen prompt and no `assets/design/` has a design waiting to be made.
+Report it under Optional with its exact path.
+
 ---
 
 ## Step 2: Decide the one next action
@@ -69,8 +79,18 @@ Pick the first line that is true. This is the single thing the user does next.
 8. A change is **built, waiting to be archived** : merge its pull request, then run `/ralph-loop:cleanup`
 9. Every change is **done** : run `/ralph-loop:slice` for the next release
 
-The design system is never the next action. It is optional and it does not block a build.
-Report it as a separate line when `DESIGN: no` and `DESIGN_PROMPT: yes`.
+Design is never the next action. It is optional and it does not block a build. Report it
+under Optional instead, and always name the exact path the files go in. A user who has a
+design in hand and no path for it is stuck for no reason.
+
+Two design items can be outstanding, and they are independent:
+
+- The system, when `DESIGN: no` and `DESIGN_PROMPT: yes`. Files go in `ralph/design/system/`.
+- One change's screens, when it has a screen prompt and no `assets/design/`. Files go in
+  `openspec/changes/<cell-id>/assets/design/`.
+
+When `DESIGN: yes`, say so under Done. The user then knows the system is in place, and that
+any remaining design work is per change.
 
 ---
 
@@ -105,7 +125,7 @@ Updated <YYYY-MM-DD>. Re-check any time with `/ralph-loop:status`.
 
 ## Optional
 
-- <only when something optional is outstanding, such as the design handoff>
+- <only when something optional is outstanding. Always name the path files go in.>
 ```
 
 Write `## Optional` only when it has an item. Write `## Still to come` only when something
@@ -126,6 +146,7 @@ needs it first.
 - Anyone can see their list of tasks. Built and merged.
 - The product has a story map with 4 activities and 3 depths.
 - The pipeline is set up and the gates run on every commit.
+- The design system is in place. Screens can cite it.
 
 ## Still to come
 
@@ -135,9 +156,14 @@ needs it first.
 
 ## Optional
 
-- No design system yet. Paste ralph/design/SYSTEM_PROMPT.md into Claude Design,
-  then unpack the result into ralph/design/system/.
+- Screens for adding a task are not drawn yet. Paste the marked block of
+  openspec/changes/capture-basic/design/SCREEN_PROMPT.md into Claude Design, ask it
+  for a handoff bundle, then put the files in
+  openspec/changes/capture-basic/assets/design/ and commit them.
 ```
+
+The same shape covers a missing design system, with `ralph/design/SYSTEM_PROMPT.md` as the
+prompt and `ralph/design/system/` as the destination.
 
 ---
 

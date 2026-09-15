@@ -167,6 +167,11 @@ Every fact is derived from the filesystem and git at write time, so the file can
 but never wrong about a step that was skipped. It names exactly one next action, and
 `req-slc`, `slice`, `run`, and `cleanup` each end by pointing at it.
 
+Design is never the next action in `ralph/NEXT.md`, but it always carries its destination
+path. The system and each change's screens are independent: the system can be in place while
+a change still has a screen prompt and no `assets/design/`. A user holding a finished design
+with no path for it is stuck for no reason.
+
 `slice --status` reports one release in detail and stays. The two overlap on per-change
 state. Fold `slice --status` into the status skill once the plain-language format has been
 used on a real project, not before.
