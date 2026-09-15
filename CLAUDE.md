@@ -134,6 +134,19 @@ change that already has commits against it rather than overwriting work.
 `prompts/PROMPT_plan_slc.md` steps 3 and 4. The two will drift. Extract a shared file once
 the shape settles, not before: the second consumer has to prove the shape first.
 
+`slice` creates a `theme-foundation` change first when `ralph/design/system/` exists and the
+user says the codebase has no theme. The gates force this: `scripts/gates/llm/theme_colors.md`
+flags a raw colour value and `hardcoded_fonts.sh` flags a fixed font size, so the first screen
+built without a theme fails both and the build agent invents one inside a change whose
+proposal never mentioned it. Its source is `ralph/design/system/README.md` and `tokens.json`
+rather than an activity spec, and it skips the screen prompt.
+
+The step asks rather than detects. No reliable check tells you whether a codebase already
+holds its colours, type sizes and spacing in one place.
+
+Its proposal stays in plain words: every screen uses the same colours, type and spacing from
+one place, and without it each screen invents its own. No schema exception is needed.
+
 `slice` writes four of the five bridge artifacts per cell: proposal, specs, design, tasks.
 It calls `openspec instructions <artifact> --change <cell-id>` for each and follows what
 comes back, then checks `openspec status --change --json`. Both build routes refuse a

@@ -68,4 +68,7 @@ RATIONALE
 Order every cell in PROPOSED SLICE, using the dependencies from STEP 3. A cell comes after
 every cell it needs. Two cells that need nothing from each other keep story map order.
 
+Do not put the theme in this list. The skill adds it ahead of every cell when the codebase
+needs one.
+
 If ALREADY DONE or DEFERRED is empty, print the heading and "none".

@@ -76,10 +76,62 @@ Slugify the answer. Refuse a name that already exists in `ralph/releases/` and a
 
 ---
 
+## Step 4b: The theme, when the codebase has none
+
+Skip this step when `ralph/design/system/` does not exist. Without a design system there is
+nothing to build a theme from.
+
+```bash
+[[ -d ralph/design/system ]] || echo NO_SYSTEM
+[[ -d openspec/changes/theme-foundation ]] && echo EXISTS
+[[ -d openspec/changes/archive/theme-foundation ]] && echo DONE
+grep -rl 'theme-foundation' ralph/releases/ 2>/dev/null | head -1
+```
+
+`DONE`, or the change already named in a release record: the theme is handled. Skip.
+
+Otherwise ask the user, because no reliable check tells you whether a codebase already holds
+its colours, type sizes and spacing in one place:
+
+> "Does this codebase already have a theme: one place holding the colours, type sizes and
+> spacing that every screen reads from?"
+
+Options: **No, build it first** / **Yes, it exists** / **Not sure, show me**.
+
+On **Not sure**, read `ralph/design/system/README.md` for the conventions it names, look for
+them in `${SOURCE_DIR}`, report what you found in one line, and ask again.
+
+On **Yes**, skip the rest of this step.
+
+On **No**, add `theme-foundation` to this release as the first change. It takes Order 1 and
+every cell needs it first. It is built the same way as any other change, in Step 5, with one
+difference: its content comes from `ralph/design/system/`, not from an activity spec.
+
+**Why this is a change of its own.** The gates require it. `scripts/gates/llm/theme_colors.md`
+flags a raw colour value and asks for a theme token; `hardcoded_fonts.sh` flags a fixed font
+size. The first screen built without a theme fails both, and the build agent then invents a
+theme inside a change whose proposal never mentioned one.
+
+Its proposal is still written for a product user. It says that every screen will use the
+same colours, type and spacing, from one place, and that without it each screen invents its
+own and they drift. Name the capability `design-tokens`.
+
+Its design and tasks are technical and come from `ralph/design/system/README.md` and
+`tokens.json`: the README names the conventions the codebase should use, and `tokens.json`
+holds every token with its value in each appearance. Do not restate token values in the
+proposal or the specs.
+
+---
+
 ## Step 5: Materialise
 
-Work through the confirmed cells in BUILD ORDER. Every change is created, whatever its
-position: the order decides the build sequence, not what gets written.
+Work through the confirmed cells in BUILD ORDER, starting with `theme-foundation` when Step
+4b created it. Every change is created, whatever its position: the order decides the build
+sequence, not what gets written.
+
+For `theme-foundation`, 5c to 5g run the same way, with `ralph/design/system/README.md` and
+`tokens.json` as the source in place of an activity spec, and 5h is skipped: a theme has no
+screens to design.
 
 **5a. Check for an existing change.**
 ```bash
@@ -187,8 +239,11 @@ Sliced: <date>
 
 | Order | Cell | Change | Activity | Depth | Needs first |
 |---|---|---|---|---|---|
-| 1 | `<cell-id>` | `openspec/changes/<cell-id>` | <activity> | <depth> | none |
+| 1 | `theme-foundation` | `openspec/changes/theme-foundation` | (the theme) | n/a | none |
+| 2 | `<cell-id>` | `openspec/changes/<cell-id>` | <activity> | <depth> | `theme-foundation` |
 ```
+
+Include the `theme-foundation` row only when Step 4b created it.
 
 The Order column is the confirmed BUILD ORDER. `--status` reports against it, so a reader
 can see which change is next without re-deriving the dependencies.
@@ -222,8 +277,9 @@ Tell the user:
 
 ```
 Created <N> changes for release <release>, in build order:
-  1. openspec/changes/<cell-id>/    proposal, specs, design, tasks
-  2. ...                            needs <cell-id>
+  1. openspec/changes/theme-foundation/   the theme every screen reads from
+  2. openspec/changes/<cell-id>/          proposal, specs, design, tasks
+  3. ...                                  needs <cell-id>
 
 Skipped:
   <cell-id> — already has work against it
