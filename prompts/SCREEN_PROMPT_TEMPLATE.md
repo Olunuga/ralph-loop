@@ -58,8 +58,12 @@ goes stale the moment the system changes.
    menu has no such item; the bundle is produced on request in the chat.
 2. Download the bundle folder.
 3. Put its contents in `openspec/changes/${CHANGE_ID}/assets/design/`. That exact path.
-4. Commit the files, not the .zip. The build agent refuses to read an archive.
-5. Check `README.md` is there. The build agent reads it first and uses it to choose what
+4. Delete the bundle's own `design_system/` directory if it has one. Claude Design copies
+   the system in to make the bundle self-contained. The system is already committed at
+   `ralph/design/system/`, and a second copy drifts from it. The bundle README cites the
+   committed path, so nothing breaks when the copy goes.
+5. Commit the files, not the .zip. The build agent refuses to read an archive.
+6. Check `README.md` is there. The build agent reads it first and uses it to choose what
    else to open.
 
 A single `.dc.html` downloaded on its own is not enough. It needs sibling files that the

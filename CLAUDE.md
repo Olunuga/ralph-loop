@@ -198,6 +198,11 @@ An observed system bundle holds `README.md` addressed to a coding agent, `tokens
 the machine-readable source of truth, the spec document as `.dc.html`, and the source
 system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
 
+A screen bundle embeds a copy of the design system under `design_system/`, so the bundle is
+self-contained. The copy is byte-identical to what `ralph/design/system/` holds. Delete it
+before committing: a second copy of the tokens drifts, and the bundle README already cites
+the committed path.
+
 A single `.dc.html` downloaded from Export is not a bundle. It carries token names in its
 annotation prose but raw hex in its markup, with zero CSS variables, and it references
 sibling files the single download leaves behind. An exported PNG is worth committing beside
