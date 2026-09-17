@@ -24,11 +24,21 @@ PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
 
 SRC="${SOURCE_DIR:-.}"
 
+# A test directory outside SOURCE_DIR needs its own pathspec entry. Without it the
+# test_adequacy gate sees added functions and no tests, and fails every iteration.
+DIFF_PATHS=("$SRC/")
+if [[ -n "${TEST_DIR:-}" && "$SRC" != "." ]]; then
+    case "$TEST_DIR/" in
+        "$SRC"/*) ;;
+        *) DIFF_PATHS+=("$TEST_DIR/") ;;
+    esac
+fi
+
 DIFF_BASE_REF=$(git merge-base "${DIFF_BASE_BRANCH:-main}" HEAD 2>/dev/null || echo "HEAD~1")
 
-PREPARED_DIFF=$(git diff "$DIFF_BASE_REF"...HEAD -- "$SRC/" 2>/dev/null || true)
-DIFF_STATS=$(git diff --stat "$DIFF_BASE_REF"...HEAD -- "$SRC/" 2>/dev/null || true)
-CHANGED_FILES=$(git diff --name-only "$DIFF_BASE_REF"...HEAD -- "$SRC/" 2>/dev/null || true)
+PREPARED_DIFF=$(git diff "$DIFF_BASE_REF"...HEAD -- "${DIFF_PATHS[@]}" 2>/dev/null || true)
+DIFF_STATS=$(git diff --stat "$DIFF_BASE_REF"...HEAD -- "${DIFF_PATHS[@]}" 2>/dev/null || true)
+CHANGED_FILES=$(git diff --name-only "$DIFF_BASE_REF"...HEAD -- "${DIFF_PATHS[@]}" 2>/dev/null || true)
 
 # Approximate token count (1 token ≈ 4 chars)
 DIFF_CHARS=$(echo "$PREPARED_DIFF" | wc -c | tr -d ' ')

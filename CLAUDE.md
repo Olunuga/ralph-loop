@@ -276,6 +276,17 @@ Two gates cover it:
   call the behaviour they name. It also covers the case the static gate misses: an edit to
   an existing function body adds behaviour but declares no function.
 
+### The review diff must include TEST_DIR
+`scripts/prepare_diff.sh` and the UI routing block in `bin/loop.sh` scoped the diff to
+`$SOURCE_DIR/` alone. A project whose tests sit outside the source directory, which is the
+Xcode default, showed every LLM gate a diff with added functions and no tests.
+`scripts/gates/llm/test_adequacy.md` item 3 asks whether each added function has a test that
+calls it, so it failed every iteration that added one. Both now add `TEST_DIR` as a second
+pathspec entry when it is set and is not already under `SOURCE_DIR`.
+
+The static gates are unaffected. A gate like `force_unwrap.sh` scopes to `SOURCE_DIR` on
+purpose, and `missing_tests.sh` passes no pathspec at all.
+
 ## Intent source slots
 
 `bin/loop.sh` reads a brief and tracks a task ledger. Both paths are environment
