@@ -115,8 +115,18 @@ echo "source files: $(find "$SRC" -name "*.swift" 2>/dev/null | wc -l | tr -d ' 
 find "$SRC" -maxdepth 1 -name "*.swift" 2>/dev/null | head -10
 ```
 
-If layer directories already exist, record their real paths for the `LAYER_*` variables in Step 3 and
-skip the rest of this step. A codebase with its own structure keeps it.
+If layer directories already exist, record their real paths for the `LAYER_*` variables in
+Step 3. A codebase with its own structure keeps it: never propose a different one during
+setup.
+
+Show the mapping you inferred, as `<their directory> -> <slot>`, and ask one question:
+"Record this structure, or restructure the project first?"
+
+- **Record it**: the normal answer. Carry the paths to Step 3 and skip the rest of this step.
+- **Restructure first**: go to Step 2d. Setup will still finish; the restructure is planned
+  as work, not done here.
+
+Then skip the rest of this step either way.
 
 Three states remain, and they are not the same:
 
@@ -201,14 +211,11 @@ git status --porcelain | head -5
 ```
 
 **Above 20 files, do not offer the move.** Say: "This is N files. A move of that size is a
-refactor with its own risk, not a setup step. Build it as a change so it is planned, gated
-and reviewed: run `/ralph-loop:spec restructure-source`, or `/ralph-loop:slice` if the
-project uses OpenSpec." Then continue to Step 3 with the directories created and the loose
-files where they are.
+refactor with its own risk, not a setup step." Then go to Step 2d.
 
 **Refuse on a dirty tree.** If `git status --porcelain` prints anything, say: "Commit or
 stash your changes first. A move mixed with uncommitted edits cannot be undone cleanly."
-Then continue to Step 3.
+Then continue to Step 3 without moving anything.
 
 At 20 files or fewer on a clean tree, read each one and decide its slot from what it holds.
 Use the chosen architecture's directory for that slot, not the slot name:
@@ -243,6 +250,41 @@ Then verify, and report honestly:
 A build failure here is almost always Xcode project references, not the code. Tell the user
 which files moved and that the project file needs them re-added. Do not try to edit the
 `.xcodeproj` yourself.
+
+---
+
+## Step 2d — Restructuring a project that already has an architecture
+
+Run this only when the user asked to restructure in Step 2b, or when Step 2c refused because
+there were more than 20 loose files.
+
+**Do not move any file here.** Moving working code is a refactor: it can break the build, it
+touches files no gate has seen, and it deserves a plan, a review and a pull request. Setup is
+not the place for it.
+
+Write the intent down and hand it to the pipeline instead.
+
+1. Record the target in `ralph/config.sh` now, not after. The `LAYER_*` paths name where code
+   should live. Until the move happens the gates check directories that are empty or partial,
+   which reports PASS. Say that plainly: "The gates will not enforce this until the files
+   move."
+2. Ask which architecture to move to, using the same options and mapping table as Step 2b.
+3. Write the current structure and the target into `ralph/AGENTS.md` in Step 6, as two lists.
+   The build agent reads that file, so a new file lands in the target layer from the next
+   iteration on, even before old files move.
+4. Tell the user how to do the move as real work:
+
+```
+Restructuring is a change, not a setup step. Describe it once and the pipeline builds it:
+
+    /ralph-loop:spec restructure-source     a single spec, then /ralph-loop:run
+    /ralph-loop:slice                       if this project uses OpenSpec
+
+Either way the move is planned, gated, and opened as a pull request you can review file
+by file. Nothing moves until you approve it.
+```
+
+Do not run those commands yourself. Name them and continue to Step 3.
 
 ---
 

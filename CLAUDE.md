@@ -387,7 +387,15 @@ dirty tree it refuses outright, because a move mixed with uncommitted edits cann
 cleanly. It places a file by what the file holds, and lists anything it cannot place as
 "unsure, left in place" rather than guessing.
 
-It never edits the `.xcodeproj`. A build failure after a move is almost always a stale
+Step 2d covers a project that already has an architecture and wants a different one, and the
+case where Step 2c refused on size. It moves nothing. It records the target `LAYER_*` paths,
+writes both the current and target structure into `ralph/AGENTS.md` so new files land
+correctly from the next iteration, states plainly that the gates will not enforce the target
+until files move, and routes the move to `/ralph-loop:spec restructure-source` or
+`/ralph-loop:slice`. Moving working code is a refactor: it deserves a plan, a review and a
+pull request, and setup is not the place for it.
+
+Step 2c never edits the `.xcodeproj`. A build failure after a move is almost always a stale
 project reference, and the gates read the filesystem, so they pass while the build does not.
 
 The four slots are positions in a dependency order, not MVVM parts. The gates enforce one
