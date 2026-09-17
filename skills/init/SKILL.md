@@ -272,19 +272,40 @@ Write the intent down and hand it to the pipeline instead.
 3. Write the current structure and the target into `ralph/AGENTS.md` in Step 6, as two lists.
    The build agent reads that file, so a new file lands in the target layer from the next
    iteration on, even before old files move.
-4. Tell the user how to do the move as real work:
+4. Tell the user how to do the move as real work. Name one route, chosen by whether
+   OpenSpec is wired. Check after Step 7 has run, or check directly:
+
+```bash
+command -v openspec >/dev/null && grep -q '^schema: *ralph-bridge' openspec/config.yaml 2>/dev/null \
+  && echo OPENSPEC || echo LEGACY
+```
+
+`OPENSPEC`:
 
 ```
 Restructuring is a change, not a setup step. Describe it once and the pipeline builds it:
 
-    /ralph-loop:spec restructure-source     a single spec, then /ralph-loop:run
-    /ralph-loop:slice                       if this project uses OpenSpec
-
-Either way the move is planned, gated, and opened as a pull request you can review file
-by file. Nothing moves until you approve it.
+    /opsx:propose restructure-source     writes the proposal, specs, design and tasks
+    /ralph-loop:run restructure-source   builds it and opens a pull request
 ```
 
-Do not run those commands yourself. Name them and continue to Step 3.
+`LEGACY`:
+
+```
+Restructuring is a change, not a setup step. Describe it once and the pipeline builds it:
+
+    /ralph-loop:spec restructure-source   writes the spec
+    /ralph-loop:run restructure-source    builds it and opens a pull request
+```
+
+Do not name `/ralph-loop:slice` here. It slices a story map into one change per activity and
+stops without `ralph/AUDIENCE_JTBD.md`. A restructure is a single change, not a release
+slice.
+
+Either way the move is planned, gated, and opened as a pull request the user reviews file by
+file. Say that. Nothing moves until they approve it.
+
+Do not run the command yourself. Name it and continue to Step 3.
 
 ---
 
