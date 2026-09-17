@@ -378,8 +378,17 @@ source, which finds nothing on an empty project.
 
 Loose source files are the case to watch. Creating the layer directories beside them
 switches the gates on over nothing, because the gates look only inside the layer paths. Step
-2b counts them, says so, and offers to name the target layer for each. It never moves a file:
-the step configures and does not refactor.
+2b counts them and says so; Step 2c offers the move.
+
+Step 2c moves with `git mv`, so history follows the file, and commits on its own. It has two
+refusals. Above 20 files it routes to `/ralph-loop:spec restructure-source` instead: a move
+of that size is a refactor that should be planned, gated and reviewed, not a setup step. On a
+dirty tree it refuses outright, because a move mixed with uncommitted edits cannot be undone
+cleanly. It places a file by what the file holds, and lists anything it cannot place as
+"unsure, left in place" rather than guessing.
+
+It never edits the `.xcodeproj`. A build failure after a move is almost always a stale
+project reference, and the gates read the filesystem, so they pass while the build does not.
 
 `init` Step 2b asks for an architecture when no layer directory exists, creates the
 directories with a `.gitkeep`, and writes the `LAYER_*` variables into `ralph/config.sh`. A codebase that

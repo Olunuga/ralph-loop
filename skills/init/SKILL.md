@@ -127,8 +127,7 @@ Three states remain, and they are not the same:
    inside the layer paths. Say so before asking, in these words: "There are N source files
    that are not in any layer directory. Creating the directories does not move them, and the
    architecture gates will not see them until they move."
-   Then offer to list them and say which layer each belongs in, so the user can move them in
-   one pass. Do not move a file yourself. This step configures; it does not refactor.
+   Choose the architecture first, then run Step 2c.
 3. **Directories exist but are empty.** Treat this as state 1.
 
 If none exist, the project has no architecture yet. Three things depend on one being chosen
@@ -165,6 +164,63 @@ shows up as a build failure rather than a gate failure.
 
 Carry the chosen paths into the `LAYER_*` variables in Step 3, and into the Architecture section of
 `ralph/AGENTS.md` in Step 6.
+
+---
+
+## Step 2c — Move loose files into the chosen architecture
+
+Run this only when Step 2b found loose source files. Skip it otherwise.
+
+```bash
+LOOSE=$(find "$SRC" -name "*.swift" -not -path "*/Views/*" -not -path "*/ViewModels/*" \
+  -not -path "*/Services/*" -not -path "*/Repositories/*" -not -path "*/Models/*" \
+  -not -path "*/Core/*" -not -path "*/Features/*" 2>/dev/null)
+echo "$LOOSE" | grep -c . 
+git status --porcelain | head -5
+```
+
+**Above 20 files, do not offer the move.** Say: "This is N files. A move of that size is a
+refactor with its own risk, not a setup step. Build it as a change so it is planned, gated
+and reviewed: run `/ralph-loop:spec restructure-source`, or `/ralph-loop:slice` if the
+project uses OpenSpec." Then continue to Step 3 with the directories created and the loose
+files where they are.
+
+**Refuse on a dirty tree.** If `git status --porcelain` prints anything, say: "Commit or
+stash your changes first. A move mixed with uncommitted edits cannot be undone cleanly."
+Then continue to Step 3.
+
+At 20 files or fewer on a clean tree, read each one and decide its layer from what it holds:
+
+| What the file holds | Layer |
+| --- | --- |
+| A `View`, or anything importing SwiftUI for its own body | view |
+| An `ObservableObject`, `@Observable`, or a type a view binds to | viewmodel |
+| A protocol and its implementation for data access, persistence, or network | repository |
+| Business rules with no UI and no storage of its own | service |
+| A plain data type, a `Codable`, a `@Model` | the models directory |
+| The `@main` entry point, an app delegate, a widget bundle | leave where it is |
+
+Show the full list as `<path> -> <target>` and ask for confirmation. A file you cannot place
+goes in the list as `<path> -> unsure, left in place`, never guessed.
+
+On confirmation, move with `git mv` so history follows the file, then commit on its own:
+
+```bash
+git mv "<src>" "<dst>"
+```
+```bash
+git -c commit.gpgsign=false commit -m "ralph: move source files into the chosen architecture"
+```
+
+Then verify, and report honestly:
+
+```bash
+<BUILD_CMD from Step 2>
+```
+
+A build failure here is almost always Xcode project references, not the code. Tell the user
+which files moved and that the project file needs them re-added. Do not try to edit the
+`.xcodeproj` yourself.
 
 ---
 
