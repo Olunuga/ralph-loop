@@ -145,11 +145,32 @@ Use AskUserQuestion: "This project has no folder structure yet. Which architectu
 the pipeline enforce?"
 
 - **MVVM with repositories (Recommended)**: `Views/`, `ViewModels/`, `Services/`,
-  `Repositories/`, `Models/`. Views hold no logic, view models hold no UI types, services
-  and repositories import no SwiftUI. This is what the default gates already check.
+  `Repositories/`, `Models/`.
 - **Feature-first**: `Features/<Name>/{Views,ViewModels}/`, with `Core/Services/`,
   `Core/Repositories/`, `Core/Models/` shared. Same rules, grouped by feature.
-- **Let me describe it**: the user names the directories and the dependency direction.
+- **Let me describe it**: the user names their own directories, and you map them onto the
+  four slots below.
+
+**The four slots are positions in a dependency order, not MVVM parts.** The gates enforce
+one thing: UI does not leak downward. `view` is whatever holds the UI. `viewmodel` is
+whatever the UI binds to. `service` and `repository` are whatever sits below that, with
+`repository` reaching storage or the network. The names are historical; any layered
+architecture maps onto them.
+
+| Architecture | view | viewmodel | service | repository |
+| --- | --- | --- | --- | --- |
+| MVVM | Views | ViewModels | Services | Repositories |
+| The Composable Architecture | Views | Reducers | Clients | Clients (persistence) |
+| Clean Architecture | Views | Presenters | UseCases | Gateways |
+| VIPER | Views | Presenters | Interactors | DataManagers |
+| MVC with a service layer | Views | Controllers | Services | Stores |
+
+On **Let me describe it**, ask for the directories and the dependency direction, then show
+the mapping you inferred as `<their directory> -> <slot>` and ask them to confirm it. Leave a
+slot empty when nothing fills it; an empty slot turns its rule off rather than failing.
+
+Record the user's own names in `ralph/AGENTS.md` in Step 6. `LAYER_*` carries the paths; the
+names the team uses belong in the documentation the build agent reads.
 
 Create the directories, each with a `.gitkeep` so git tracks them:
 
@@ -189,7 +210,8 @@ files where they are.
 stash your changes first. A move mixed with uncommitted edits cannot be undone cleanly."
 Then continue to Step 3.
 
-At 20 files or fewer on a clean tree, read each one and decide its layer from what it holds:
+At 20 files or fewer on a clean tree, read each one and decide its slot from what it holds.
+Use the chosen architecture's directory for that slot, not the slot name:
 
 | What the file holds | Layer |
 | --- | --- |

@@ -390,6 +390,13 @@ cleanly. It places a file by what the file holds, and lists anything it cannot p
 It never edits the `.xcodeproj`. A build failure after a move is almost always a stale
 project reference, and the gates read the filesystem, so they pass while the build does not.
 
+The four slots are positions in a dependency order, not MVVM parts. The gates enforce one
+rule: UI does not leak downward. `view` holds the UI, `viewmodel` is what the UI binds to,
+`service` and `repository` sit below. The names are historical. Step 2b carries a mapping
+table for TCA, Clean Architecture, VIPER, and MVC, and its "let me describe it" option maps
+the user's own directories onto the slots. An empty slot turns its rule off rather than
+failing. The team's own layer names go in `ralph/AGENTS.md`; `LAYER_*` carries only paths.
+
 `init` Step 2b asks for an architecture when no layer directory exists, creates the
 directories with a `.gitkeep`, and writes the `LAYER_*` variables into `ralph/config.sh`. A codebase that
 already has its own structure keeps it: the step records the real paths and asks nothing.
