@@ -14,10 +14,17 @@ Run each step in order. Tell the user which step you are on.
 `--openspec` turns on the OpenSpec wiring in Step 7. Without it, Step 7 is skipped
 entirely: no `openspec/` directory is created and no git hooks are written.
 
-`/ralph-loop:init --openspec` is also the upgrade command. It is idempotent. Run it
-again after `claude plugin update ralph-loop` to refresh the installed schema. It never
-modifies `ralph/config.sh`, `ralph/gates/`, `ralph/gate_context.md`, `ralph/.diff_base`,
-or anything under `ralph/specs/`.
+`/ralph-loop:init --openspec` is also the upgrade command. It is idempotent. Run it again
+after `claude plugin update ralph-loop` to refresh the installed schema and to add config
+keys a new plugin version introduced.
+
+It never touches `ralph/gates/`, `ralph/gate_context.md`, `ralph/.diff_base`, or anything
+under `ralph/specs/`.
+
+`ralph/config.sh` is the one file it rewrites, and it only ever adds. Every value already in
+the file is carried across unchanged, and Step 2 asks only about keys that are missing or
+empty. A re-run is how an existing project picks up a key such as `LAYER_VIEW`. Tell the
+user which keys you added, and say that nothing else changed.
 
 ---
 
@@ -72,7 +79,7 @@ From the output, infer:
   is actually there: `*Tests.swift`, `test_*.py`, `*.test.ts`, `*_test.go`. If the directory is
   empty or absent, leave both keys empty rather than guessing.
 
-If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty.
+If `ralph/config.sh` already exists, read it. Use its values as the baseline and only ask about fields that are missing or empty. Never replace a value the user set, and never drop a key you do not recognise: a later plugin version may have added it, or the user may have.
 
 Present everything you discovered to the user in a single AskUserQuestion:
 
@@ -95,6 +102,192 @@ Apply any corrections the user gives, then write `ralph/config.sh`.
 
 ---
 
+## Step 2b — Architecture, when the codebase has none
+
+Look for layer directories under the source directory:
+
+```bash
+SRC="<source_dir>"
+for d in Views ViewModels Services Repositories Models Features Domain Data Presentation; do
+  [[ -d "$SRC/$d" ]] && echo "FOUND $d"
+done
+echo "source files: $(find "$SRC" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')"
+find "$SRC" -maxdepth 1 -name "*.swift" 2>/dev/null | head -10
+```
+
+If layer directories already exist, record their real paths for the `LAYER_*` variables in
+Step 3. A codebase with its own structure keeps it: never propose a different one during
+setup.
+
+Show the mapping you inferred, as `<their directory> -> <slot>`, and ask one question:
+"Record this structure, or restructure the project first?"
+
+- **Record it**: the normal answer. Carry the paths to Step 3 and skip the rest of this step.
+- **Restructure first**: go to Step 2d. Setup will still finish; the restructure is planned
+  as work, not done here.
+
+Then skip the rest of this step either way.
+
+Three states remain, and they are not the same:
+
+1. **No directories and no source files.** A new project. Create the directories; the first
+   feature lands in them.
+2. **No directories, but source files sit loose under the source directory.** Creating empty
+   directories beside them switches the gates on over nothing, because the gates look only
+   inside the layer paths. Say so before asking, in these words: "There are N source files
+   that are not in any layer directory. Creating the directories does not move them, and the
+   architecture gates will not see them until they move."
+   Choose the architecture first, then run Step 2c.
+3. **Directories exist but are empty.** Treat this as state 1.
+
+If none exist, the project has no architecture yet. Three things depend on one being chosen
+now, so do not defer it:
+
+- `layer_boundaries.sh`, `dependency_direction.sh`, and `model_context.sh` read
+  `LAYER_VIEW`, `LAYER_VIEWMODEL`, `LAYER_SERVICE`, and `LAYER_REPOSITORY` from
+  `ralph/config.sh`. With none set they fall back to `Views`, `ViewModels`, `Services`,
+  `Repositories` under the source directory, find nothing, and pass without checking.
+- `ralph/AGENTS.md` tells the build agent which layer a new file belongs in. With no
+  architecture that section is blank.
+- Each change's `design.md` otherwise invents its own structure, and they drift.
+
+Use AskUserQuestion: "This project has no folder structure yet. Which architecture should
+the pipeline enforce?"
+
+- **MVVM with repositories (Recommended)**: `Views/`, `ViewModels/`, `Services/`,
+  `Repositories/`, `Models/`.
+- **Feature-first**: `Features/<Name>/{Views,ViewModels}/`, with `Core/Services/`,
+  `Core/Repositories/`, `Core/Models/` shared. Same rules, grouped by feature.
+- **Let me describe it**: the user names their own directories, and you map them onto the
+  four slots below.
+
+**The four slots are positions in a dependency order, not MVVM parts.** The gates enforce
+one thing: UI does not leak downward. `view` is whatever holds the UI. `viewmodel` is
+whatever the UI binds to. `service` and `repository` are whatever sits below that, with
+`repository` reaching storage or the network. The names are historical; any layered
+architecture maps onto them.
+
+| Architecture | view | viewmodel | service | repository |
+| --- | --- | --- | --- | --- |
+| MVVM | Views | ViewModels | Services | Repositories |
+| The Composable Architecture | Views | Reducers | Clients | Clients (persistence) |
+| Clean Architecture | Views | Presenters | UseCases | Gateways |
+| VIPER | Views | Presenters | Interactors | DataManagers |
+| MVC with a service layer | Views | Controllers | Services | Stores |
+
+On **Let me describe it**, ask for the directories and the dependency direction, then show
+the mapping you inferred as `<their directory> -> <slot>` and ask them to confirm it. Leave a
+slot empty when nothing fills it; an empty slot turns its rule off rather than failing.
+
+Record the user's own names in `ralph/AGENTS.md` in Step 6. `LAYER_*` carries the paths; the
+names the team uses belong in the documentation the build agent reads.
+
+Create the directories, each with a `.gitkeep` so git tracks them:
+
+```bash
+for d in <chosen dirs>; do mkdir -p "$SRC/$d" && touch "$SRC/$d/.gitkeep"; done
+```
+
+On an Xcode project that does not use synchronized folder references, a directory created on
+disk is not in the project file until it is added in Xcode. Tell the user to check, and say
+that the gates read the filesystem and will pass either way, so a missing project reference
+shows up as a build failure rather than a gate failure.
+
+Carry the chosen paths into the `LAYER_*` variables in Step 3, and into the Architecture section of
+`ralph/AGENTS.md` in Step 6.
+
+---
+
+## Step 2c — Move loose files into the chosen architecture
+
+Run this only when Step 2b found loose source files. Skip it otherwise.
+
+```bash
+LOOSE=$(find "$SRC" -name "*.swift" -not -path "*/Views/*" -not -path "*/ViewModels/*" \
+  -not -path "*/Services/*" -not -path "*/Repositories/*" -not -path "*/Models/*" \
+  -not -path "*/Core/*" -not -path "*/Features/*" 2>/dev/null)
+echo "$LOOSE" | grep -c . 
+git status --porcelain | head -5
+```
+
+**Above 20 files, do not offer the move.** Say: "This is N files. A move of that size is a
+refactor with its own risk, not a setup step." Then go to Step 2d.
+
+**Refuse on a dirty tree.** If `git status --porcelain` prints anything, say: "Commit or
+stash your changes first. A move mixed with uncommitted edits cannot be undone cleanly."
+Then continue to Step 3 without moving anything.
+
+At 20 files or fewer on a clean tree, read each one and decide its slot from what it holds.
+Use the chosen architecture's directory for that slot, not the slot name:
+
+| What the file holds | Layer |
+| --- | --- |
+| A `View`, or anything importing SwiftUI for its own body | view |
+| An `ObservableObject`, `@Observable`, or a type a view binds to | viewmodel |
+| A protocol and its implementation for data access, persistence, or network | repository |
+| Business rules with no UI and no storage of its own | service |
+| A plain data type, a `Codable`, a `@Model` | the models directory |
+| The `@main` entry point, an app delegate, a widget bundle | leave where it is |
+
+Show the full list as `<path> -> <target>` and ask for confirmation. A file you cannot place
+goes in the list as `<path> -> unsure, left in place`, never guessed.
+
+On confirmation, move with `git mv` so history follows the file, then commit on its own:
+
+```bash
+git mv "<src>" "<dst>"
+```
+```bash
+git -c commit.gpgsign=false commit -m "ralph: move source files into the chosen architecture"
+```
+
+Then verify, and report honestly:
+
+```bash
+<BUILD_CMD from Step 2>
+```
+
+A build failure here is almost always Xcode project references, not the code. Tell the user
+which files moved and that the project file needs them re-added. Do not try to edit the
+`.xcodeproj` yourself.
+
+---
+
+## Step 2d — Restructuring a project that already has an architecture
+
+Run this only when the user asked to restructure in Step 2b, or when Step 2c refused because
+there were more than 20 loose files.
+
+**Do not move any file here.** Moving working code is a refactor: it can break the build, it
+touches files no gate has seen, and it deserves a plan, a review and a pull request. Setup is
+not the place for it.
+
+Write the intent down and hand it to the pipeline instead.
+
+1. Record the target in `ralph/config.sh` now, not after. The `LAYER_*` paths name where code
+   should live. Until the move happens the gates check directories that are empty or partial,
+   which reports PASS. Say that plainly: "The gates will not enforce this until the files
+   move."
+2. Ask which architecture to move to, using the same options and mapping table as Step 2b.
+3. Write the current structure and the target into `ralph/AGENTS.md` in Step 6, as two lists.
+   The build agent reads that file, so a new file lands in the target layer from the next
+   iteration on, even before old files move.
+4. Tell the user how to do the move as real work:
+
+```
+Restructuring is a change, not a setup step. Describe it once and the pipeline builds it:
+
+    /ralph-loop:spec restructure-source     a single spec, then /ralph-loop:run
+    /ralph-loop:slice                       if this project uses OpenSpec
+
+Either way the move is planned, gated, and opened as a pull request you can review file
+by file. Nothing moves until you approve it.
+```
+
+Do not run those commands yourself. Name them and continue to Step 3.
+
+---
+
 ## Step 3 — Write ralph/config.sh
 
 ```bash
@@ -109,6 +302,14 @@ XCODEPROJ="<xcodeproj>"
 XCWORKSPACE="<xcworkspace>"  # leave empty if no .xcworkspace exists
 PROTOCOLS_DIR="<protocols_dir>"
 SOURCE_DIR="<source_dir>"
+
+# Layer paths for the architecture gates. Plain variables, not an associative array:
+# macOS ships bash 3.2, which has none. A glob is allowed; `find` expands it.
+# An unset role falls back to <source_dir>/Views and its siblings.
+LAYER_VIEW="<source_dir>/Views"
+LAYER_VIEWMODEL="<source_dir>/ViewModels"
+LAYER_SERVICE="<source_dir>/Services"
+LAYER_REPOSITORY="<source_dir>/Repositories"
 
 # Test layout. missing_tests.sh reads these. Leave any of them empty to turn
 # that gate off; it passes with a notice rather than failing.

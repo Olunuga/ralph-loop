@@ -14,6 +14,13 @@ STEP 1 — Identify the build system (use subagents for all reads)
 
 STEP 2 — Discover architecture by reading source
 
+If `ralph/config.sh` sets `LAYER_VIEW` and its siblings, those paths are the architecture. They were
+chosen deliberately during init. Use them, and do not propose a different structure.
+
+On a project with no source files yet, the layer directories exist and are empty. That is
+the expected state. Record them, write "none yet" for the reference implementation, and do
+not treat an empty layer as a finding.
+
 - List all top-level directories in the main app folder
 - Read 1-2 files from each layer to understand naming and import patterns
 - Find all protocol definitions: `grep -r "^protocol " [AppFolder]/ --include="*.swift" -l`
@@ -28,7 +35,9 @@ STEP 3 — Verify build and test commands
 
 STEP 4 — Write ralph/AGENTS.md with what you discovered
 
-Use this structure — fill in discovered values, do not invent:
+Use this structure. Fill in discovered values and do not invent, with one exception: the
+layer paths come from the `LAYER_*` variables in `ralph/config.sh` when they are set, whether or not those
+directories hold any code yet.
 
 ```markdown
 ## Build & Run
@@ -45,7 +54,8 @@ Use this structure — fill in discovered values, do not invent:
   - [Layer]: [folder path] — [one line on what it contains]
   ... (list all layers you found)
 - Protocols: [path to protocols] ([list protocol file names])
-- Reference implementation: [most complete module] — use as pattern for new features
+- Reference implementation: [most complete module, or "none yet — the first feature built
+  becomes it"] — use as pattern for new features
 - New features: add [implementation file] in [layer folder], conform to protocol in [protocols folder]
 
 ## Code Quality — Hard Failures (block commit)

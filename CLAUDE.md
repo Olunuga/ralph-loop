@@ -357,6 +357,62 @@ When the loop is restarted, the iteration counter resets and `IMPLEMENTATION_PLA
 ### `git rev-parse --show-toplevel` vs `--git-common-dir`
 `--show-toplevel` returns the worktree root when run inside a worktree. This causes double-nested paths like `.worktrees/ref/.worktrees/ref`. Always use `git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||'` to get the main repo root.
 
+## Architecture and the layer gates
+
+### The layer gates never ran on macOS
+`layer_boundaries.sh`, `dependency_direction.sh` and `model_context.sh` looked up their paths
+with `${LAYER_MAP[$role]}` and their fallbacks with `${fallback_dirs[$role]}`. macOS ships
+bash 3.2, which has no associative arrays, so both aborted `get_layer_files` under `set -u`.
+The caller assigns with `files=$(get_layer_files "$role")`, which swallows the failure, and
+`[[ -z "$files" ]] && continue` then skipped every role. All three gates reported PASS while
+checking nothing, on every macOS project, whether configured or not.
+
+Layer paths are now plain variables read by indirect expansion: `LAYER_VIEW`,
+`LAYER_VIEWMODEL`, `LAYER_SERVICE`, `LAYER_REPOSITORY`. The fallback is a `case`. Never
+introduce `declare -A` into a gate or into `ralph/config.sh`: bash 3.2 rejects the option
+outright and takes the whole run with it.
+
+### Greenfield projects had no architecture at all
+Nothing wrote the layer paths, and `PROMPT_bootstrap.md` discovers architecture by reading
+source, which finds nothing on an empty project.
+
+Loose source files are the case to watch. Creating the layer directories beside them
+switches the gates on over nothing, because the gates look only inside the layer paths. Step
+2b counts them and says so; Step 2c offers the move.
+
+Step 2c moves with `git mv`, so history follows the file, and commits on its own. It has two
+refusals. Above 20 files it routes to `/ralph-loop:spec restructure-source` instead: a move
+of that size is a refactor that should be planned, gated and reviewed, not a setup step. On a
+dirty tree it refuses outright, because a move mixed with uncommitted edits cannot be undone
+cleanly. It places a file by what the file holds, and lists anything it cannot place as
+"unsure, left in place" rather than guessing.
+
+Step 2d covers a project that already has an architecture and wants a different one, and the
+case where Step 2c refused on size. It moves nothing. It records the target `LAYER_*` paths,
+writes both the current and target structure into `ralph/AGENTS.md` so new files land
+correctly from the next iteration, states plainly that the gates will not enforce the target
+until files move, and routes the move to `/ralph-loop:spec restructure-source` or
+`/ralph-loop:slice`. Moving working code is a refactor: it deserves a plan, a review and a
+pull request, and setup is not the place for it.
+
+Step 2c never edits the `.xcodeproj`. A build failure after a move is almost always a stale
+project reference, and the gates read the filesystem, so they pass while the build does not.
+
+The four slots are positions in a dependency order, not MVVM parts. The gates enforce one
+rule: UI does not leak downward. `view` holds the UI, `viewmodel` is what the UI binds to,
+`service` and `repository` sit below. The names are historical. Step 2b carries a mapping
+table for TCA, Clean Architecture, VIPER, and MVC, and its "let me describe it" option maps
+the user's own directories onto the slots. An empty slot turns its rule off rather than
+failing. The team's own layer names go in `ralph/AGENTS.md`; `LAYER_*` carries only paths.
+
+`init` Step 2b asks for an architecture when no layer directory exists, creates the
+directories with a `.gitkeep`, and writes the `LAYER_*` variables into `ralph/config.sh`. A codebase that
+already has its own structure keeps it: the step records the real paths and asks nothing.
+
+`PROMPT_bootstrap.md` discovers architecture by reading source, which finds nothing on an
+empty project. It now takes the layer paths from the `LAYER_*` variables when set, and treats an empty
+layer directory as the expected state rather than a finding.
+
 ## Gates
 
 ### LLM gates diverge on retry
