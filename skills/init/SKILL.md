@@ -14,10 +14,17 @@ Run each step in order. Tell the user which step you are on.
 `--openspec` turns on the OpenSpec wiring in Step 7. Without it, Step 7 is skipped
 entirely: no `openspec/` directory is created and no git hooks are written.
 
-`/ralph-loop:init --openspec` is also the upgrade command. It is idempotent. Run it
-again after `claude plugin update ralph-loop` to refresh the installed schema. It never
-modifies `ralph/config.sh`, `ralph/gates/`, `ralph/gate_context.md`, `ralph/.diff_base`,
-or anything under `ralph/specs/`.
+`/ralph-loop:init --openspec` is also the upgrade command. It is idempotent. Run it again
+after `claude plugin update ralph-loop` to refresh the installed schema and to add config
+keys a new plugin version introduced.
+
+It never touches `ralph/gates/`, `ralph/gate_context.md`, `ralph/.diff_base`, or anything
+under `ralph/specs/`.
+
+`ralph/config.sh` is the one file it rewrites, and it only ever adds. Every value already in
+the file is carried across unchanged, and Step 2 asks only about keys that are missing or
+empty. A re-run is how an existing project picks up a key such as `LAYER_VIEW`. Tell the
+user which keys you added, and say that nothing else changed.
 
 ---
 
@@ -72,7 +79,7 @@ From the output, infer:
   is actually there: `*Tests.swift`, `test_*.py`, `*.test.ts`, `*_test.go`. If the directory is
   empty or absent, leave both keys empty rather than guessing.
 
-If `ralph/config.sh` already exists, read it — use its values as the baseline and only ask about fields that are missing or empty.
+If `ralph/config.sh` already exists, read it. Use its values as the baseline and only ask about fields that are missing or empty. Never replace a value the user set, and never drop a key you do not recognise: a later plugin version may have added it, or the user may have.
 
 Present everything you discovered to the user in a single AskUserQuestion:
 
