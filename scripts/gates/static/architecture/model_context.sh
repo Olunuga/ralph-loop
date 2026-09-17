@@ -10,17 +10,21 @@ gate_tier()  { echo "fast"; }
 # ---------------------------------------------------------------------------
 get_layer_files() {
     local role="$1"
-    if [[ -n "${LAYER_MAP[$role]:-}" ]]; then
-        local pattern="${LAYER_MAP[$role]}"
+    # Indirect expansion, not an associative array: macOS ships bash 3.2, which has none.
+    local var="LAYER_$(echo "$role" | tr '[:lower:]' '[:upper:]')"
+    local pattern="${!var:-}"
+    if [[ -n "$pattern" ]]; then
         find $pattern -name "*.swift" 2>/dev/null || true
     else
-        local -A fallback_dirs=(
-            [view]="Views"
-            [viewmodel]="ViewModels"
-            [service]="Services"
-            [repository]="Repositories"
-        )
-        local dir="$SOURCE_DIR/${fallback_dirs[$role]}"
+        local fallback
+        case "$role" in
+            view)       fallback="Views" ;;
+            viewmodel)  fallback="ViewModels" ;;
+            service)    fallback="Services" ;;
+            repository) fallback="Repositories" ;;
+            *)          return 0 ;;
+        esac
+        local dir="${SOURCE_DIR:-.}/$fallback"
         [[ -d "$dir" ]] && find "$dir" -name "*.swift" 2>/dev/null || true
     fi
 }

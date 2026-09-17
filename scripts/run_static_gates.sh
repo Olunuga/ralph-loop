@@ -32,7 +32,7 @@ PLUGIN_GATES_DIR="${RALPH_PLUGIN_DIR:-$SCRIPT_DIR/..}/scripts/gates/static"
 PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
 PROJECT_GATES_DIR="$PROJECT_ROOT/ralph/gates/static"
 
-# Source config if available (provides SOURCE_DIR, LAYER_MAP, etc.)
+# Source config if available (provides SOURCE_DIR, LAYER_VIEW, etc.)
 # shellcheck source=/dev/null
 [[ -f "$PROJECT_ROOT/ralph/config.sh" ]] && source "$PROJECT_ROOT/ralph/config.sh"
 

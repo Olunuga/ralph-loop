@@ -95,6 +95,53 @@ Apply any corrections the user gives, then write `ralph/config.sh`.
 
 ---
 
+## Step 2b — Architecture, when the codebase has none
+
+Look for layer directories under the source directory:
+
+```bash
+SRC="<source_dir>"
+for d in Views ViewModels Services Repositories Models Features Domain Data Presentation; do
+  [[ -d "$SRC/$d" ]] && echo "FOUND $d"
+done
+find "$SRC" -name "*.swift" 2>/dev/null | wc -l
+```
+
+If layer directories already exist, record their real paths for the `LAYER_*` variables in Step 3 and
+skip the rest of this step. A codebase with its own structure keeps it.
+
+If none exist, the project has no architecture yet. Three things depend on one being chosen
+now, so do not defer it:
+
+- `layer_boundaries.sh`, `dependency_direction.sh`, and `model_context.sh` read
+  `LAYER_VIEW`, `LAYER_VIEWMODEL`, `LAYER_SERVICE`, and `LAYER_REPOSITORY` from
+  `ralph/config.sh`. With none set they fall back to `Views`, `ViewModels`, `Services`,
+  `Repositories` under the source directory, find nothing, and pass without checking.
+- `ralph/AGENTS.md` tells the build agent which layer a new file belongs in. With no
+  architecture that section is blank.
+- Each change's `design.md` otherwise invents its own structure, and they drift.
+
+Use AskUserQuestion: "This project has no folder structure yet. Which architecture should
+the pipeline enforce?"
+
+- **MVVM with repositories (Recommended)**: `Views/`, `ViewModels/`, `Services/`,
+  `Repositories/`, `Models/`. Views hold no logic, view models hold no UI types, services
+  and repositories import no SwiftUI. This is what the default gates already check.
+- **Feature-first**: `Features/<Name>/{Views,ViewModels}/`, with `Core/Services/`,
+  `Core/Repositories/`, `Core/Models/` shared. Same rules, grouped by feature.
+- **Let me describe it**: the user names the directories and the dependency direction.
+
+Create the directories, each with a `.gitkeep` so git tracks them:
+
+```bash
+for d in <chosen dirs>; do mkdir -p "$SRC/$d" && touch "$SRC/$d/.gitkeep"; done
+```
+
+Carry the chosen paths into the `LAYER_*` variables in Step 3, and into the Architecture section of
+`ralph/AGENTS.md` in Step 6.
+
+---
+
 ## Step 3 — Write ralph/config.sh
 
 ```bash
@@ -109,6 +156,14 @@ XCODEPROJ="<xcodeproj>"
 XCWORKSPACE="<xcworkspace>"  # leave empty if no .xcworkspace exists
 PROTOCOLS_DIR="<protocols_dir>"
 SOURCE_DIR="<source_dir>"
+
+# Layer paths for the architecture gates. Plain variables, not an associative array:
+# macOS ships bash 3.2, which has none. A glob is allowed; `find` expands it.
+# An unset role falls back to <source_dir>/Views and its siblings.
+LAYER_VIEW="<source_dir>/Views"
+LAYER_VIEWMODEL="<source_dir>/ViewModels"
+LAYER_SERVICE="<source_dir>/Services"
+LAYER_REPOSITORY="<source_dir>/Repositories"
 
 # Test layout. missing_tests.sh reads these. Leave any of them empty to turn
 # that gate off; it passes with a notice rather than failing.

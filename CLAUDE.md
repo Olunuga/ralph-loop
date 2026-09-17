@@ -357,6 +357,33 @@ When the loop is restarted, the iteration counter resets and `IMPLEMENTATION_PLA
 ### `git rev-parse --show-toplevel` vs `--git-common-dir`
 `--show-toplevel` returns the worktree root when run inside a worktree. This causes double-nested paths like `.worktrees/ref/.worktrees/ref`. Always use `git rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||'` to get the main repo root.
 
+## Architecture and the layer gates
+
+### The layer gates never ran on macOS
+`layer_boundaries.sh`, `dependency_direction.sh` and `model_context.sh` looked up their paths
+with `${LAYER_MAP[$role]}` and their fallbacks with `${fallback_dirs[$role]}`. macOS ships
+bash 3.2, which has no associative arrays, so both aborted `get_layer_files` under `set -u`.
+The caller assigns with `files=$(get_layer_files "$role")`, which swallows the failure, and
+`[[ -z "$files" ]] && continue` then skipped every role. All three gates reported PASS while
+checking nothing, on every macOS project, whether configured or not.
+
+Layer paths are now plain variables read by indirect expansion: `LAYER_VIEW`,
+`LAYER_VIEWMODEL`, `LAYER_SERVICE`, `LAYER_REPOSITORY`. The fallback is a `case`. Never
+introduce `declare -A` into a gate or into `ralph/config.sh`: bash 3.2 rejects the option
+outright and takes the whole run with it.
+
+### Greenfield projects had no architecture at all
+Nothing wrote the layer paths, and `PROMPT_bootstrap.md` discovers architecture by reading
+source, which finds nothing on an empty project.
+
+`init` Step 2b asks for an architecture when no layer directory exists, creates the
+directories with a `.gitkeep`, and writes the `LAYER_*` variables into `ralph/config.sh`. A codebase that
+already has its own structure keeps it: the step records the real paths and asks nothing.
+
+`PROMPT_bootstrap.md` discovers architecture by reading source, which finds nothing on an
+empty project. It now takes the layer paths from the `LAYER_*` variables when set, and treats an empty
+layer directory as the expected state rather than a finding.
+
 ## Gates
 
 ### LLM gates diverge on retry
