@@ -1263,7 +1263,14 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     echo ""
     echo "=== UI routing ==="
     BASE=$(git merge-base "$DIFF_BASE_BRANCH" HEAD 2>/dev/null || echo "HEAD~1")
-    CUMULATIVE_DIFF=$(git diff "$BASE"...HEAD -- "$SOURCE_DIR/" 2>/dev/null)
+    UI_DIFF_PATHS=("$SOURCE_DIR/")
+    if [[ -n "${TEST_DIR:-}" && "$SOURCE_DIR" != "." ]]; then
+        case "$TEST_DIR/" in
+            "$SOURCE_DIR"/*) ;;
+            *) UI_DIFF_PATHS+=("$TEST_DIR/") ;;
+        esac
+    fi
+    CUMULATIVE_DIFF=$(git diff "$BASE"...HEAD -- "${UI_DIFF_PATHS[@]}" 2>/dev/null)
 
     UI_ROUTE=$(printf \
         "Classify the UI impact of these changes.\n\nDiff:\n%s\n\nRespond with EXACTLY one of these three words, nothing else:\nNO_UI\nVIEW_LEVEL\nFLOW_LEVEL\n\nDefinitions:\n- NO_UI: changes only in models, repositories, services, viewmodels, utilities, or tests\n- VIEW_LEVEL: changes confined to Views/ or Components/ only\n- FLOW_LEVEL: changes touching navigation, multi-view flows, or spanning more than one layer" \
