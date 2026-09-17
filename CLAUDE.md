@@ -376,6 +376,11 @@ outright and takes the whole run with it.
 Nothing wrote the layer paths, and `PROMPT_bootstrap.md` discovers architecture by reading
 source, which finds nothing on an empty project.
 
+Loose source files are the case to watch. Creating the layer directories beside them
+switches the gates on over nothing, because the gates look only inside the layer paths. Step
+2b counts them, says so, and offers to name the target layer for each. It never moves a file:
+the step configures and does not refactor.
+
 `init` Step 2b asks for an architecture when no layer directory exists, creates the
 directories with a `.gitkeep`, and writes the `LAYER_*` variables into `ralph/config.sh`. A codebase that
 already has its own structure keeps it: the step records the real paths and asks nothing.

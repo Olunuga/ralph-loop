@@ -111,11 +111,25 @@ SRC="<source_dir>"
 for d in Views ViewModels Services Repositories Models Features Domain Data Presentation; do
   [[ -d "$SRC/$d" ]] && echo "FOUND $d"
 done
-find "$SRC" -name "*.swift" 2>/dev/null | wc -l
+echo "source files: $(find "$SRC" -name "*.swift" 2>/dev/null | wc -l | tr -d ' ')"
+find "$SRC" -maxdepth 1 -name "*.swift" 2>/dev/null | head -10
 ```
 
 If layer directories already exist, record their real paths for the `LAYER_*` variables in Step 3 and
 skip the rest of this step. A codebase with its own structure keeps it.
+
+Three states remain, and they are not the same:
+
+1. **No directories and no source files.** A new project. Create the directories; the first
+   feature lands in them.
+2. **No directories, but source files sit loose under the source directory.** Creating empty
+   directories beside them switches the gates on over nothing, because the gates look only
+   inside the layer paths. Say so before asking, in these words: "There are N source files
+   that are not in any layer directory. Creating the directories does not move them, and the
+   architecture gates will not see them until they move."
+   Then offer to list them and say which layer each belongs in, so the user can move them in
+   one pass. Do not move a file yourself. This step configures; it does not refactor.
+3. **Directories exist but are empty.** Treat this as state 1.
 
 If none exist, the project has no architecture yet. Three things depend on one being chosen
 now, so do not defer it:
@@ -143,6 +157,11 @@ Create the directories, each with a `.gitkeep` so git tracks them:
 ```bash
 for d in <chosen dirs>; do mkdir -p "$SRC/$d" && touch "$SRC/$d/.gitkeep"; done
 ```
+
+On an Xcode project that does not use synchronized folder references, a directory created on
+disk is not in the project file until it is added in Xcode. Tell the user to check, and say
+that the gates read the filesystem and will pass either way, so a missing project reference
+shows up as a build failure rather than a gate failure.
 
 Carry the chosen paths into the `LAYER_*` variables in Step 3, and into the Architecture section of
 `ralph/AGENTS.md` in Step 6.
