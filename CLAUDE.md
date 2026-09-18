@@ -305,6 +305,11 @@ incomplete `tasks.md`, so `run` and `status` both detect the state: design files
 no task naming `assets/design`. `status` reports it under Do this next, not Optional, because
 the screens will not be built and no gate says so.
 
+A design bundle is a board, not one file per state: a single `.dc.html` carries every state
+side by side, each under its own label such as `A · Launch, first read outstanding`. A task
+names the file and the label together. `PROMPT_build.md` step 0d2 tells the agent to work
+from the labelled part alone and not to build a state its task does not name.
+
 `run` Step 0b repairs it. It reads the bundle README, or `SCREEN_PROMPT.md` when there is
 none, proposes one task per screen state plus a verification task after each, confirms, then
 appends a new group and commits.

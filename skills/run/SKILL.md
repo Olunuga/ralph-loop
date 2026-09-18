@@ -76,14 +76,20 @@ promised, and name the files from the directory listing.
 
 **2. Propose the tasks.**
 
-Take the highest existing group number, add one, and draft the group. One task per screen
-state, each naming the file that shows it, and a verification task after each:
+**One file usually holds every state.** A Claude Design bundle is a board: a single
+`.dc.html` carrying all the states side by side, each under its own label such as
+`A · Launch, first read outstanding`. Do not assume one file per state, and do not invent
+filenames. Read the file, take the labels it actually uses, and name the file and the label
+together. One file per state also happens; the same rule covers it.
+
+Take the highest existing group number, add one, and draft the group. One task per state, a
+verification task after each:
 
 ```markdown
 ## <N>. Screens
 
-- [ ] <N>.1 Build <state> as shown in assets/design/<file>
-- [ ] <N>.2 Snapshot test <state> against assets/design/<file>
+- [ ] <N>.1 Build <state label> as shown in assets/design/<file>
+- [ ] <N>.2 Snapshot test <state label> against assets/design/<file>
 ```
 
 Two rules the schema also carries. A task that only says "review the design" is not a task.

@@ -16,6 +16,10 @@
       what it says and read the files it names, rather than reading the directory blindly.
     - Read at most 4 bundle files per iteration, the README included. If the README names
       more, read the ones your chosen task needs and say which you skipped.
+    - One file usually holds every state, as a board with each state under its own label.
+      Your task names the file and the label. Find that label in the file and work from that
+      part alone. Do not build a state your task does not name: the others belong to other
+      tasks.
     - If the bundle has no README, read its images under the image rule below and say the
       bundle had no README.
 

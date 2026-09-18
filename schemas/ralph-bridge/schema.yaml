@@ -150,6 +150,11 @@ artifacts:
       all. A change whose proposal describes what a person sees, and whose tasks build only
       storage, is not finished and no gate will say so.
 
+      One design file usually holds every state, as a board with each state under its own
+      label. Name the file and the label together. Do not assume one file per state, and do
+      not invent a filename for a state: when the designs have not arrived, name the state
+      alone and let the build agent find it.
+
       **Every visual task has a verification task after it.** Running the unit tests does
       not check that a view matches its design. Name the state, name the file that shows it,
       and say what to compare. A snapshot test is the usual form.
