@@ -14,9 +14,7 @@ get_layer_files() {
     # Indirect expansion, not an associative array: macOS ships bash 3.2, which has none.
     local var="LAYER_$(echo "$role" | tr '[:lower:]' '[:upper:]')"
     local pattern="${!var:-}"
-    if [[ -n "$pattern" ]]; then
-        find $pattern -name "*.swift" 2>/dev/null || true
-    else
+    if [[ -z "$pattern" ]]; then
         local fallback
         case "$role" in
             view)       fallback="Views" ;;
@@ -25,9 +23,31 @@ get_layer_files() {
             repository) fallback="Repositories" ;;
             *)          return 0 ;;
         esac
-        local dir="${SOURCE_DIR:-.}/$fallback"
-        [[ -d "$dir" ]] && find "$dir" -name "*.swift" 2>/dev/null || true
+        pattern="${SOURCE_DIR:-.}/$fallback"
     fi
+
+    # compgen expands a glob and keeps a path with a space intact. An unquoted `find
+    # $pattern` splits "Another Todo/Views" into two arguments, finds nothing, and the
+    # gate passes without checking.
+    local -a dirs=()
+    local d
+    while IFS= read -r d; do
+        [[ -n "$d" ]] && dirs[${#dirs[@]}]="$d"
+    done < <(compgen -G "$pattern" 2>/dev/null || true)
+
+    [[ ${#dirs[@]} -eq 0 ]] && return 0
+    find "${dirs[@]}" -name "*.swift" 2>/dev/null || true
+}
+
+# Grep each file by name. `xargs` splits on whitespace, so a path with a space became two
+# nonexistent files and matched nothing. BSD xargs has no -d, so read the list instead.
+grep_layer_files() {
+    local files="$1"; shift
+    local f
+    printf '%s\n' "$files" | while IFS= read -r f; do
+        [[ -n "$f" ]] || continue
+        grep "$@" "$f" 2>/dev/null || true
+    done
 }
 
 gate_check() {
@@ -40,7 +60,7 @@ gate_check() {
 
         # Rule 1: Must not import SwiftUI
         local hits
-        hits=$(echo "$files" | xargs grep -ln "^import SwiftUI" 2>/dev/null || true)
+        hits=$(grep_layer_files "$files" -ln "^import SwiftUI")
         if [[ -n "$hits" ]]; then
             echo "VIOLATION: ${role} layer imports SwiftUI"
             echo "$hits"
@@ -48,7 +68,7 @@ gate_check() {
         fi
 
         # Rule 2: Must not reference UI types
-        hits=$(echo "$files" | xargs grep -ln 'UIView\b\|UIViewController\b\|struct.*View\b\|some View\b' 2>/dev/null || true)
+        hits=$(grep_layer_files "$files" -ln 'UIView\b\|UIViewController\b\|struct.*View\b\|some View\b')
         if [[ -n "$hits" ]]; then
             echo "VIOLATION: ${role} layer references UI types"
             echo "$hits"
@@ -60,7 +80,7 @@ gate_check() {
     local vm_files
     vm_files=$(get_layer_files "viewmodel")
     if [[ -n "$vm_files" ]]; then
-        hits=$(echo "$vm_files" | xargs grep -ln 'struct.*View\b\|some View\b' 2>/dev/null || true)
+        hits=$(grep_layer_files "$vm_files" -ln 'struct.*View\b\|some View\b')
         if [[ -n "$hits" ]]; then
             echo "VIOLATION: viewmodel layer references SwiftUI View types"
             echo "$hits"

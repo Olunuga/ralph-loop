@@ -154,10 +154,12 @@ now, so do not defer it:
 Use AskUserQuestion: "This project has no folder structure yet. Which architecture should
 the pipeline enforce?"
 
-- **MVVM with repositories (Recommended)**: `Views/`, `ViewModels/`, `Services/`,
-  `Repositories/`, `Models/`.
-- **Feature-first**: `Features/<Name>/{Views,ViewModels}/`, with `Core/Services/`,
-  `Core/Repositories/`, `Core/Models/` shared. Same rules, grouped by feature.
+- **Feature-first MVVM (Recommended)**: `Features/<Name>/{Views,ViewModels}/`, with
+  `Core/Services/`, `Core/Repositories/`, `Core/Models/` shared. Everything one feature owns
+  sits together, so a change touches one directory and two features cannot quietly share a
+  view model.
+- **Flat MVVM**: `Views/`, `ViewModels/`, `Services/`, `Repositories/`, `Models/`. Every
+  view in one directory. Simpler to start, harder to read once there are many features.
 - **Let me describe it**: the user names their own directories, and you map them onto the
   four slots below.
 
@@ -169,7 +171,8 @@ architecture maps onto them.
 
 | Architecture | view | viewmodel | service | repository |
 | --- | --- | --- | --- | --- |
-| MVVM | Views | ViewModels | Services | Repositories |
+| Feature-first MVVM | Features/*/Views | Features/*/ViewModels | Core/Services | Core/Repositories |
+| Flat MVVM | Views | ViewModels | Services | Repositories |
 | The Composable Architecture | Views | Reducers | Clients | Clients (persistence) |
 | Clean Architecture | Views | Presenters | UseCases | Gateways |
 | VIPER | Views | Presenters | Interactors | DataManagers |
@@ -325,12 +328,14 @@ PROTOCOLS_DIR="<protocols_dir>"
 SOURCE_DIR="<source_dir>"
 
 # Layer paths for the architecture gates. Plain variables, not an associative array:
-# macOS ships bash 3.2, which has none. A glob is allowed; `find` expands it.
+# macOS ships bash 3.2, which has none. A glob is allowed. Quote every value: a source
+# directory with a space in it is common on Xcode projects.
 # An unset role falls back to <source_dir>/Views and its siblings.
-LAYER_VIEW="<source_dir>/Views"
-LAYER_VIEWMODEL="<source_dir>/ViewModels"
-LAYER_SERVICE="<source_dir>/Services"
-LAYER_REPOSITORY="<source_dir>/Repositories"
+# Feature-first: "<source_dir>/Features/*/Views" and "<source_dir>/Core/Repositories".
+LAYER_VIEW="<source_dir>/Features/*/Views"
+LAYER_VIEWMODEL="<source_dir>/Features/*/ViewModels"
+LAYER_SERVICE="<source_dir>/Core/Services"
+LAYER_REPOSITORY="<source_dir>/Core/Repositories"
 
 # Test layout. missing_tests.sh reads these. Leave any of them empty to turn
 # that gate off; it passes with a notice rather than failing.

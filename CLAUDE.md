@@ -372,6 +372,20 @@ Layer paths are now plain variables read by indirect expansion: `LAYER_VIEW`,
 introduce `declare -A` into a gate or into `ralph/config.sh`: bash 3.2 rejects the option
 outright and takes the whole run with it.
 
+### A path with a space silenced them the same way
+`find $pattern` unquoted split `Another Todo/Views` into two arguments and found nothing, and
+`echo "$files" | xargs grep` split each path the same way. Both failure modes end in an empty
+result, which the gates read as "nothing to check" and report as PASS. An Xcode source
+directory with a space in its name is common, so this hit real projects.
+
+`get_layer_files` now expands the pattern with `compgen -G`, which keeps a space intact and
+still expands a glob, into an array passed quoted to `find`. `grep_layer_files` replaces the
+`xargs` pipeline and greps one file at a time: BSD `xargs` has no `-d`, so a newline-delimited
+list cannot be passed to it safely.
+
+Both bugs share one shape: a lookup that silently yields nothing, and a gate that treats
+nothing as PASS. When touching these gates, test with a path that contains a space.
+
 ### Greenfield projects had no architecture at all
 Nothing wrote the layer paths, and `PROMPT_bootstrap.md` discovers architecture by reading
 source, which finds nothing on an empty project.

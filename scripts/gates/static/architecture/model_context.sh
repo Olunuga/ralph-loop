@@ -13,9 +13,7 @@ get_layer_files() {
     # Indirect expansion, not an associative array: macOS ships bash 3.2, which has none.
     local var="LAYER_$(echo "$role" | tr '[:lower:]' '[:upper:]')"
     local pattern="${!var:-}"
-    if [[ -n "$pattern" ]]; then
-        find $pattern -name "*.swift" 2>/dev/null || true
-    else
+    if [[ -z "$pattern" ]]; then
         local fallback
         case "$role" in
             view)       fallback="Views" ;;
@@ -24,9 +22,31 @@ get_layer_files() {
             repository) fallback="Repositories" ;;
             *)          return 0 ;;
         esac
-        local dir="${SOURCE_DIR:-.}/$fallback"
-        [[ -d "$dir" ]] && find "$dir" -name "*.swift" 2>/dev/null || true
+        pattern="${SOURCE_DIR:-.}/$fallback"
     fi
+
+    # compgen expands a glob and keeps a path with a space intact. An unquoted `find
+    # $pattern` splits "Another Todo/Views" into two arguments, finds nothing, and the
+    # gate passes without checking.
+    local -a dirs=()
+    local d
+    while IFS= read -r d; do
+        [[ -n "$d" ]] && dirs[${#dirs[@]}]="$d"
+    done < <(compgen -G "$pattern" 2>/dev/null || true)
+
+    [[ ${#dirs[@]} -eq 0 ]] && return 0
+    find "${dirs[@]}" -name "*.swift" 2>/dev/null || true
+}
+
+# Grep each file by name. `xargs` splits on whitespace, so a path with a space became two
+# nonexistent files and matched nothing. BSD xargs has no -d, so read the list instead.
+grep_layer_files() {
+    local files="$1"; shift
+    local f
+    printf '%s\n' "$files" | while IFS= read -r f; do
+        [[ -n "$f" ]] || continue
+        grep "$@" "$f" 2>/dev/null || true
+    done
 }
 
 gate_check() {
@@ -36,8 +56,8 @@ gate_check() {
 
     # Match @Environment(\.modelContext) ignoring comment lines
     local hits
-    hits=$(echo "$files" | xargs grep -n '@Environment(\\\.modelContext)' 2>/dev/null \
-        | grep -v "^\s*//" || true)
+    hits=$(grep_layer_files "$files" -Hn '@Environment(\\\.modelContext)' \
+        | grep -v "//" || true)
 
     if [[ -n "$hits" ]]; then
         echo "VIOLATION: View layer directly uses @Environment(\\.modelContext)"
