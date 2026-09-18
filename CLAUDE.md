@@ -196,6 +196,20 @@ path. The system and each change's screens are independent: the system can be in
 a change still has a screen prompt and no `assets/design/`. A user holding a finished design
 with no path for it is stuck for no reason.
 
+`/ralph-loop:cleanup` routes by what `<ref>` is. An OpenSpec change is archived with
+`openspec archive <ref> -y`, which moves it under `openspec/changes/archive/` and merges its
+specs into `openspec/specs/`; the skill then commits, because the CLI moves files and does
+not commit. A legacy spec goes through `bin/cleanup_specs.sh`, which knows nothing about
+OpenSpec: it reads the `# Generated from:` header in `IMPLEMENTATION_PLAN.md`, a file that
+does not exist in OpenSpec mode.
+
+The archive directory is what both status reporters read, so a change that is built but never
+archived reads as unfinished forever and its release never completes.
+
+An infrastructure change with no spec deltas, such as `theme-foundation` or
+`restructure-source`, needs `openspec archive --skip-specs`. Never `--no-validate`: a change
+that fails validation is not ready to archive.
+
 `slice --status` reports one release in detail and stays. The two overlap on per-change
 state. Fold `slice --status` into the status skill once the plain-language format has been
 used on a real project, not before.
