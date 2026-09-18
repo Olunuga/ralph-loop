@@ -336,10 +336,25 @@ warns when the installed copy is older than the plugin.
 
 `openspec init` needs `--tools`. Without it, it prints the tool list and creates nothing.
 
+### A build agent inherits the user's CLAUDE.md
+Every `claude -p` loads the user's own `CLAUDE.md` files. Those are written for a person in a
+chat: be brief, ask when unsure, stop early and let the reader pull more. A build agent that
+follows them replies "What task?" and the iteration does no work. One post-mortem recorded 6
+idle iterations out of 18 from this.
+
+`bin/loop.sh` passes `--append-system-prompt "$AGENT_AUTONOMY_PROMPT"` on every agent call.
+It says there is no reader, no question will be answered, and inherited guidance about
+brevity or asking does not apply. It overrides nothing else, so project conventions still
+reach the agent.
+
 ### The loop bypasses the git hooks by design
-Every `git commit` in `loop.sh` passes `--no-verify`. The loop runs the gate engine
-directly, so a hook on its commits repeats work already done and can block the loop
-mid-fix. The hooks exist for humans and for commits made outside the loop.
+Every `git commit` and every `git push` in `loop.sh` passes `--no-verify`. The loop runs the
+gate engine directly, so a hook on its own commits or pushes repeats work already done and
+can block the loop mid-fix. The hooks exist for humans and for work done outside the loop.
+
+The pushes were missing it. `hooks/pre-push` runs the precise static tier and then all the
+LLM gates, so every green iteration paid for a full LLM gate pass that the post-loop run
+repeats. When adding a git call to the loop, pass `--no-verify`.
 
 ### Nested `claude -p` doesn't work
 `loop.sh` spawns `claude -p` subprocesses. These cannot run inside an existing Claude Code session. The `/ralph` skill must use the Bash tool's `run_in_background: true` parameter — NOT shell backgrounding (`&`).
@@ -474,6 +489,19 @@ Thresholds are configurable per-project via `ralph/gate_context.md`.
 preserves it, which is correct. The hook tier lines therefore have to come from the
 bootstrap template, and they do. `hooks/pre-commit` and `hooks/pre-push` parse them with
 `grep -E "^- pre_commit_tier:"` and fall back to their defaults when absent.
+
+### Two design failures that cost whole iterations
+Both came out of one post-mortem and are now rules in the `design` instruction of
+`schemas/ralph-bridge/schema.yaml`.
+
+A design that names a type but not its shape lets the build agent choose a literal that a
+gate forbids: a fixed font size, a raw colour. One change spent 5 extra tasks fixing this.
+The design must name the property and method names and the type of each value, for any type
+a gate inspects.
+
+A design that contradicts a test the same change adds cannot be auto-fixed. Each fix attempt
+satisfies one and breaks the other, and the iteration ends in a revert. State the rule once
+and make the design obey it.
 
 ### gate_context.md format
 The gate runner parses `gate_context.md` with `grep -E "^- [a-z_]+: SKIP"`. Each entry must be a markdown list item in this exact format:
