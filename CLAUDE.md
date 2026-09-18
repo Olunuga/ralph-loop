@@ -138,7 +138,28 @@ change that already has commits against it rather than overwriting work.
 `prompts/PROMPT_plan_slc.md` steps 3 and 4. The two will drift. Extract a shared file once
 the shape settles, not before: the second consumer has to prove the shape first.
 
-`slice` creates a `theme-foundation` change first when `ralph/design/system/` exists and the
+### The archive folder carries a date prefix
+`openspec archive foo` creates `openspec/changes/archive/2026-09-18-foo`, not
+`archive/foo`. Every check matches with `compgen -G "openspec/changes/archive/????-??-??-$ID"`.
+A bare `*-$ID` glob is wrong: it also matches `2026-09-18-bar-$ID`.
+
+### Foundations come before cells
+A cell is one activity at one capability depth. Some work belongs to no cell and every cell
+needs it. `prompts/PROMPT_slice.md` STEP 3b names these, and `slice` Step 4b creates one
+change each, ahead of every cell.
+
+The test is three parts, all required: two or more proposed cells need it, no single cell
+owns it, and it is absent from the codebase. STEP 3b carries a checklist (colour and type,
+talking to a server, keeping data between launches, knowing who the user is, moving between
+screens, working offline, recording what happens, more than one language) so the pass is
+thorough, not so that every item is proposed.
+
+A foundation's proposal stays in plain words like any other: a network foundation says the
+app can reach the server and says something useful when it cannot, not that it adds a
+`URLSession` wrapper.
+
+`theme-foundation` is one instance with an extra condition, because it has a source of its
+own. `slice` creates it when `ralph/design/system/` exists and the
 user says the codebase has no theme. The gates force this: `scripts/gates/llm/theme_colors.md`
 flags a raw colour value and `hardcoded_fonts.sh` flags a fixed font size, so the first screen
 built without a theme fails both and the build agent invents one inside a change whose

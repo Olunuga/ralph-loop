@@ -39,7 +39,8 @@ change named there, derive its state:
 
 ```bash
 ID="<cell-id>"
-[[ -d "openspec/changes/archive/$ID" ]] && echo "$ID archived" && continue
+# openspec archive names the folder <YYYY-MM-DD>-<id>, so an exact path never matches.
+compgen -G "openspec/changes/archive/????-??-??-$ID" >/dev/null && echo "$ID archived" && continue
 [[ -d "openspec/changes/$ID" ]] || { echo "$ID missing"; continue; }
 grep -c '^- \[x\]' "openspec/changes/$ID/tasks.md" 2>/dev/null
 grep -c '^- \[ \]' "openspec/changes/$ID/tasks.md" 2>/dev/null
