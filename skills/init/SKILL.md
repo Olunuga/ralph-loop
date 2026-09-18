@@ -1,6 +1,7 @@
 ---
 name: init
-description: One-time setup of the Ralph autonomous dev pipeline for a new project
+description: Set up the pipeline, or upgrade an existing setup
+argument-hint: "[--openspec]"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
@@ -10,6 +11,10 @@ You are setting up the Ralph autonomous development pipeline for this project.
 Run each step in order. Tell the user which step you are on.
 
 ## Arguments
+
+```
+/ralph-loop:init [--openspec]
+```
 
 `--openspec` turns on the OpenSpec wiring in Step 7. Without it, Step 7 is skipped
 entirely: no `openspec/` directory is created and no git hooks are written.

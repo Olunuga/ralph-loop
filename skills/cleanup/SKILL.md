@@ -2,6 +2,7 @@
 name: cleanup
 description: Archive a completed change or spec after its pull request is merged
 arguments: [ref]
+argument-hint: "<ref>"
 allowed-tools: Bash Read AskUserQuestion
 disable-model-invocation: true
 ---

@@ -2,6 +2,7 @@
 name: req-slc
 description: Requirements gathering with SLC release discipline — captures audience, JTBDs, and full activity space across all capability depths
 arguments: [ref]
+argument-hint: "<ref>"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---

@@ -2,6 +2,7 @@
 name: spec
 description: Create a ralph spec for a new feature through a structured JTBD conversation
 arguments: [ref]
+argument-hint: "<ref>"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
