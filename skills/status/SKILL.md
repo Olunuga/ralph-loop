@@ -122,8 +122,11 @@ Two design items can be outstanding, and they are independent:
 - A duplicate system already committed under a change's `assets/design/design_system/`.
 
 A change whose designs no task names is different: report it under **Do this next**, not
-Optional. Its screens will not be built, and no gate says so. Name the command:
-`openspec instructions tasks --change <cell-id>`, then re-run the build.
+Optional. Its screens will not be built, and no gate says so. The fix is to run the build:
+`/ralph-loop:run <cell-id>` stops at its Step 0b, proposes the missing screen tasks, and
+appends them once the user confirms. Do not tell the user to run
+`openspec instructions tasks`: that writes a whole new `tasks.md` and discards every box
+already ticked.
 
 When `DESIGN: yes`, say so under Done. The user then knows the system is in place, and that
 any remaining design work is per change.

@@ -48,21 +48,76 @@ openspec status --change "$ref" --json 2>/dev/null
   ```
   `NO_DESIGN`, or a non-zero count: continue, the tasks reference the design.
 
-  Design files present and the count is zero: stop before starting the loop and tell the user:
+  Design files present and the count is zero: do not start the loop. Go to Step 0b.
 
-  ```
-  openspec/changes/<ref>/ has screen designs, and no task names them.
-  The tasks were written before the designs arrived, so the loop would build
-  the data and skip the screens.
+---
 
-  Regenerate the tasks, then re-run:
-      openspec instructions tasks --change <ref>
+## Step 0b: Add the missing design tasks
 
-  Follow what it returns. It writes one task per screen state and a
-  verification task after each. Keep every `- [x]` already ticked.
-  ```
+Only reached from Step 1. The change has screen designs and no task names them.
 
-  Do not regenerate the tasks yourself. `tasks.md` is a shared ledger and a person may have edited it.
+**Append. Never regenerate.** `openspec instructions tasks` writes a whole `tasks.md`, which
+would discard every `- [x]` already ticked and any task a person added by hand. The existing
+tasks stay exactly as they are; the screen tasks go after them as a new group.
+
+**1. Read the sources.**
+
+```bash
+CH="openspec/changes/$ref"
+cat "$CH/design/SCREEN_PROMPT.md" 2>/dev/null
+cat "$CH/assets/design/README.md" 2>/dev/null
+ls "$CH/assets/design"
+tail -5 "$CH/tasks.md"
+```
+
+The bundle README is written for a coding agent and names each file and the state it shows.
+Follow it. When there is no README, read `SCREEN_PROMPT.md` for the states the change
+promised, and name the files from the directory listing.
+
+**2. Propose the tasks.**
+
+Take the highest existing group number, add one, and draft the group. One task per screen
+state, each naming the file that shows it, and a verification task after each:
+
+```markdown
+## <N>. Screens
+
+- [ ] <N>.1 Build <state> as shown in assets/design/<file>
+- [ ] <N>.2 Snapshot test <state> against assets/design/<file>
+```
+
+Two rules the schema also carries. A task that only says "review the design" is not a task.
+A visual task without a verification task after it means nothing checks the result: unit
+tests do not compare a view with its design.
+
+**3. Confirm before writing.**
+
+Show the full proposed group and ask: "Append these <N> tasks to
+`openspec/changes/<ref>/tasks.md`? Nothing already in the file changes." Stop on anything
+but yes.
+
+**4. Append and commit.**
+
+Use the Edit tool to add the group at the end of the file. Do not rewrite the file. Then:
+
+```bash
+git -C "$WORKTREE" add "openspec/changes/$ref/tasks.md" 2>/dev/null || git add "openspec/changes/$ref/tasks.md"
+```
+```bash
+git -c commit.gpgsign=false commit -m "ralph: add screen tasks for $ref"
+```
+
+**5. Verify, then continue.**
+
+```bash
+openspec status --change "$ref" --json 2>/dev/null
+grep -c '^- \[ \]' "openspec/changes/$ref/tasks.md"
+```
+
+Not apply-ready: say which artifact is malformed and stop. Otherwise report how many tasks
+were added and continue to Step 1.
+
+---
 
 **Legacy mode** otherwise. Continue to Step 1.
 

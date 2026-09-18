@@ -302,12 +302,16 @@ storage ran as `NO_UI`. It now adds a note when `$RALPH_BRIEF_DIR/assets/design`
 
 The schema fix only reaches a change sliced after it. A change sliced earlier keeps its
 incomplete `tasks.md`, so `run` and `status` both detect the state: design files present and
-no task naming `assets/design`. `run` stops before the loop starts; `status` reports it under
-Do this next, not Optional, because the screens will not be built and no gate says so. The fix
-is `openspec instructions tasks --change <ref>`.
+no task naming `assets/design`. `status` reports it under Do this next, not Optional, because
+the screens will not be built and no gate says so.
 
-Neither regenerates the tasks itself. `tasks.md` is a shared ledger and a person may have
-edited it.
+`run` Step 0b repairs it. It reads the bundle README, or `SCREEN_PROMPT.md` when there is
+none, proposes one task per screen state plus a verification task after each, confirms, then
+appends a new group and commits.
+
+It appends and never regenerates. `openspec instructions tasks` writes a whole `tasks.md`,
+which discards every box already ticked and any task a person added by hand. Never name that
+command as a repair.
 
 ## Design references
 
