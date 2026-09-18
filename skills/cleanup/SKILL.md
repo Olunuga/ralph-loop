@@ -20,7 +20,7 @@ worktree.** Archiving writes to the main specs, and that belongs on the merged b
 
 ```bash
 [[ -d "openspec/changes/$ref" ]] && echo OPENSPEC
-[[ -d "openspec/changes/archive/$ref" ]] && echo ALREADY_ARCHIVED
+compgen -G "openspec/changes/archive/????-??-??-$ref" >/dev/null && echo ALREADY_ARCHIVED
 ls ralph/specs/"$ref".md ralph/specs/"$ref"/spec.md 2>/dev/null
 [[ -f IMPLEMENTATION_PLAN.md ]] && echo HAS_PLAN
 ```
@@ -50,7 +50,7 @@ Use AskUserQuestion:
 
 "Archive `$ref`?
 
-  openspec/changes/$ref/  ->  openspec/changes/archive/$ref/
+  openspec/changes/$ref/  ->  openspec/changes/archive/<today>-$ref/
   Its specs are merged into openspec/specs/.
 
   Branch ralph/$ref: [exists / not found]
