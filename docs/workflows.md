@@ -112,16 +112,24 @@ Runs the full baseline: build, unit tests, static gates (fast + precise), and LL
 
 ## Post-merge cleanup
 
-Use the command that matches where the intent came from.
+One command, either mode.
 
 ```
-/ralph-loop:cleanup my-feature     # legacy spec: move to ralph/specs/done/, delete spec branch
-/opsx:archive my-feature           # OpenSpec change: fold deltas into openspec/specs/, archive the change
+/ralph-loop:cleanup my-feature
 ```
 
-`/opsx:archive` also updates your main specs, so `openspec/specs/` stays the current
-picture of the system. `/ralph-loop:cleanup` only moves files. A spec directory with an
-`assets/` folder moves as a unit, so design references archive with their spec.
+It detects what the name refers to. An OpenSpec change is archived with `openspec archive`,
+which moves it under `openspec/changes/archive/` and folds its deltas into `openspec/specs/`,
+so the main specs stay the current picture of the system. A legacy spec moves to
+`ralph/specs/done/` and its `spec/` branch is deleted. A spec directory with an `assets/`
+folder moves as a unit, so design references archive with their spec.
+
+Archiving is not optional on an SLC product. `/ralph-loop:status` and `/ralph-loop:slice
+--status` both read `openspec/changes/archive/`, so a change that is built but never archived
+reads as unfinished and its release never completes.
+
+Run it from the project root on the branch the pull request merged into. Neither mode deletes
+the `ralph/<name>` build branch; do that yourself once the pull request is closed.
 
 ---
 

@@ -460,7 +460,7 @@ Report to the user:
 - Gates: list which passed
 - What was built: summarise from the Done section of IMPLEMENTATION_PLAN.md
 - If tasks remain: note what's incomplete and suggest re-running `/ralph-loop:run $ref`
-- Remind: "Once the PR is merged, run `/ralph-loop:cleanup $ref` to archive the spec and delete the spec branch."
+- Remind: "Once the PR is merged, run `/ralph-loop:cleanup $ref` to archive it. On an OpenSpec change that folds its specs into openspec/specs/; on a legacy spec it moves the file to ralph/specs/done/ and deletes the spec branch."
 
 Then run `/ralph-loop:status` to refresh `ralph/NEXT.md`, so the next change to build is
 named without the user re-deriving it."

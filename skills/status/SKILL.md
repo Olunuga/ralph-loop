@@ -92,7 +92,17 @@ Print both, with the change named:
 
 Both work through the same `tasks.md`, so a change started one way can be finished the
 other. Neither undoes the other's checked items.
-8. A change is **built, waiting to be archived** : merge its pull request, then run `/ralph-loop:cleanup`
+8. A change is **built, waiting to be archived** : merge its pull request, then archive it
+
+For 8, print the command with the change named:
+
+```
+    /ralph-loop:cleanup <cell-id>
+```
+
+`cleanup` detects that this is an OpenSpec change and runs `openspec archive`, which moves
+it to `openspec/changes/archive/` and merges its specs into `openspec/specs/`. Until that
+happens the change reads as unfinished here and the release never completes.
 9. Every change is **done** : run `/ralph-loop:slice` for the next release
 
 Design is never the next action. It is optional and it does not block a build. Report it
