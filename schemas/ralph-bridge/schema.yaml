@@ -83,6 +83,17 @@ artifacts:
       obvious approach conflict, either pick a different approach or record the conflict
       as a decision with its reason.
 
+      **A design that a gate rejects costs more than a vague one.** When the change adds a
+      type that a gate inspects, name its exact shape: the property or method names, and
+      the type of each value. A type that carries a raw colour, a fixed font size, or any
+      other literal a gate forbids has to be caught here, not after it is built. Every
+      extra pass to fix one is a full iteration.
+
+      **A design must not contradict a test the change also adds.** When the change adds a
+      test that checks a rule, state the rule once and make the design obey it. A design
+      that disagrees with its own test cannot be auto-fixed: each attempt satisfies one and
+      breaks the other, and the iteration ends in a revert.
+
       If `ralph/gate_context.md` does not exist, proceed from the gate definitions alone
       and record its absence under Open Questions.
 
