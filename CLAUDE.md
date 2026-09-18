@@ -300,6 +300,15 @@ check that a view matches its design.
 `bin/loop.sh` also routes UI testing from the diff alone, so a change whose diff held only
 storage ran as `NO_UI`. It now adds a note when `$RALPH_BRIEF_DIR/assets/design` exists.
 
+The schema fix only reaches a change sliced after it. A change sliced earlier keeps its
+incomplete `tasks.md`, so `run` and `status` both detect the state: design files present and
+no task naming `assets/design`. `run` stops before the loop starts; `status` reports it under
+Do this next, not Optional, because the screens will not be built and no gate says so. The fix
+is `openspec instructions tasks --change <ref>`.
+
+Neither regenerates the tasks itself. `tasks.md` is a shared ledger and a person may have
+edited it.
+
 ## Design references
 
 Assets live beside the intent: `ralph/specs/<name>/assets/` for a legacy spec, which makes

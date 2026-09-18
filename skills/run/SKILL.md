@@ -39,6 +39,30 @@ openspec status --change "$ref" --json 2>/dev/null
   export RALPH_PLAN_FILE="openspec/changes/$ref/tasks.md"
   ```
   `RALPH_PLAN_FILE` is relative to the worktree root, so the loop marks the change's own `tasks.md`. Both lanes share that file: work only the unchecked `- [ ]` items, and never uncheck an item a human already checked.
+- Check that the tasks cover the change's screen designs. A design bundle is placed after the tasks are written, so a change sliced before the bundle arrived has tasks for its data and none for its screens. Nothing else catches this: every gate passes on a change that built half of what it described.
+  ```bash
+  CH="openspec/changes/$ref"
+  [[ -d "$CH/assets/design" ]] || echo NO_DESIGN
+  ls "$CH/assets/design" 2>/dev/null | head -20
+  grep -ci 'assets/design' "$CH/tasks.md" 2>/dev/null
+  ```
+  `NO_DESIGN`, or a non-zero count: continue, the tasks reference the design.
+
+  Design files present and the count is zero: stop before starting the loop and tell the user:
+
+  ```
+  openspec/changes/<ref>/ has screen designs, and no task names them.
+  The tasks were written before the designs arrived, so the loop would build
+  the data and skip the screens.
+
+  Regenerate the tasks, then re-run:
+      openspec instructions tasks --change <ref>
+
+  Follow what it returns. It writes one task per screen state and a
+  verification task after each. Keep every `- [x]` already ticked.
+  ```
+
+  Do not regenerate the tasks yourself. `tasks.md` is a shared ledger and a person may have edited it.
 
 **Legacy mode** otherwise. Continue to Step 1.
 
