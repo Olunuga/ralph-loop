@@ -2,6 +2,7 @@
 name: req-prd
 description: Requirements gathering for a JTBD spanning multiple topics of concern — produces one spec per topic
 arguments: [ref]
+argument-hint: "<ref>"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---

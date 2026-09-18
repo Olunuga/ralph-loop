@@ -85,6 +85,10 @@ When modifying path references, always ask: is this a plugin file or a project f
 - **Gate scripts must be diff-scoped** — check added lines only, not the entire file. Use `git diff $BASE_REF...HEAD` patterns.
 - **All `claude -p` calls must be error-guarded** — `|| AGENT_OK=false` or `|| echo "WARN: ..."`. Unguarded calls crash the loop via `set -euo pipefail`.
 - **Test with `claude --plugin-dir .`** from this repo root to load the plugin locally.
+- **Every skill declares `argument-hint` in its frontmatter.** It is what the slash command
+  picker shows, so a flag that is not there is invisible: `--openspec`, `--status` and
+  `--add-theme` all were. A skill that takes flags also lists them under an `## Arguments`
+  heading in its body, because the hint is one line.
 - **Skills are prompts, not programs** — the agent interprets them. Use numbered sequences, bold critical rules, minimize conditionals. The simpler the instruction, the more reliably the agent follows it.
 - **Project files go in `$PROJECT_ROOT/ralph/`**, plugin files go in `$RALPH_PLUGIN_DIR/`. Never mix them.
 

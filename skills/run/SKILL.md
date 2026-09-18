@@ -2,6 +2,7 @@
 name: run
 description: Run the Ralph autonomous development pipeline for a spec
 arguments: [ref]
+argument-hint: "<ref>"
 allowed-tools: Bash Read Write Edit AskUserQuestion Monitor TaskCreate TaskUpdate TaskList Agent
 disable-model-invocation: true
 ---

@@ -1,6 +1,7 @@
 ---
 name: slice
-description: Choose the next SLC release slice and turn it into one OpenSpec change per cell
+description: Turn the next SLC release slice into OpenSpec changes
+argument-hint: "[--status] [--add-theme]"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
@@ -9,6 +10,12 @@ You are choosing the next release slice for an SLC product and turning it into O
 changes. One change per cell. A cell is one activity at one capability depth.
 
 Run each step in order. Tell the user which step you are on.
+
+## Arguments
+
+```
+/ralph-loop:slice [--status] [--add-theme]
+```
 
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
