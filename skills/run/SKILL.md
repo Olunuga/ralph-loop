@@ -42,13 +42,20 @@ openspec status --change "$ref" --json 2>/dev/null
 - Check that the tasks cover the change's screen designs. A design bundle is placed after the tasks are written, so a change sliced before the bundle arrived has tasks for its data and none for its screens. Nothing else catches this: every gate passes on a change that built half of what it described.
   ```bash
   CH="openspec/changes/$ref"
-  [[ -d "$CH/assets/design" ]] || echo NO_DESIGN
-  ls "$CH/assets/design" 2>/dev/null | head -20
-  grep -ci 'assets/design' "$CH/tasks.md" 2>/dev/null
+  [[ -f "$CH/design/SCREEN_PROMPT.md" ]] && echo HAS_PROMPT
+  [[ -d "$CH/assets/design" ]] && echo HAS_BUNDLE && ls "$CH/assets/design" | head -20
+  grep -ci 'assets/design\|screen\|state' "$CH/tasks.md" 2>/dev/null
   ```
-  `NO_DESIGN`, or a non-zero count: continue, the tasks reference the design.
+  Neither `HAS_PROMPT` nor `HAS_BUNDLE`: continue. This change has no screens.
 
-  Design files present and the count is zero: do not start the loop. Go to Step 0b.
+  A non-zero count: continue, the tasks already cover the screens.
+
+  A screen prompt or a bundle, and the count is zero: do not start the loop. Go to Step 0b.
+  The prompt counts on its own. A change whose bundle has not arrived still promised those
+  states, and its tasks should name them.
+
+  More than one change is in this state: say so and name `/ralph-loop:slice --add-design-tasks`,
+  which repairs them all in one pass without building.
 
 ---
 
@@ -66,13 +73,16 @@ tasks stay exactly as they are; the screen tasks go after them as a new group.
 CH="openspec/changes/$ref"
 cat "$CH/design/SCREEN_PROMPT.md" 2>/dev/null
 cat "$CH/assets/design/README.md" 2>/dev/null
-ls "$CH/assets/design"
+ls "$CH/assets/design" 2>/dev/null
 tail -5 "$CH/tasks.md"
 ```
 
 The bundle README is written for a coding agent and names each file and the state it shows.
 Follow it. When there is no README, read `SCREEN_PROMPT.md` for the states the change
 promised, and name the files from the directory listing.
+
+No bundle at all: work from `SCREEN_PROMPT.md` alone. Name each state and leave the file out.
+The task still says what to build, and the build agent finds the file once the design lands.
 
 **2. Propose the tasks.**
 

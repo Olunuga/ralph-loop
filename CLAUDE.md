@@ -310,7 +310,14 @@ side by side, each under its own label such as `A · Launch, first read outstand
 names the file and the label together. `PROMPT_build.md` step 0d2 tells the agent to work
 from the labelled part alone and not to build a state its task does not name.
 
-`run` Step 0b repairs it. It reads the bundle README, or `SCREEN_PROMPT.md` when there is
+The detection keys on the screen prompt or the bundle, not the bundle alone. A change whose
+bundle never arrived still promised those states in `design/SCREEN_PROMPT.md`, and its tasks
+should name them; the build agent finds the file once the design lands. A change with neither
+is skipped, because adding tasks for screens it never described would invent work.
+
+`/ralph-loop:slice --add-design-tasks` sweeps every non-archived change and repairs them all
+in one pass, building nothing. `run` Step 0b repairs the one change it is about to build, and
+names the sweep when more than one is affected. It reads the bundle README, or `SCREEN_PROMPT.md` when there is
 none, proposes one task per screen state plus a verification task after each, confirms, then
 appends a new group and commits.
 
