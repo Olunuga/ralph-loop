@@ -111,9 +111,11 @@ export DIFF_BASE_BRANCH="${DIFF_BASE_BRANCH:-main}"
 # OpenSpec change when it resolves one.
 export RALPH_BRIEF_DIR="${RALPH_BRIEF_DIR:-$PROJECT_ROOT/ralph/specs}"
 export RALPH_PLAN_FILE="${RALPH_PLAN_FILE:-IMPLEMENTATION_PLAN.md}"
-SPEC_TITLE=$(find "$PROJECT_ROOT/ralph/specs" -name "*.md" 2>/dev/null \
-    | xargs grep -h "^# " 2>/dev/null | head -1 | sed 's/^# //' \
-    || echo "$BRANCH")
+# Read the title from the brief actually in use. Scanning ralph/specs unconditionally puts
+# an unrelated legacy spec's heading on an OpenSpec change's pull request.
+SPEC_TITLE=$(find "$RALPH_BRIEF_DIR" -maxdepth 2 -name "proposal.md" -o -maxdepth 2 -name "*.md" 2>/dev/null \
+    | head -20 | xargs grep -h "^# " 2>/dev/null | head -1 | sed 's/^# //' || true)
+SPEC_TITLE="${SPEC_TITLE:-$BRANCH}"
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -217,12 +219,18 @@ rollback_all() {
         cp "$f" "$tmpdir/$f" 2>/dev/null && preserved+=("$f") || true
     done
 
-    # Undo agent commits from this iteration (commits since last known-good state)
-    local agent_commits
-    agent_commits=$(git log --oneline --grep="^ralph:" --since="5 minutes ago" 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$agent_commits" -gt 0 ]]; then
-        echo "Undoing $agent_commits agent commit(s) from this iteration."
-        git reset HEAD~"$agent_commits" 2>/dev/null || true
+    # Reset to the commit this iteration started from. A time window over-counts: a fix
+    # attempt that takes longer than the window, or a fast iteration after a slow one,
+    # deletes commits from earlier iterations that were already green.
+    if [[ -n "${ITERATION_START_REF:-}" ]] && git rev-parse --verify "$ITERATION_START_REF" >/dev/null 2>&1; then
+        local undone
+        undone=$(git rev-list --count "$ITERATION_START_REF"..HEAD 2>/dev/null || echo 0)
+        if [[ "$undone" -gt 0 ]]; then
+            echo "Undoing $undone commit(s) made since this iteration started."
+            git reset --hard "$ITERATION_START_REF" 2>/dev/null || true
+        fi
+    else
+        echo "No iteration start point recorded. Leaving commits in place."
     fi
     git checkout -- . 2>/dev/null || true
     git clean -fd -e 'IMPLEMENTATION_PLAN*.md' -e 'iteration_context.md' -e 'progress.txt' -e "$RALPH_PLAN_FILE" 2>/dev/null || true
@@ -244,12 +252,15 @@ rollback_files() {
         rollback_all
         return
     fi
-    # Check if agent committed this iteration — if so, need to undo commits first
-    local agent_commits
-    agent_commits=$(git log --oneline --grep="^ralph:" --since="5 minutes ago" 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$agent_commits" -gt 0 ]]; then
-        echo "Undoing $agent_commits agent commit(s) before selective rollback."
-        git reset HEAD~"$agent_commits" 2>/dev/null || true
+    # Undo only the commits made since this iteration started, so a selective rollback
+    # cannot reach back into an earlier green iteration.
+    if [[ -n "${ITERATION_START_REF:-}" ]] && git rev-parse --verify "$ITERATION_START_REF" >/dev/null 2>&1; then
+        local undone
+        undone=$(git rev-list --count "$ITERATION_START_REF"..HEAD 2>/dev/null || echo 0)
+        if [[ "$undone" -gt 0 ]]; then
+            echo "Undoing $undone commit(s) before selective rollback."
+            git reset "$ITERATION_START_REF" 2>/dev/null || true
+        fi
     fi
     while IFS= read -r f; do
         [[ -n "$f" && -f "$f" ]] && git checkout HEAD -- "$f" 2>/dev/null || true
@@ -888,15 +899,24 @@ if [[ "$MODE" == "build" ]]; then
 
     echo "=== Pipeline started: $(date '+%Y-%m-%d %H:%M:%S') ===" >> progress.txt
 
-    # Detect prior progress — if ralph: commits exist, reconcile the plan
+    # Reconcile the ledger with the commit log, once per branch.
+    #
+    # It exists because a restarted loop loses its iteration counter. It runs once because
+    # a commit message is weaker evidence than the ledger: a task a person deliberately
+    # reopened, after finding the work incomplete, has a commit naming it and would be
+    # marked done again on every restart. After the first pass the ledger is authoritative.
+    RECONCILED_MARKER="$PROJECT_ROOT/ralph/.reconciled-$(echo "$BRANCH" | tr '/' '-')"
     PRIOR_COMMITS=$(git log --oneline --grep="^ralph:" 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "$PRIOR_COMMITS" -gt 0 && -f "$RALPH_PLAN_FILE" ]]; then
+    if [[ -f "$RECONCILED_MARKER" ]]; then
+        echo "Plan already reconciled on this branch. The ledger is authoritative."
+    elif [[ "$PRIOR_COMMITS" -gt 0 && -f "$RALPH_PLAN_FILE" ]]; then
         echo "Detected $PRIOR_COMMITS prior ralph commits — reconciling plan with code state..."
         COMMIT_LOG=$(git log --oneline --grep="^ralph:" 2>/dev/null)
-        printf "These commits have already been made on this branch:\n%s\n\nUpdate $RALPH_PLAN_FILE: mark any task as [x] done if the commit log shows it was implemented. Do not uncheck tasks. Do not change task descriptions. Only update checkboxes.\n\n$RALPH_PLAN_FILE:\n%s" \
+        printf "These commits have already been made on this branch:\n%s\n\nUpdate $RALPH_PLAN_FILE: mark a task as [x] done only if the commit log shows it was implemented AND the code for it is present. A commit naming a task is not proof on its own: read the files it touched. Do not uncheck tasks. Do not change task descriptions. Only update checkboxes.\n\n$RALPH_PLAN_FILE:\n%s" \
             "$COMMIT_LOG" "$(cat "$RALPH_PLAN_FILE")" \
         | claude_run_fast 2>/dev/null
         echo "Plan reconciled."
+        touch "$RECONCILED_MARKER"
     fi
 
     ITER=0
@@ -919,8 +939,15 @@ if [[ "$MODE" == "build" ]]; then
         echo ""
         echo "=== Build iteration $((ITER + 1)) ==="
 
+        # Every rollback in this iteration resets to here, and no further back.
+        ITERATION_START_REF=$(git rev-parse HEAD 2>/dev/null || echo "")
+        export ITERATION_START_REF
+
         # Build the prompt, prepending context if available
-        PROMPT=$(sed "s|\${XCODEPROJ}|$XCODEPROJ|g" "$RALPH_PLUGIN_DIR/prompts/PROMPT_build.md")
+        PROMPT=$(sed -e "s|\${XCODEPROJ}|$XCODEPROJ|g" \
+                     -e "s|\${RALPH_PLAN_FILE}|$RALPH_PLAN_FILE|g" \
+                     -e "s|\${RALPH_BRIEF_DIR}|$RALPH_BRIEF_DIR|g" \
+                     "$RALPH_PLUGIN_DIR/prompts/PROMPT_build.md")
         # Inject gate locations so build agent knows where to find them
         PROMPT="Gate scripts (plugin): $RALPH_PLUGIN_DIR/scripts/gates/static/
 LLM gates (plugin): $RALPH_PLUGIN_DIR/scripts/gates/llm/
@@ -1285,9 +1312,17 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     fi
     CUMULATIVE_DIFF=$(git diff "$BASE"...HEAD -- "${UI_DIFF_PATHS[@]}" 2>/dev/null)
 
+    # A change carrying screen designs is a UI change even when its diff shows only storage:
+    # the screens it specifies are the part still to build.
+    DESIGN_NOTE=""
+    if [[ -d "$RALPH_BRIEF_DIR/assets/design" ]]; then
+        DESIGN_NOTE=$'\n\nThis change also carries screen designs in assets/design/. Those screens are part of this change whether or not the diff has reached them yet.'
+        echo "Design assets present: routing as a UI change."
+    fi
+
     UI_ROUTE=$(printf \
-        "Classify the UI impact of these changes.\n\nDiff:\n%s\n\nRespond with EXACTLY one of these three words, nothing else:\nNO_UI\nVIEW_LEVEL\nFLOW_LEVEL\n\nDefinitions:\n- NO_UI: changes only in models, repositories, services, viewmodels, utilities, or tests\n- VIEW_LEVEL: changes confined to Views/ or Components/ only\n- FLOW_LEVEL: changes touching navigation, multi-view flows, or spanning more than one layer" \
-        "$CUMULATIVE_DIFF" \
+        "Classify the UI impact of these changes.%s\n\nDiff:\n%s\n\nRespond with EXACTLY one of these three words, nothing else:\nNO_UI\nVIEW_LEVEL\nFLOW_LEVEL\n\nDefinitions:\n- NO_UI: changes only in models, repositories, services, viewmodels, utilities, or tests\n- VIEW_LEVEL: changes confined to Views/ or Components/ only\n- FLOW_LEVEL: changes touching navigation, multi-view flows, or spanning more than one layer" \
+        "$DESIGN_NOTE" "$CUMULATIVE_DIFF" \
     | claude -p --model claude-sonnet-4-6 2>/dev/null \
     | grep -oE 'NO_UI|VIEW_LEVEL|FLOW_LEVEL' | awk 'NR==1{print; exit}') || true
 

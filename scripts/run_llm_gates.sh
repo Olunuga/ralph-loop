@@ -133,7 +133,9 @@ $PREPARED_DIFF${PROTOCOLS_SECTION}"
                 STILL_RUNNING+=("$pid")
             fi
         done
-        PIDS=("${STILL_RUNNING[@]}")
+        # bash 3.2 treats an empty array as unbound under set -u, which killed the runner
+        # mid-sweep and was counted as a gate failure.
+        PIDS=(${STILL_RUNNING[@]+"${STILL_RUNNING[@]}"})
         [[ ${#PIDS[@]} -ge $MAX_CONCURRENT ]] && sleep 1
     done
 
