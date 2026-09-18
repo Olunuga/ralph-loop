@@ -20,8 +20,9 @@ Run each step in order. Tell the user which step you are on.
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
 
-`--add-theme` adds the theme to a release that was sliced without one, and slices nothing
-new. If the user passed it, run Step 1, then skip to Step 1b.
+`--add-theme` adds the theme alone to a release that was sliced without it. Prefer running
+`/ralph-loop:slice` with no flag: Step 1b then offers every missing foundation, not only the
+theme. If the user passed it, run Step 1, then skip to Step 1b.
 
 ---
 
@@ -49,46 +50,70 @@ for the format." Stop.
 
 ---
 
-## Step 1b: A release sliced without the theme
+## Step 1b: A release sliced without its foundations
 
 Run this whenever `ralph/releases/` holds a record. It repairs a release made before the
-theme step existed, and it creates no new release.
+foundation step existed, and it creates no new release.
+
+`--add-theme` runs this step for the theme alone and skips everything else.
 
 ```bash
 NEWEST=$(ls -t ralph/releases/*.md 2>/dev/null | head -1)
-[[ -n "$NEWEST" ]] && echo "$NEWEST"
-grep -rq 'theme-foundation' ralph/releases/ 2>/dev/null && echo THEME_IN_A_RELEASE
-compgen -G "openspec/changes/archive/????-??-??-theme-foundation" >/dev/null && echo THEME_DONE
-[[ -d ralph/design/system ]] || echo NO_SYSTEM
+[[ -n "$NEWEST" ]] && echo "$NEWEST" && cat "$NEWEST"
 ```
 
-Skip this step, saying nothing, when any of `THEME_IN_A_RELEASE`, `THEME_DONE`, or
-`NO_SYSTEM` printed, or when there is no release record. Only a release with a design system
-and no theme needs repair.
+No release record: skip this step, saying nothing.
 
-Otherwise ask the theme question from Step 4b. On **Yes, it exists**, record the answer so
-you do not ask again: append `<!-- theme: already in the codebase -->` to the newest release
-record and skip.
+Read the record. Its rows are the changes in the release. Now answer, for that set of
+changes, the question STEP 3b of the slice prompt asks: what does every change need that no
+change owns, and is absent from the codebase? Use the same three-part test and the same
+checklist.
 
-On **No, build it first**:
+Check each candidate before naming it:
 
-1. Create the change exactly as Step 5 does for `theme-foundation`, with
-   `ralph/design/system/README.md` and `tokens.json` as the source. Skip 5h.
-2. Insert a `theme-foundation` row at Order 1 in the newest release record and renumber the
-   rows below it. Set `Needs first` to `theme-foundation` on every row that had `none`.
-3. Tell the user:
-
-```
-Added theme-foundation to release <release> as change 1.
-Every other change in that release now needs it first.
-
-    /ralph-loop:run theme-foundation      the pipeline builds it and opens a pull request
-    /opsx:apply theme-foundation          you build it, and it stops to ask
+```bash
+SLUG="<foundation-slug>"
+grep -rq "$SLUG" ralph/releases/ 2>/dev/null && echo IN_A_RELEASE
+compgen -G "openspec/changes/archive/????-??-??-$SLUG" >/dev/null && echo DONE
+[[ -d "openspec/changes/$SLUG" ]] && echo EXISTS
 ```
 
-Then run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
+Drop a candidate that printed any of the three. For `theme-foundation` also drop it when
+`ralph/design/system/` is absent, or when the newest record carries
+`<!-- theme: already in the codebase -->`.
 
-This is the one case that edits an existing release record. It inserts the theme row and
+Nothing survives: skip this step, saying nothing.
+
+Otherwise list what survived and ask: "Release <release> was sliced without these. Every
+change in it needs them and none of them owns one. Add them now?" Show one line each: the
+slug, which changes need it, and what is missing today.
+
+The user may say a foundation already exists in the codebase. Record that so you do not ask
+again: append `<!-- <slug>: already in the codebase -->` to the newest release record, and
+treat that marker as a reason to drop the candidate on every later run.
+
+For each foundation the user confirms:
+
+1. Create the change exactly as Step 5 does, with its own source in place of an activity
+   spec. Skip 5h: a foundation has no screens. For `theme-foundation` the source is
+   `ralph/design/system/README.md` and `tokens.json`.
+2. Insert a row for it at the top of the newest release record, ahead of every cell, and
+   renumber the rows below. Set `Needs first` on every row that had `none`.
+3. Order foundations among themselves by dependency. A network client that stores a token
+   needs the store first.
+
+Then tell the user, naming the first one to build:
+
+```
+Added <N> foundations to release <release>, ahead of every change in it.
+
+    /ralph-loop:run <first-slug>      the pipeline builds it and opens a pull request
+    /opsx:apply <first-slug>          you build it, and it stops to ask
+```
+
+Run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
+
+This is the one case that edits an existing release record. It inserts foundation rows and
 renumbers; it never removes or reorders a cell.
 
 ---
@@ -322,7 +347,7 @@ The Order column is the confirmed BUILD ORDER. `--status` reports against it, so
 can see which change is next without re-deriving the dependencies.
 
 Never modify an existing release record. Each slice adds a new file. Step 1b is the one
-exception: it inserts the theme row and renumbers below it.
+exception: it inserts foundation rows and renumbers below them.
 
 **When `--status` was passed**, read every file in `ralph/releases/`. For each change named
 in each record, derive its state rather than reading a stored value:
