@@ -1,7 +1,7 @@
 ---
 name: slice
 description: Turn the next SLC release slice into OpenSpec changes
-argument-hint: "[--status] [--add-theme]"
+argument-hint: "[--status] [--add-theme] [--add-design-tasks]"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
@@ -19,6 +19,10 @@ Run each step in order. Tell the user which step you are on.
 
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
+
+`--add-design-tasks` sweeps every change in the project and adds the screen tasks any of
+them is missing. It builds nothing and slices nothing. If the user passed it, run Step 1,
+then skip to Step 1c.
 
 `--add-theme` adds the theme alone to a release that was sliced without it. Prefer running
 `/ralph-loop:slice` with no flag: Step 1b then offers every missing foundation, not only the
@@ -115,6 +119,65 @@ Run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
 
 This is the one case that edits an existing release record. It inserts foundation rows and
 renumbers; it never removes or reorders a cell.
+
+---
+
+## Step 1c: Changes missing their screen tasks
+
+Reached by `--add-design-tasks`. Run it over every change that is not archived.
+
+A change sliced before the tasks instruction covered screens has tasks for its data and none
+for its screens. Nothing else catches it: every gate passes on a change that built half of
+what it described.
+
+```bash
+for CH in openspec/changes/*/; do
+  ID=$(basename "$CH")
+  [[ "$ID" == "archive" ]] && continue
+  HAS_PROMPT=no; HAS_BUNDLE=no; NAMED=0
+  [[ -f "$CH/design/SCREEN_PROMPT.md" ]] && HAS_PROMPT=yes
+  [[ -d "$CH/assets/design" ]] && HAS_BUNDLE=yes
+  NAMED=$(grep -ci 'assets/design\|screen\|state' "$CH/tasks.md" 2>/dev/null || echo 0)
+  echo "$ID prompt=$HAS_PROMPT bundle=$HAS_BUNDLE named=$NAMED"
+done
+```
+
+A change needs repair when it has a screen prompt or a bundle, and `named` is 0. Both count:
+a change whose bundle has not arrived still promised screens in its prompt, and its tasks
+should name the states even before the files exist.
+
+Skip a change with no screen prompt and no bundle. It has no screens, and adding tasks for
+screens it never described would invent work.
+
+Report what you found before touching anything:
+
+```
+<N> changes have screens and no task that names them:
+  <cell-id>   <how many states its prompt or bundle names>
+  ...
+
+<M> changes are already covered.
+```
+
+Nothing found: say "Every change with screens has tasks for them." and stop.
+
+Otherwise ask once, for the whole set: "Add the missing screen tasks to these <N> changes?"
+On anything but yes, stop.
+
+For each change, in the order its release record lists them, follow the same procedure as
+Step 0b of `/ralph-loop:run`:
+
+1. Read the bundle README when there is one, otherwise `design/SCREEN_PROMPT.md`.
+2. One task per state, naming the file and the state label together when the files exist, and
+   the state alone when they do not. A verification task after each.
+3. Append a new group after the highest existing group number. **Never rewrite `tasks.md`.**
+   Every `- [x]` already ticked stays exactly as it is.
+4. Commit each change separately: `ralph: add screen tasks for <cell-id>`.
+
+Show the proposed group for the first change and confirm it before writing. Once the user
+approves the shape, apply the rest without asking again, and report each as you go.
+
+Then run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
 
 ---
 
