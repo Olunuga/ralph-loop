@@ -4,7 +4,7 @@
 0b. Read the feature brief with subagents (up to 10 parallel): every text file under
     $RALPH_BRIEF_DIR (defaults to ralph/specs/). Skip the assets/ directory here.
 0c. Read ralph/AGENTS.md — understand build commands, architecture rules, gates.
-0d. Read IMPLEMENTATION_PLAN.md — pick the FIRST unchecked [ ] item (top-down order).
+0d. Read ${RALPH_PLAN_FILE} — pick the FIRST unchecked [ ] item (top-down order).
     **You MUST implement exactly ONE task per iteration. Not two, not "while I'm here."
     Pick one. Implement it. Validate it. Commit it. Stop.**
 0d2. Design references. If $RALPH_BRIEF_DIR/assets/ exists, read it YOURSELF with the Read
@@ -16,6 +16,10 @@
       what it says and read the files it names, rather than reading the directory blindly.
     - Read at most 4 bundle files per iteration, the README included. If the README names
       more, read the ones your chosen task needs and say which you skipped.
+    - One file usually holds every state, as a board with each state under its own label.
+      Your task names the file and the label. Find that label in the file and work from that
+      part alone. Do not build a state your task does not name: the others belong to other
+      tasks.
     - If the bundle has no README, read its images under the image rule below and say the
       bundle had no README.
 
@@ -44,7 +48,7 @@
 ---
 
 1. Implement the chosen task.
-  - Follow the reference pattern noted in the task (check IMPLEMENTATION_PLAN.md).
+  - Follow the reference pattern noted in the task (check ${RALPH_PLAN_FILE}).
   - Before writing tests, read the initializer signatures of every model/type you will instantiate in the test. Do not guess init parameters — get them from the source.
   - Tests must cover both happy paths (expected inputs, success cases) AND sad paths (nil values, empty collections, invalid inputs, edge cases). Do not write tests that only verify the success case.
   - Use subagents for all reads. Use only 1 subagent for build/test runs.
@@ -60,9 +64,9 @@
   - Run unit test command from AGENTS.md.
   - If either fails, fix and re-validate. Do not commit a red state.
 3. When all validation passes:
-  - Mark ONLY the ONE item you implemented as [x] done in IMPLEMENTATION_PLAN.md
+  - Mark ONLY the ONE item you implemented as [x] done in ${RALPH_PLAN_FILE}
   - Verify: count how many [ ] items you changed to [x]. If more than 1, you did too much — revert the extras back to [ ].
-  - git add -A && git reset HEAD IMPLEMENTATION_PLAN.md progress.txt 2>/dev/null; git commit -m "ralph: [one-line description of what you did]"
+  - git add -A && git reset HEAD ${RALPH_PLAN_FILE} progress.txt 2>/dev/null; git commit -m "ralph: [one-line description of what you did]"
   - **STOP after committing. Do not start the next task. The loop will start a new iteration.**
 
 ---

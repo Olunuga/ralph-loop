@@ -284,6 +284,40 @@ rename when it finds a directory under `ralph/design/` that is not `system`.
 A committed `.tar` or `.zip` is refused rather than unpacked. Automatic extraction would
 run over content the pipeline did not produce, and an archive in git is opaque to review.
 
+## Screens need tasks and a verification step
+
+`slice` writes `design/SCREEN_PROMPT.md` and the tasks at the same time, and the design
+bundle arrives afterwards. The `tasks` instruction only mentioned `assets/`, which does not
+exist yet at that moment, so a change whose proposal described five screen states got tasks
+for storage alone. Every gate passed: none of them checks that a change built what its
+proposal described.
+
+The instruction now says to read `design/SCREEN_PROMPT.md` and write one task per screen
+state whether or not the bundle has arrived, and to follow each visual task with a
+verification task that names the state and the file to compare against. Unit tests do not
+check that a view matches its design.
+
+`bin/loop.sh` also routes UI testing from the diff alone, so a change whose diff held only
+storage ran as `NO_UI`. It now adds a note when `$RALPH_BRIEF_DIR/assets/design` exists.
+
+The schema fix only reaches a change sliced after it. A change sliced earlier keeps its
+incomplete `tasks.md`, so `run` and `status` both detect the state: design files present and
+no task naming `assets/design`. `status` reports it under Do this next, not Optional, because
+the screens will not be built and no gate says so.
+
+A design bundle is a board, not one file per state: a single `.dc.html` carries every state
+side by side, each under its own label such as `A · Launch, first read outstanding`. A task
+names the file and the label together. `PROMPT_build.md` step 0d2 tells the agent to work
+from the labelled part alone and not to build a state its task does not name.
+
+`run` Step 0b repairs it. It reads the bundle README, or `SCREEN_PROMPT.md` when there is
+none, proposes one task per screen state plus a verification task after each, confirms, then
+appends a new group and commits.
+
+It appends and never regenerates. `openspec instructions tasks` writes a whole `tasks.md`,
+which discards every box already ticked and any task a person added by hand. Never name that
+command as a repair.
+
 ## Design references
 
 Assets live beside the intent: `ralph/specs/<name>/assets/` for a legacy spec, which makes
@@ -391,6 +425,30 @@ Any uncaught error in a `claude -p` call, `git push`, or API timeout kills the e
 ### Inline fix before rollback
 When the build or tests fail, the loop gives the agent up to 2 fix attempts scoped to **only the files it touched this iteration** (`git diff --name-only HEAD`). The fix agent gets the error output + the file list and can only modify those files. If the fix lands (build/tests pass), the iteration continues to gates. If not, normal rollback + diagnostician kicks in. This avoids the expensive rollback → re-read specs → re-implement cycle for simple compile errors like wrong init signatures.
 
+### Rollback resets to a recorded ref, never a time window
+Both rollback paths counted agent commits with `git log --grep="^ralph:" --since="5 minutes
+ago"` and then `git reset HEAD~N`. The window does not match an iteration: a slow fix attempt
+runs past it, and a fast iteration after a slow one counts the previous iteration's commits.
+One run deleted two commits that had already passed their gates.
+
+Each iteration now records `ITERATION_START_REF` before the agent runs, and every rollback
+resets to exactly that. No start ref means no reset: leaving commits in place is the safe
+failure.
+
+### The build prompt reads the ledger path from the loop
+`prompts/PROMPT_build.md` named `IMPLEMENTATION_PLAN.md` in four places while `loop.sh`
+substituted only `${XCODEPROJ}`, so in OpenSpec mode the agent marked a file that does not
+exist and the loop reported 0 of 11 tasks done. The prompt now uses `${RALPH_PLAN_FILE}` and
+`${RALPH_BRIEF_DIR}`, and `loop.sh` substitutes all three. A new path added to the loop has to
+be added to that `sed` as well.
+
+### Reconciliation runs once per branch
+A restarted loop loses its iteration counter, so it reconciles the ledger against the commit
+log. A commit message is weaker evidence than the ledger: a task a person reopened after
+finding the work incomplete has a commit naming it, and every later restart marked it done
+again. A marker file at `ralph/.reconciled-<branch>` limits it to one pass; after that the
+ledger is authoritative.
+
 ### Rollback must undo commits, not just uncommitted changes
 The build agent commits its work before gates run. `git checkout HEAD -- <file>` only reverts uncommitted changes — committed code is untouched. `rollback_all` and `rollback_files` now detect agent commits from the current iteration (via `git log --grep="^ralph:" --since="5 minutes ago"`) and `git reset HEAD~N` to undo them before reverting files.
 
@@ -486,6 +544,13 @@ empty project. It now takes the layer paths from the `LAYER_*` variables when se
 layer directory as the expected state rather than a finding.
 
 ## Gates
+
+### An empty array is unbound on bash 3.2
+`run_llm_gates.sh` rebuilt its PID list with `PIDS=("${STILL_RUNNING[@]}")`. When every gate
+had finished, that array was empty, `set -u` killed the runner, and the loop counted the
+crash as a gate failure and spent both fix attempts on it. The form that works is
+`PIDS=(${STILL_RUNNING[@]+"${STILL_RUNNING[@]}"})`. This is the same class of bug as the
+associative arrays in the layer gates: write for bash 3.2, because that is what macOS runs.
 
 ### LLM gates diverge on retry
 Each LLM gate retry can invent new complaints instead of re-checking the same criteria. Mitigations:

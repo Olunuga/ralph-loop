@@ -60,6 +60,9 @@ For each change that still exists, also check its design files:
 [[ -f "openspec/changes/$ID/design/SCREEN_PROMPT.md" ]] && echo "$ID has a screen prompt"
 [[ -d "openspec/changes/$ID/assets/design" ]] && echo "$ID has screen designs"
 [[ -d "openspec/changes/$ID/assets/design/design_system" ]] && echo "$ID has a duplicate system"
+[[ -d "openspec/changes/$ID/assets/design" ]] && \
+  [[ "$(grep -ci 'assets/design' "openspec/changes/$ID/tasks.md" 2>/dev/null)" == "0" ]] && \
+  echo "$ID has designs no task names"
 ```
 
 A change with a screen prompt and no `assets/design/` has a design waiting to be made.
@@ -117,6 +120,13 @@ Two design items can be outstanding, and they are independent:
   `openspec/changes/<cell-id>/assets/design/`, and the bundle's own `design_system/`
   directory is deleted before committing.
 - A duplicate system already committed under a change's `assets/design/design_system/`.
+
+A change whose designs no task names is different: report it under **Do this next**, not
+Optional. Its screens will not be built, and no gate says so. The fix is to run the build:
+`/ralph-loop:run <cell-id>` stops at its Step 0b, proposes the missing screen tasks, and
+appends them once the user confirms. Do not tell the user to run
+`openspec instructions tasks`: that writes a whole new `tasks.md` and discards every box
+already ticked.
 
 When `DESIGN: yes`, say so under Done. The user then knows the system is in place, and that
 any remaining design work is per change.
