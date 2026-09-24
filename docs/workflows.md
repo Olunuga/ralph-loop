@@ -21,12 +21,14 @@ it creates the folders and records your choice. Then map the product and start:
 
 ```
 /ralph-loop:req-slc my-product
-/ralph-loop:slice                # builds the colours, type and groundwork first
-/ralph-loop:run theme-foundation
+/ralph-loop:slice                # shared groundwork first, then one change per part
+/ralph-loop:run <first-change>
 ```
 
-The colours and type come before the first screen. The checks reject a raw colour value, so
-a screen built first fails, and the agent invents its own colours instead.
+`slice` finds the work every part needs and no part owns, and builds it first. Depending on
+the product that is somewhere to keep data, a way to talk to a server, sign-in, moving
+between screens, or the colours and type every screen uses. Build each once, or every change
+builds its own version and they drift apart.
 
 ### A project that already has code
 
@@ -97,15 +99,40 @@ ask cannot sit inside an autonomous loop.
 /ralph-loop:status               # any time: what is done, what to do next
 ```
 
-`req-slc` writes a table: columns are things people do, rows are how far each one goes. A
-release takes one cell per column, so a person gets something they can finish rather than
-one thing done deeply and the rest missing.
+`req-slc` writes a table. Columns are things people do, rows are how far each one goes. For
+a photo palette app whose users want to "extract a photo's colors so I can reuse them":
 
-`slice` builds the shared groundwork first (colours and type, talking to a server, keeping
-data), then one change per cell. Each change gets its own checks and its own pull request.
+| Depth | Upload photo | Extract colors | Save palette |
+|---|---|---|---|
+| **Basic** | single file | top 5 colors | save to device |
+| **Enhanced** | many at once | pick how many, show hex | name and tag |
+| **Advanced** | import from a link | smarter matching | sync and export |
 
-**[Full walkthrough: SLC releases](slc.md)** covers the map, the groundwork, how screens
-arrive after the tasks, and filing changes away.
+A release takes one cell per column, so a person gets something they can finish rather than
+one thing done deeply and the rest missing. Here that is basic, basic, basic. The other six
+cells stay as backlog.
+
+The row need not be level. If picking how many colors is what makes it worth shipping, the
+release is basic, **enhanced**, basic.
+
+`slice` builds the shared groundwork first, then one change per cell:
+
+```
+openspec/changes/theme-foundation/
+openspec/changes/upload-photo-basic/
+openspec/changes/extract-colors-basic/
+openspec/changes/save-palette-basic/
+```
+
+Four changes, four pull requests, each with its own checks. `ralph/releases/<name>.md`
+records which ones make up the release, and `--status` calls it done only when every one is
+filed away.
+
+The table lives in `ralph/AUDIENCE_JTBD.md` and is never filed away, so the next release
+takes deeper rows without asking you again.
+
+**[Full walkthrough: SLC releases](slc.md)** covers the groundwork, how screens arrive after
+the tasks, and filing changes away.
 
 ## Resuming an incomplete run
 

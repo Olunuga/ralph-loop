@@ -52,18 +52,25 @@ this reads your working folder, not a branch.
 
 ## 2. Shared groundwork comes first
 
-Some work belongs to no single cell and every cell needs it: the colours and type every
-screen uses, a way to talk to a server, somewhere to keep data between launches.
+Some work belongs to no single cell and every cell needs it. Which ones depend on the
+product:
+
+- Somewhere to keep data between launches
+- A way to talk to a server, and what happens when it cannot be reached
+- Knowing who the person is: sign-in, and what a signed-out person sees
+- Moving between screens
+- The colours, type and spacing every screen uses
+- Working offline, and catching up when the connection returns
 
 `slice` finds these first and makes each one a change of its own, before any feature. It
-asks about each, so you can say you already have it.
+asks about each, so you can say you already have it. It names only what this release needs.
 
-The colours and type are the clearest case. The checks reject a raw colour value and a fixed
-font size, so the first screen built without them fails. The agent then invents its own, and
-the next screen invents different ones.
+Each one has the same shape: build it once, or every change builds its own version and they
+drift apart. The colours and type also fail the checks outright, which reject a raw colour
+value and a fixed font size, so a screen built before them cannot pass.
 
-Sliced a release before this existed? Run `/ralph-loop:slice` with no flag. It adds what is
-missing and creates no new release.
+A release sliced before this existed is repaired by running `/ralph-loop:slice` with no flag.
+It adds what is missing and creates no new release.
 
 ---
 
@@ -91,8 +98,7 @@ Each change gets four documents:
 
 ## 4. Screens are drawn after the tasks
 
-This one catches people. **The tasks are written now. The screens are drawn later, often
-weeks later.**
+**The tasks are written now. The screens are drawn later, often weeks later.**
 
 `slice` writes a prompt per change. You paste it into Claude Design, ask in the chat for a
 handoff bundle, and commit what comes back. See [Design](design.md) for how.
@@ -144,7 +150,7 @@ wrote a task for changes no lines at all.
 It moves the change into the archive and folds what it promised into your main specs, so
 those stay a true picture of the product.
 
-**Do not skip this.** `status` and `slice --status` both read the archive. A change that is
+`status` and `slice --status` both read the archive. A change that is
 built but never filed reads as unfinished, and the release never completes.
 
 ```
