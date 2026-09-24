@@ -134,32 +134,43 @@ what it described.
 for CH in openspec/changes/*/; do
   ID=$(basename "$CH")
   [[ "$ID" == "archive" ]] && continue
-  HAS_PROMPT=no; HAS_BUNDLE=no; NAMED=0
+  HAS_PROMPT=no; HAS_BUNDLE=no
   [[ -f "$CH/design/SCREEN_PROMPT.md" ]] && HAS_PROMPT=yes
   [[ -d "$CH/assets/design" ]] && HAS_BUNDLE=yes
-  NAMED=$(grep -ci 'assets/design\|screen\|state' "$CH/tasks.md" 2>/dev/null || echo 0)
-  echo "$ID prompt=$HAS_PROMPT bundle=$HAS_BUNDLE named=$NAMED"
+  echo "$ID prompt=$HAS_PROMPT bundle=$HAS_BUNDLE"
 done
 ```
 
-A change needs repair when it has a screen prompt or a bundle, and `named` is 0. Both count:
-a change whose bundle has not arrived still promised screens in its prompt, and its tasks
-should name the states even before the files exist.
+Skip a change with neither. It has no screens, and adding tasks for screens it never
+described would invent work.
 
-Skip a change with no screen prompt and no bundle. It has no screens, and adding tasks for
-screens it never described would invent work.
+For every other change, compare state by state. **Do not count keywords.** A task group
+written before the designs arrived says "screen" and "state" in every line, so any keyword
+test passes it while it describes screens the designer never drew.
+
+For each change: list the states the design names, from the bundle README and the board files
+it points at, or from `design/SCREEN_PROMPT.md` when there is no bundle. Then list the states
+the tasks name. A change needs repair when any of these holds:
+
+- A state the design names that no task names.
+- A task naming a state the design does not have.
+- A state both name, where the task says one treatment and the design shows another.
+
+The third is why keyword counting fails. A task saying "show a text line under the field" and
+a design showing a toast both name the same state, and only reading both catches it.
 
 Report what you found before touching anything:
 
 ```
-<N> changes have screens and no task that names them:
-  <cell-id>   <how many states its prompt or bundle names>
+<N> changes need their tasks reconciled with the drawn screens:
+  <cell-id>   <A> states not covered, <B> tasks contradicting the design, <C> tasks for
+              states the design does not have
   ...
 
-<M> changes are already covered.
+<M> changes already match.
 ```
 
-Nothing found: say "Every change with screens has tasks for them." and stop.
+Nothing found: say "Every change with screens has tasks that match them." and stop.
 
 Otherwise ask once, for the whole set: "Add the missing screen tasks to these <N> changes?"
 On anything but yes, stop.
@@ -168,11 +179,14 @@ For each change, in the order its release record lists them, follow the same pro
 Step 0b of `/ralph-loop:run`:
 
 1. Read the bundle README when there is one, otherwise `design/SCREEN_PROMPT.md`.
-2. One task per state, naming the file and the state label together when the files exist, and
-   the state alone when they do not. A verification task after each.
-3. Append a new group after the highest existing group number. **Never rewrite `tasks.md`.**
-   Every `- [x]` already ticked stays exactly as it is.
-4. Commit each change separately: `ralph: add screen tasks for <cell-id>`.
+2. One task per uncovered state, naming the file and the state label together when the files
+   exist, and the state alone when they do not. A verification task after each.
+3. For a task that contradicts the design: edit that one line when it is unticked; when it is
+   ticked, leave the tick and add a correcting task naming what was built and what the design
+   shows. For a task naming a state the design does not have, ask rather than delete.
+4. Append the new group after the highest existing group number. **Never rewrite
+   `tasks.md`.** Every `- [x]` already ticked stays exactly as it is.
+5. Commit each change separately: `ralph: reconcile screen tasks for <cell-id>`.
 
 Show the proposed group for the first change and confirm it before writing. Once the user
 approves the shape, apply the rest without asking again, and report each as you go.

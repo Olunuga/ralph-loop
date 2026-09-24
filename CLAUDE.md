@@ -310,6 +310,47 @@ side by side, each under its own label such as `A · Launch, first read outstand
 names the file and the label together. `PROMPT_build.md` step 0d2 tells the agent to work
 from the labelled part alone and not to build a state its task does not name.
 
+### The design coverage check is not a gate, on purpose
+`scripts/check_design_coverage.sh` runs once in the post-loop, after every gate has passed
+and before `gh pr create`. It lists the state labels in the bundle README, checks each
+appears somewhere in `tasks.md`, and exits 9 with `DESIGN_COVERAGE_FAILED` when one does not.
+It edits nothing.
+
+It is not under `scripts/gates/` for two reasons. A gate failure is handed to an agent by
+`run_gate_with_fix`, and the only fix here is editing `tasks.md`, the ledger both the loop
+and a human tick off; an agent rewriting that to pass a check is worse than the miss. And a
+gate runs every iteration, where a change whose design has not arrived would fail every time,
+which is a normal state and not a defect.
+
+It skips rather than fails when there is no bundle, no README, or no screens. It matches on
+any one distinctive word of a label, not the whole string, because it blocks a pull request:
+a false pass costs a later catch, a false failure blocks correct work. The thorough
+comparison is `run` Step 0b, which also finds tasks that contradict the design.
+
+### A keyword count cannot tell a stale task from a correct one
+The first detection counted matches of `screen` or `state` in `tasks.md`. A task group
+written before the designs arrived uses those words in every line, so it passed while
+describing screens the designer never drew: a task said "text line under the field" and the
+design showed a toast.
+
+All three checks now compare state by state. List the states the design names, from the
+bundle README and the board files it points at, or from `design/SCREEN_PROMPT.md` when there
+is no bundle. List the states the tasks name. Report three sets: states no task covers, tasks
+naming a state the design does not have, and states where the two disagree about what
+happens. The third is the common one and the one no keyword test can find.
+
+The drawn design is the authority. Tasks are written at slice time and the screens are drawn
+weeks later, so when they disagree the task changes. `run` Step 0b edits an unticked line in
+place; for a ticked one it leaves the tick and adds a correcting task, because the work was
+done against the wrong description. It never deletes a task for a state the design lacks: it
+asks, since the designer may have dropped the state or the task may cover something real.
+
+Two upstream rules keep the gap small. The `tasks` instruction says a task written before the
+screens exist states the outcome and never the treatment, and marks itself "treatment per the
+design, not yet drawn". `SCREEN_PROMPT_TEMPLATE.md` tells the designer that empty, loading,
+error and normal are a floor rather than the list, asks which states they added, and asks for
+the treatment of every refusal and failure rather than only that it fails.
+
 The detection keys on the screen prompt or the bundle, not the bundle alone. A change whose
 bundle never arrived still promised those states in `design/SCREEN_PROMPT.md`, and its tasks
 should name them; the build agent finds the file once the design lands. A change with neither
