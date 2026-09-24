@@ -43,29 +43,45 @@ openspec status --change "$ref" --json 2>/dev/null
   ```bash
   CH="openspec/changes/$ref"
   [[ -f "$CH/design/SCREEN_PROMPT.md" ]] && echo HAS_PROMPT
-  [[ -d "$CH/assets/design" ]] && echo HAS_BUNDLE && ls "$CH/assets/design" | head -20
-  grep -ci 'assets/design\|screen\|state' "$CH/tasks.md" 2>/dev/null
+  [[ -d "$CH/assets/design" ]] && echo HAS_BUNDLE && ls "$CH/assets/design"
   ```
-  Neither `HAS_PROMPT` nor `HAS_BUNDLE`: continue. This change has no screens.
+  Neither: continue. This change has no screens.
 
-  A non-zero count: continue, the tasks already cover the screens.
+  Otherwise compare state by state. **Do not count keywords.** A task group written before
+  the designs arrived says "screen" and "state" in every line and matches any keyword test
+  while describing screens the designer never drew.
 
-  A screen prompt or a bundle, and the count is zero: do not start the loop. Go to Step 0b.
-  The prompt counts on its own. A change whose bundle has not arrived still promised those
-  states, and its tasks should name them.
+  1. List the states the design names. Read `$CH/assets/design/README.md` when it exists, and
+     the board files it points at; those carry a label per state. With no bundle, read
+     `$CH/design/SCREEN_PROMPT.md` and take the states it promised.
+  2. List the states the tasks name. Read `$CH/tasks.md`.
+  3. Report three sets: states no task names, tasks that name a state the design does not
+     have, and states where the two disagree about what happens.
+
+  The third set is the one a keyword test can never find. A task saying "show a text line
+  under the field" and a design showing a toast both name the same state, and only reading
+  both catches it.
+
+  All three sets empty: continue to the build.
+
+  Any set non-empty: do not start the loop. Go to Step 0b.
 
   More than one change is in this state: say so and name `/ralph-loop:slice --add-design-tasks`,
   which repairs them all in one pass without building.
 
 ---
 
-## Step 0b: Add the missing design tasks
+## Step 0b: Reconcile the tasks with the drawn screens
 
-Only reached from Step 1. The change has screen designs and no task names them.
+Only reached from Step 1, with one or more of its three sets non-empty.
+
+**The drawn design is the authority.** Tasks are written at slice time and the screens are
+drawn later, often weeks later. A task written first names an outcome and guesses the
+treatment; the designer then chooses something else and adds states nobody asked for. When
+they disagree, the design wins and the tasks change.
 
 **Append. Never regenerate.** `openspec instructions tasks` writes a whole `tasks.md`, which
-would discard every `- [x]` already ticked and any task a person added by hand. The existing
-tasks stay exactly as they are; the screen tasks go after them as a new group.
+would discard every `- [x]` already ticked and any task a person added by hand.
 
 **1. Read the sources.**
 
@@ -106,11 +122,25 @@ Two rules the schema also carries. A task that only says "review the design" is 
 A visual task without a verification task after it means nothing checks the result: unit
 tests do not compare a view with its design.
 
+**2b. Handle the tasks that disagree with the design.**
+
+For a state the tasks name and the design shows differently, and for a task naming a state
+the design does not have, the existing line is wrong. It is also possibly already ticked.
+
+- **Unticked `- [ ]`**: edit that one line so it matches the design. Say what changed.
+- **Ticked `- [x]`**: leave the tick. The work was done, against the wrong description. Add a
+  new task in the Screens group to correct it, naming the built state and what the design
+  shows instead.
+- **A task for a state the design does not have**: do not delete it. Ask the user. The
+  designer may have dropped a state deliberately, or the task may cover something real that
+  the design simply does not draw.
+
+Never silently rewrite a line a person may have relied on.
+
 **3. Confirm before writing.**
 
-Show the full proposed group and ask: "Append these <N> tasks to
-`openspec/changes/<ref>/tasks.md`? Nothing already in the file changes." Stop on anything
-but yes.
+Show the full proposed group, every edit to an existing line, and every question, then ask:
+"Apply these changes to `openspec/changes/<ref>/tasks.md`?" Stop on anything but yes.
 
 **4. Append and commit.**
 
@@ -131,7 +161,7 @@ grep -c '^- \[ \]' "openspec/changes/$ref/tasks.md"
 ```
 
 Not apply-ready: say which artifact is malformed and stop. Otherwise report how many tasks
-were added and continue to Step 1.
+were added, how many lines were corrected, and continue to Step 1.
 
 ---
 
