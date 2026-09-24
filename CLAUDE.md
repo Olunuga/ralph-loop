@@ -310,6 +310,23 @@ side by side, each under its own label such as `A · Launch, first read outstand
 names the file and the label together. `PROMPT_build.md` step 0d2 tells the agent to work
 from the labelled part alone and not to build a state its task does not name.
 
+### The design coverage check is not a gate, on purpose
+`scripts/check_design_coverage.sh` runs once in the post-loop, after every gate has passed
+and before `gh pr create`. It lists the state labels in the bundle README, checks each
+appears somewhere in `tasks.md`, and exits 9 with `DESIGN_COVERAGE_FAILED` when one does not.
+It edits nothing.
+
+It is not under `scripts/gates/` for two reasons. A gate failure is handed to an agent by
+`run_gate_with_fix`, and the only fix here is editing `tasks.md`, the ledger both the loop
+and a human tick off; an agent rewriting that to pass a check is worse than the miss. And a
+gate runs every iteration, where a change whose design has not arrived would fail every time,
+which is a normal state and not a defect.
+
+It skips rather than fails when there is no bundle, no README, or no screens. It matches on
+any one distinctive word of a label, not the whole string, because it blocks a pull request:
+a false pass costs a later catch, a false failure blocks correct work. The thorough
+comparison is `run` Step 0b, which also finds tasks that contradict the design.
+
 ### A keyword count cannot tell a stale task from a correct one
 The first detection counted matches of `screen` or `state` in `tasks.md`. A task group
 written before the designs arrived uses those words in every line, so it passed while

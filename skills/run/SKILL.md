@@ -466,6 +466,34 @@ cd "$WORKTREE" && loop.sh post-loop 2>&1
 
 Report each gate outcome to the user.
 
+### Design coverage failure (exit code 9)
+
+If the loop exits with code 9 or `.loop_status` contains `DESIGN_COVERAGE_FAILED`, the code
+passed every gate and the task list does not cover every drawn state. The branch is pushed
+and no pull request was opened.
+
+This is not a code defect. The tasks were written before the screens were drawn, and the
+designer named states the tasks never had.
+
+1. Re-run the check to see which states are uncovered:
+```bash
+bash "$RALPH_PLUGIN_DIR/scripts/check_design_coverage.sh" "$WORKTREE/openspec/changes/$ref"
+```
+
+2. Go to Step 0b and reconcile the tasks with the drawn screens. It reads the bundle README,
+   proposes tasks for the uncovered states, corrects any task that contradicts the design,
+   and appends.
+
+3. Re-run the build so the new tasks are implemented:
+```bash
+cd "$WORKTREE" && loop.sh build 2>&1
+```
+
+**Never open the pull request by hand to get past this.** The change would ship without the
+screens it described, which is the failure the check exists to prevent. If the user decides a
+state genuinely belongs to a different change, say so in the task list and move it there,
+rather than bypassing the check.
+
 ### LLM gate failures (exit code 7)
 
 If the loop exits with code 7 or `.loop_status` contains `LLM_GATES_BLOCKED`, LLM gates failed and could not be auto-fixed. **Do NOT silently continue.** Instead:
