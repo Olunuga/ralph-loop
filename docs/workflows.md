@@ -6,6 +6,50 @@ Every way to get from an idea to merged code.
 
 ---
 
+## Starting out: a new project, or one that already exists
+
+Setup differs most here. Everything after it is the same.
+
+### A new project, nothing built yet
+
+```
+/ralph-loop:init --openspec
+```
+
+It asks how you want the code laid out, since there is nothing to copy from. Pick one, and
+it creates the folders and records your choice. Then map the product and start:
+
+```
+/ralph-loop:req-slc my-product
+/ralph-loop:slice                # builds the colours, type and groundwork first
+/ralph-loop:run theme-foundation
+```
+
+The colours and type come before the first screen. The checks reject a raw colour value, so
+a screen built first fails, and the agent invents its own colours instead.
+
+### A project that already has code
+
+```
+/ralph-loop:doctor               # what is already broken, before you add to it
+/ralph-loop:init --openspec      # keeps your existing layout, records where things live
+```
+
+`doctor` runs the build, the tests and every check, groups what it finds by cause, and
+splits it into what blocks the pipeline and what is only untidy. You pick what to fix, and
+it writes specs for those.
+
+`init` does not propose a new layout for code that already has one. It records where your
+files actually live so the checks know where to look.
+
+Loose files with no folders, 20 or fewer, on a clean branch? It offers to move them. More
+than that is a change of its own, planned and reviewed like any other.
+
+Then carry on as normal, with `/ralph-loop:spec` for one feature or `/ralph-loop:req-slc`
+for a whole product.
+
+---
+
 ## Single feature (quick)
 
 ```
@@ -43,54 +87,25 @@ ask cannot sit inside an autonomous loop.
 /ralph-loop:run my-project         # pipeline plans across all specs
 ```
 
-## SLC release planning (incremental delivery)
+## SLC release (map the product, ship it in parts)
 
 ```
-/ralph-loop:req-slc my-product     # capture audience, JTBDs, activities at all depths
-/ralph-loop:run my-product         # auto-detects SLC mode, recommends thin slice
+/ralph-loop:req-slc my-product   # once: map the product
+/ralph-loop:slice                # per release: split it into changes
+/ralph-loop:run <change>         # per change: build it
+/ralph-loop:cleanup <change>     # per change: file it away once merged
+/ralph-loop:status               # any time: what is done, what to do next
 ```
 
-SLC mode captures the **full activity space** upfront, then ships a narrow part of it.
+`req-slc` writes a table: columns are things people do, rows are how far each one goes. A
+release takes one cell per column, so a person gets something they can finish rather than
+one thing done deeply and the rest missing.
 
-`req-slc` builds a story map. Activities are the columns, capability depths are the rows.
-For a photo palette app with one JTBD, "extract a photo's colors so I can reuse them":
+`slice` builds the shared groundwork first (colours and type, talking to a server, keeping
+data), then one change per cell. Each change gets its own checks and its own pull request.
 
-| Depth | Upload photo | Extract colors | Save palette |
-|---|---|---|---|
-| **Basic** | single file | top 5 dominant | save to device |
-| **Enhanced** | bulk upload | adjustable count, hex codes | name and tag palettes |
-| **Advanced** | batch plus URL import | perceptual clustering | sync, export ASE |
-
-A **Simple, Lovable, Complete** slice takes one cell per column, cutting vertically so the
-user gets a complete outcome rather than one activity done deeply and the rest missing.
-Here that is basic, basic, basic. The other six cells stay visible as backlog.
-
-The row does not have to be level. If extraction needs adjustable counts to be worth
-shipping, the slice is basic, **enhanced**, basic.
-
-`ralph/AUDIENCE_JTBD.md` holds the table and is never archived, so later releases pick
-deeper cells with no re-interview.
-
-**With OpenSpec**, a slice becomes one change per cell, so each cell gets its own gates and
-its own pull request.
-
-```
-/ralph-loop:req-slc my-product     # once per product, builds the table
-/ralph-loop:slice                  # per release, proposes a slice, you confirm
-                                   #   writes openspec/changes/upload-photo-basic/
-                                   #          openspec/changes/extract-colors-basic/
-                                   #          openspec/changes/save-palette-basic/
-/ralph-loop:run upload-photo-basic # per change, or /opsx:apply for the tricky ones
-/opsx:archive upload-photo-basic   # per change, once merged
-/ralph-loop:slice --status         # is the release shippable yet?
-```
-
-A slice of three cells means three changes and three pull requests. `ralph/releases/<name>.md`
-records which changes form the release, and `--status` calls it complete only when every one
-is archived. Then tag it.
-
-The legacy path stays: `/ralph-loop:run my-product` slices at planning time and builds the
-whole release as one plan, with one pull request.
+**[Full walkthrough: SLC releases](slc.md)** covers the map, the groundwork, how screens
+arrive after the tasks, and filing changes away.
 
 ## Resuming an incomplete run
 

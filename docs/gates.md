@@ -76,6 +76,28 @@ OVERALL: PASS|FAIL
 
 No pipeline changes needed. A project gate with the same filename as a plugin gate replaces it.
 
+## One check that is not a gate
+
+After every gate passes and before the pull request opens, one more check runs: does every
+screen state the design names have a task?
+
+```
+Design coverage: FAIL
+
+README names 5 states. No task covers these:
+  - C · Empty
+  - D · Signed out of iCloud
+```
+
+The branch is pushed, no pull request opens, and you are sent back to fix the tasks.
+
+It is not a gate for two reasons. A gate reads the changed lines, and a screen nobody wrote
+a task for changes no lines at all. And a failing gate is handed to an agent to fix, where
+the only fix here is editing `tasks.md`, the list you both tick off.
+
+It skips rather than fails when the change has no screens, or when its drawings have not
+arrived yet. See **[SLC releases](slc.md)** for how screens and tasks stay in step.
+
 ## Blast radius analysis
 
 When an LLM gate flags an architectural issue, the pipeline measures the **blast radius** of the affected type before attempting a fix.

@@ -1,6 +1,6 @@
 # Reference
 
-[ralph-loop](../README.md) · Previous: [Design](design.md)
+[ralph-loop](../README.md) · [Workflows](workflows.md) · [SLC releases](slc.md) · [Gates](gates.md) · Previous: [Design](design.md)
 
 Where things live, and how work is kept isolated.
 
@@ -21,6 +21,19 @@ These live in your project's `ralph/` directory (not in the plugin):
 | `ralph/gate_context.md` | Bootstrap / manual | Gate calibration and blast radius thresholds |
 | `ralph/lessons.md` | `loop.sh` | Persistent lessons for hard problems |
 | `ralph/deferred_issues.md` | `loop.sh` | Tech debt deferred by blast radius analysis |
+| `ralph/NEXT.md` | `/ralph-loop:status` | What is done and the one thing to do next, in plain words |
+| `ralph/releases/` | `/ralph-loop:slice` | Which changes make up each release, and in what order |
+| `ralph/design/SYSTEM_PROMPT.md` | `/ralph-loop:req-slc` | The prompt you paste into Claude Design for the design system |
+| `ralph/design/system/` | You, from a Claude Design bundle | Colours, type and spacing the screens cite. That exact folder name |
+
+With OpenSpec wiring, a change also holds:
+
+| Path | Created by | Purpose |
+|---|---|---|
+| `openspec/changes/<change>/` | `/ralph-loop:slice` | proposal, specs, design, tasks |
+| `openspec/changes/<change>/design/SCREEN_PROMPT.md` | `/ralph-loop:slice` | The prompt you paste in for that change's screens |
+| `openspec/changes/<change>/assets/design/` | You, from a Claude Design bundle | The drawn screens the build agent reads |
+| `openspec/changes/archive/<date>-<change>/` | `/ralph-loop:cleanup` | Filed away once merged. The date prefix is added for you |
 
 ---
 
