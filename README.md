@@ -6,13 +6,33 @@ Distributed as a **Claude Code plugin**.
 
 ## How it works
 
-1. `/ralph-loop:spec` — structured JTBD conversation produces a spec committed to a `spec/<slug>` branch
-2. `/ralph-loop:run` — orchestrates the pipeline: creates a worktree, plans the work, runs the build loop, gates the output
-3. The build loop runs iteration by iteration, one worktree per spec. See **Parallel builds** below when a branch carries two or more specs.
-4. Post-loop gates: precise static gates → LLM gates (with blast radius analysis) → UI tests → draft PR
-5. You review the branch and merge
+1. `/ralph-loop:spec` — you describe a feature, and it writes a spec onto a `spec/<slug>` branch
+2. `/ralph-loop:run` — builds it in a separate worktree, iteration by iteration
+3. Checks run after the build: fast checks, then slower ones, then UI tests, then a draft pull request
+4. You review the branch and merge
 
-Human decisions: spec approval and branch review. Everything else is automated.
+You decide two things: whether the spec is right, and whether the branch is good. The rest
+runs on its own.
+
+### The commands
+
+| | |
+|---|---|
+| `/ralph-loop:init` | Set up a project. `--openspec` adds the planning schema and git hooks |
+| `/ralph-loop:spec` | Describe one feature, get a spec |
+| `/ralph-loop:req-prd` | One job to be done that spans several topics, one spec each |
+| `/ralph-loop:req-slc` | Map a whole product, then ship it in parts. See **[SLC releases](docs/slc.md)** |
+| `/ralph-loop:slice` | Turn the next part of the map into changes |
+| `/ralph-loop:run` | Build a spec or a change |
+| `/ralph-loop:status` | What is done and what to do next, written to `ralph/NEXT.md` |
+| `/ralph-loop:cleanup` | File a change or spec away once its pull request merges |
+| `/ralph-loop:doctor` | Find what is already broken before you start |
+| `/ralph-loop:migrate` | Move an old file-copy install onto the plugin |
+
+Run `/ralph-loop:status` any time. It reads your project and tells you the one thing to do
+next, in plain words.
+
+Starting out? [A new project, or one that already has code](docs/workflows.md#starting-out-a-new-project-or-one-that-already-exists).
 
 ### Parallel builds
 
@@ -122,7 +142,8 @@ Read in this order, or jump to what you need.
 
 | | |
 |---|---|
-| **[Workflows](docs/workflows.md)** | Every way to get from an idea to merged code: single feature, OpenSpec change, PRD, SLC release, resume, doctor, cleanup |
+| **[Workflows](docs/workflows.md)** | Every way to get from an idea to merged code: one feature, an OpenSpec change, a PRD, resuming, doctor, cleanup |
+| **[SLC releases](docs/slc.md)** | Map a product once, then ship it in finished parts: the map, shared groundwork, screens, filing changes away |
 | **[Gates](docs/gates.md)** | The 20 static and 5 LLM checks, writing your own, and blast radius analysis |
 | **[Design](docs/design.md)** | Design references for the build agent, and the Claude Design handoff loop |
 | **[Reference](docs/reference.md)** | Project files, workspace isolation, migrating from a file-copy install |
