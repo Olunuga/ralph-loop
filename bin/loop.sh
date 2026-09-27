@@ -142,6 +142,11 @@ run_quietly() {
 # Max time (seconds) for a single claude -p call before it's killed.
 CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-600}"
 
+# A task that runs UI tests does not fit in the default. An XCUITest run boots a simulator,
+# installs the app and drives it, which alone can exceed 600 seconds, so the agent was killed
+# mid-task and the iteration did no work.
+CLAUDE_TIMEOUT_UI="${CLAUDE_TIMEOUT_UI:-2400}"
+
 # Every `claude -p` inherits the user's own CLAUDE.md files. Those are written for a person
 # in a chat: be brief, ask when unsure, stop early. A build agent that follows them replies
 # "What task?" and the iteration does no work. This overrides that, and nothing else.
@@ -559,8 +564,15 @@ Use Branch by Abstraction (Fowler): introduce a protocol/abstraction, migrate ca
         }
 
         git add -A && git reset HEAD $RALPH_PLAN_FILE progress.txt iteration_context.md 2>/dev/null
-        git -c commit.gpgsign=false commit --no-verify -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null \
-            || echo "WARN: commit failed for $GATE fix attempt $ATTEMPT. Changes left staged."
+        if git diff --cached --quiet 2>/dev/null; then
+            # The agent committed its own fix. The gate passed the re-check above, so this
+            # attempt succeeded; counting an empty commit as a failure spent both attempts
+            # on an agent that did the right thing.
+            echo "GATE $GATE: fixed and committed by the agent."
+        else
+            git -c commit.gpgsign=false commit --no-verify -m "ralph: fix $GATE attempt $ATTEMPT" 2>/dev/null \
+                || echo "WARN: commit failed for $GATE fix attempt $ATTEMPT. Changes left staged."
+        fi
     done
 
     # For LLM gates, pause the pipeline — let the orchestrator ask the user
@@ -970,6 +982,13 @@ $PROMPT"
 
         # Model escalation: Haiku → Sonnet (after 2 fails) → Opus (after 4 fails)
         AGENT_OK=true
+        # A task naming UI tests needs the longer timeout: the agent boots a simulator,
+        # installs the app and drives it, which does not fit in the default.
+        if grep -qiE '^- \[ \].*(ui test|xcuitest|snapshot test)' "$RALPH_PLAN_FILE" 2>/dev/null; then
+            CLAUDE_TIMEOUT="$CLAUDE_TIMEOUT_UI"
+            echo "  (UI test task ahead: agent timeout raised to ${CLAUDE_TIMEOUT}s)"
+        fi
+
         if [[ "$CONSEC_FAIL" -ge 4 ]]; then
             echo "  (escalating to Opus after $CONSEC_FAIL consecutive failures on $LAST_FAIL_GATE)"
             echo "$PROMPT" | claude_run_deep || AGENT_OK=false
@@ -981,9 +1000,29 @@ $PROMPT"
         fi
 
         if [[ "$AGENT_OK" == false ]]; then
-            echo "WARN: Agent call failed — retrying next iteration."
-            echo "- Iter $((ITER+1)): agent error (API timeout or crash)" >> progress.txt
             [[ "$LAST_FAIL_GATE" == "agent" ]] && CONSEC_FAIL=$((CONSEC_FAIL+1)) || { CONSEC_FAIL=1; LAST_FAIL_GATE="agent"; }
+            echo "WARN: Agent call failed ($CONSEC_FAIL in a row)."
+            echo "- Iter $((ITER+1)): agent error (API timeout or crash)" >> progress.txt
+
+            # Three identical failures in a row are the account, the network or the timeout,
+            # not the code. Retrying silently turned a spend-limit exhaustion into 17
+            # iterations that looked the same as work in progress.
+            if [[ "$CONSEC_FAIL" -ge 3 ]]; then
+                echo ""
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo "Stopping: $CONSEC_FAIL agent calls failed in a row."
+                echo "The code is not the cause. Check, in this order:"
+                echo "  1. Spend limit or usage cap on the account"
+                echo "  2. Network reachability"
+                echo "  3. CLAUDE_TIMEOUT (currently ${CLAUDE_TIMEOUT}s). A task that runs"
+                echo "     UI tests needs CLAUDE_TIMEOUT_UI (currently ${CLAUDE_TIMEOUT_UI}s)."
+                echo "Then run: loop.sh build"
+                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                echo "- Stopped after $CONSEC_FAIL consecutive agent errors" >> progress.txt
+                echo "AGENT_ERRORS_REPEATED" > "$PROJECT_ROOT/ralph/.loop_status"
+                exit 10
+            fi
+
             write_loop_status "$((ITER+1))"
             ITER=$((ITER + 1)) && continue
         fi
@@ -1365,6 +1404,11 @@ if [[ "$MODE" == "build" || "$MODE" == "post-loop" ]]; then
     [[ "$UI_ROUTE" == "VIEW_LEVEL" && -n "${SNAPSHOT_TEST_CMD:-}" ]] && SNAPSHOT_LINE="- Snapshot tests: PASS"
     [[ "$UI_ROUTE" == "FLOW_LEVEL" ]] && UI_LINE="- UI tests: PASS"
     [[ "$UI_ROUTE" == "FLOW_LEVEL" && -n "${SNAPSHOT_TEST_CMD:-}" ]] && SNAPSHOT_LINE="- Snapshot tests: PASS"
+    # Say this in the pull request, not only in the log. A reviewer reading "all gates
+    # passed" on a UI change should know nothing compared the result with its design.
+    if [[ "$UI_ROUTE" != "NO_UI" && -z "${SNAPSHOT_TEST_CMD:-}" ]]; then
+        SNAPSHOT_LINE="- Snapshot tests: NOT RUN (SNAPSHOT_TEST_CMD is empty). Nothing compared these views with their design. Check them on a device."
+    fi
 
     PR_BODY="## Autonomous Implementation
 
