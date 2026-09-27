@@ -61,8 +61,7 @@ For each change that still exists, also check its design files:
 [[ -d "openspec/changes/$ID/assets/design" ]] && echo "$ID has screen designs"
 [[ -d "openspec/changes/$ID/assets/design/design_system" ]] && echo "$ID has a duplicate system"
 { [[ -f "openspec/changes/$ID/design/SCREEN_PROMPT.md" ]] || [[ -d "openspec/changes/$ID/assets/design" ]]; } && \
-  [[ "$(grep -ci 'assets/design\|screen\|state' "openspec/changes/$ID/tasks.md" 2>/dev/null)" == "0" ]] && \
-  echo "$ID has screens no task names"
+  echo "$ID has screens: compare its states against its tasks"
 ```
 
 A change with a screen prompt and no `assets/design/` has a design waiting to be made.
@@ -121,8 +120,17 @@ Two design items can be outstanding, and they are independent:
   directory is deleted before committing.
 - A duplicate system already committed under a change's `assets/design/design_system/`.
 
-A change whose screens no task names is different: report it under **Do this next**, not
-Optional. Its screens will not be built, and no gate says so.
+For a change with screens, compare state by state rather than counting keywords. List the
+states the design names, from the bundle README or `design/SCREEN_PROMPT.md`, and the states
+the tasks name. Report it when a state has no task, a task names a state the design does not
+have, or a task and the design disagree about what happens in the same state.
+
+That last case is the one a keyword test cannot find, and it is the common one: tasks are
+written at slice time and the screens are drawn weeks later, so a task guesses a treatment
+the designer then chooses differently.
+
+Report such a change under **Do this next**, not Optional. Its screens will be built wrong or
+not at all, and no gate says so.
 
 One such change: `/ralph-loop:run <cell-id>` stops at its Step 0b, proposes the missing
 screen tasks, and appends them once the user confirms.

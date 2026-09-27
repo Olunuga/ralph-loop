@@ -155,6 +155,15 @@ artifacts:
       not invent a filename for a state: when the designs have not arrived, name the state
       alone and let the build agent find it.
 
+      **A task written before the screens exist states the outcome, never the treatment.**
+      Write "an empty name is refused and nothing is created". Do not write "a red line
+      appears under the field": you are guessing, the designer has not chosen yet, and a
+      task that names a treatment nobody drew is wrong the moment the design arrives. Say so
+      in the task, so the reader knows it is open: "treatment per the design, not yet drawn".
+
+      The drawn design is the authority. When it arrives and disagrees with a task, the task
+      changes, not the design.
+
       **Every visual task has a verification task after it.** Running the unit tests does
       not check that a view matches its design. Name the state, name the file that shows it,
       and say what to compare. A snapshot test is the usual form.

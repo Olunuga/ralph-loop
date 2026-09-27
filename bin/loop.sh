@@ -1397,6 +1397,29 @@ ${UI_LINE}
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "All gates passed."
+
+    # Last check before the pull request: did this change build the screens it described?
+    # No gate answers that. A gate reads the diff, and a change that never wrote a task for
+    # a state has a clean diff. This runs outside run_gate_with_fix on purpose: the only
+    # fix is editing tasks.md, and an agent rewriting the ledger to pass a check is worse
+    # than the miss.
+    if [[ -x "$RALPH_PLUGIN_DIR/scripts/check_design_coverage.sh" ]]; then
+        echo ""
+        echo "=== Design coverage ==="
+        if ! bash "$RALPH_PLUGIN_DIR/scripts/check_design_coverage.sh" "$RALPH_BRIEF_DIR"; then
+            echo "- Post-loop DESIGN_COVERAGE: FAIL" >> progress.txt
+            echo "DESIGN_COVERAGE_FAILED" > "$PROJECT_ROOT/ralph/.loop_status"
+            git push --no-verify -u origin "$BRANCH" 2>/dev/null || true
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "The branch is pushed. No pull request opened."
+            echo "The code is fine; the task list does not cover every drawn state."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 9
+        fi
+        echo "- Post-loop DESIGN_COVERAGE: PASS" >> progress.txt
+    fi
+
     # Ensure branch is pushed before creating PR
     git push --no-verify -u origin "$BRANCH" 2>/dev/null || true
     if command -v gh &>/dev/null; then

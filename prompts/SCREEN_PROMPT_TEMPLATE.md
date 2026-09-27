@@ -24,8 +24,19 @@ ${SUCCESS_CRITERIA}
 
 ## What I need back
 
-Every screen this activity needs at this depth, and every state each screen has: empty,
-loading, error, and the normal case. Show the path a user takes through them.
+Every screen this activity needs at this depth, and every state each screen has. Empty,
+loading, error and the normal case are a floor, not the list: add every state this activity
+actually has, including ones I did not think to ask for, and say which ones you added.
+
+Show the path a user takes through them.
+
+Give each state a short label and use that label everywhere. Those labels become the task
+list, so a state without one gets built by nobody.
+
+Where something is refused or fails, show the treatment you chose, not only that it fails: a
+toast, a line under the field, a full screen with its copy and its button. The tasks were
+written before you drew anything and they guessed. Your choice replaces the guess, so it has
+to be visible.
 
 Stay at this depth. If a deeper capability would make a screen better, say so and leave it
 out. It belongs to a later release.
