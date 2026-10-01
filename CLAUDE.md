@@ -262,6 +262,25 @@ An observed system bundle holds `README.md` addressed to a coding agent, `tokens
 the machine-readable source of truth, the spec document as `.dc.html`, and the source
 system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
 
+### A screen prompt is written per cell and drawn per surface
+Eight cells in one release produced eight prompts that differed by twelve lines out of
+forty-three, all slot-filled. Each said "design the screens for this activity", so the
+designer decided which surface the activity lived on. Several cells share one surface, so one
+surface got drawn several ways.
+
+`SCREEN_PROMPT_TEMPLATE.md` now opens with where the activity goes, not what it adds:
+`${SURFACE}`, `${SURFACE_CONTEXT}`, `${ALREADY_DRAWN}`, `${IN_CODE_TODAY}`, and
+`${NOT_THIS_CHANGE}`. The last one names the other activities on that surface, which is what
+stops one designer drawing the whole product.
+
+`PROMPT_slice.md` STEP 2 now names the surface per cell, and the report carries a SURFACES
+section grouping cells by it. A surface named differently in two cells is drawn twice, so the
+name has to be identical.
+
+The prompt also states that an engineer implements it without asking anything back, so every
+value needs its token named. A value with no token behind it is a decision that cannot reach
+the code.
+
 A screen bundle embeds a copy of the design system under `design_system/`, so the bundle is
 self-contained. The copy is byte-identical to what `ralph/design/system/` holds. Delete it
 before committing: a second copy of the tokens drifts, and the bundle README already cites

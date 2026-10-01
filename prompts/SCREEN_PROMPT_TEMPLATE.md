@@ -5,9 +5,35 @@ the second line are for you, not for Claude Design.
 
 ${DESIGN_SYSTEM_CITATION}
 
-## What to design
+## Where this goes
 
-Design the screens for one activity at one capability depth. Nothing else.
+**Surface: ${SURFACE}**
+
+This is not a new screen. It is one thing a person does on a surface the product already has,
+or will have. Draw that surface, with this activity working on it.
+
+${SURFACE_CONTEXT}
+
+### Already drawn
+
+${ALREADY_DRAWN}
+
+Match what is there. Where you disagree with an earlier drawing, say so and tell me which one
+to change. Do not quietly draw it a second way: two drawings of the same surface become two
+implementations.
+
+### Already built
+
+${IN_CODE_TODAY}
+
+### Not this change
+
+${NOT_THIS_CHANGE}
+
+Draw them only where they are needed to make this surface read correctly, and mark anything
+you drew for context so I do not build it twice.
+
+## What this change adds
 
 Activity: ${ACTIVITY}
 Depth: ${DEPTH}
@@ -43,6 +69,12 @@ out. It belongs to a later release.
 
 Use the design system exactly. If it cannot express something this activity needs, tell me
 what is missing rather than inventing a one-off.
+
+**An engineer implements this without asking you anything.** For every element you draw or
+change, name the token for each value: colour, type step, spacing, radius, duration. Give
+geometry in points. Where an element is a component the system already defines, name the
+component and the state rather than redrawing it. A value with no token behind it is a
+decision I cannot carry into code.
 
 ## How I will take this away
 
