@@ -37,9 +37,13 @@ ${SUCCESS_CRITERIA}
 
 ## What I need back
 
-Every screen this activity needs at this depth, and every state each screen has. Empty,
-loading, error and the normal case are a floor, not the list: add every state this activity
-actually has, including ones I did not think to ask for, and say which ones you added.
+Start from the screen above, and every state it enters while doing this. Where the activity
+needs a second screen, a sheet or a field opening in place, draw that too and say how it is
+reached.
+
+Empty, loading, error and the normal case are a floor, not the list: add every state this
+activity actually has, including ones I did not think to ask for, and say which ones you
+added.
 
 Show the path a user takes through them.
 
