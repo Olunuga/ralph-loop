@@ -276,6 +276,14 @@ changes, which is what stops one designer drawing the whole product.
 grouping cells by it. A screen named differently in two cells is drawn twice, so the name has
 to be identical.
 
+The screen name and description are inferred, not stated. The activity specs describe
+activities; no artifact names the screen each one happens on. `slice` reads it out of them and
+must show the user what it derived, grouped by screen, before writing any prompt.
+
+The template does not assert that the activity has no screen of its own. Some do: capture may
+be a sheet. It asks for one to be drawn where the activity needs it, and only refuses a screen
+invented because the activity was described in isolation.
+
 **Every slot describes the product, never the build.** An earlier version carried what was
 already drawn and what was already in code. Both are wrong: the prompt is written at slice
 time and pasted weeks later, so build state is stale by then, and it made each prompt depend

@@ -11,7 +11,12 @@ ${DESIGN_SYSTEM_CITATION}
 
 ${SCREEN_DESCRIPTION}
 
-Draw that screen, with this activity working on it. It is not a screen of its own.
+Draw that screen, with this activity working on it.
+
+If this activity needs its own screen, a sheet, or a field opening in place, draw that and
+say how it is reached from the screen above. What I do not want is a screen invented because
+the activity was described on its own: several activities share this screen, and each one
+redrawing it from scratch gives me several versions of the same thing.
 
 ### What else this screen does
 

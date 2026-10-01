@@ -387,6 +387,12 @@ eight drawings of that screen.
   section of the slice report, exactly as written there.
 - `${SCREEN_DESCRIPTION}`: two or three sentences on what that screen is for and what it
   shows. Take it from the activity specs that name the same screen.
+
+  **The specs describe activities, not screens, so both of these are read out of them rather
+  than stated anywhere.** Show the user the screen name and description you derived, grouped
+  by screen, and ask them to confirm or correct before you write any prompt. A wrong screen
+  name sends the designer to the wrong place, and the mistake is cheap to fix now and
+  expensive after the screens are drawn.
 - `${OTHER_ACTIVITIES}`: the activities on that screen belonging to other changes, in plain
   words. "Promoting a todo to focus, and reordering the backlog."
 
