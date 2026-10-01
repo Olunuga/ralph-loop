@@ -262,20 +262,24 @@ An observed system bundle holds `README.md` addressed to a coding agent, `tokens
 the machine-readable source of truth, the spec document as `.dc.html`, and the source
 system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
 
-### A screen prompt is written per cell and drawn per surface
+### A screen prompt names the screen the activity happens on
 Eight cells in one release produced eight prompts that differed by twelve lines out of
 forty-three, all slot-filled. Each said "design the screens for this activity", so the
-designer decided which surface the activity lived on. Several cells share one surface, so one
-surface got drawn several ways.
+designer decided which screen the activity lived on. Several cells share one screen, so one
+screen got drawn several ways.
 
-`SCREEN_PROMPT_TEMPLATE.md` now opens with where the activity goes, not what it adds:
-`${SURFACE}`, `${SURFACE_CONTEXT}`, `${ALREADY_DRAWN}`, `${IN_CODE_TODAY}`, and
-`${NOT_THIS_CHANGE}`. The last one names the other activities on that surface, which is what
-stops one designer drawing the whole product.
+`SCREEN_PROMPT_TEMPLATE.md` now opens with `${SCREEN_NAME}`, `${SCREEN_DESCRIPTION}`, and
+`${OTHER_ACTIVITIES}`. The last names the activities on that screen belonging to other
+changes, which is what stops one designer drawing the whole product.
 
-`PROMPT_slice.md` STEP 2 now names the surface per cell, and the report carries a SURFACES
-section grouping cells by it. A surface named differently in two cells is drawn twice, so the
-name has to be identical.
+`PROMPT_slice.md` STEP 2 names the screen per cell, and the report carries a SCREENS section
+grouping cells by it. A screen named differently in two cells is drawn twice, so the name has
+to be identical.
+
+**Every slot describes the product, never the build.** An earlier version carried what was
+already drawn and what was already in code. Both are wrong: the prompt is written at slice
+time and pasted weeks later, so build state is stale by then, and it made each prompt depend
+on the others. Each prompt stands alone and carries only what that one cell needs.
 
 The prompt also states that an engineer implements it without asking anything back, so every
 value needs its token named. A value with no token behind it is a decision that cannot reach

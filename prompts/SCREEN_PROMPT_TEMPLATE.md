@@ -5,33 +5,20 @@ the second line are for you, not for Claude Design.
 
 ${DESIGN_SYSTEM_CITATION}
 
-## Where this goes
+## The screen this happens on
 
-**Surface: ${SURFACE}**
+**${SCREEN_NAME}**
 
-This is not a new screen. It is one thing a person does on a surface the product already has,
-or will have. Draw that surface, with this activity working on it.
+${SCREEN_DESCRIPTION}
 
-${SURFACE_CONTEXT}
+Draw that screen, with this activity working on it. It is not a screen of its own.
 
-### Already drawn
+### What else this screen does
 
-${ALREADY_DRAWN}
+${OTHER_ACTIVITIES}
 
-Match what is there. Where you disagree with an earlier drawing, say so and tell me which one
-to change. Do not quietly draw it a second way: two drawings of the same surface become two
-implementations.
-
-### Already built
-
-${IN_CODE_TODAY}
-
-### Not this change
-
-${NOT_THIS_CHANGE}
-
-Draw them only where they are needed to make this surface read correctly, and mark anything
-you drew for context so I do not build it twice.
+Those belong to other work. Draw them only as far as the screen needs to read correctly, and
+mark anything you drew for context so it is not mistaken for this job.
 
 ## What this change adds
 

@@ -22,10 +22,9 @@ For each cell, search the codebase and decide its status:
 
 Note where it would live (file path, layer) and the sibling implementation to follow.
 
-Also name the **surface** the person is on while doing this activity: the focus list, a
+Also name the **screen** the person is on while doing this activity: the focus list, a
 space's backlog, settings. Name it the way a person would, not after a type. Several cells
-usually share one surface, and the same surface must get the same name every time. Note what
-already exists on it.
+usually share one screen, and that screen must get the same name every time.
 
 STEP 3 - Dependencies
 
@@ -93,8 +92,8 @@ FOUNDATIONS
 - <foundation-slug> | <which cells need it> | <what is missing today>
 ...
 
-SURFACES
-- <surface name> | <cell-id>, <cell-id> | <what exists on it today, or "nothing yet">
+SCREENS
+- <screen name> | <cell-id>, <cell-id> | <what that screen is for, in one line>
 ...
 
 BUILD ORDER
@@ -114,9 +113,8 @@ takes a numbered position here like any other piece of work.
 Use a short slug ending in `-foundation`: `theme-foundation`, `networking-foundation`,
 `persistence-foundation`.
 
-Group the cells by surface in SURFACES, so a surface that several cells share is visible as
-one thing. The screen prompts are written per cell but drawn per surface, and a surface named
-differently in two cells gets drawn twice.
+Group the cells by screen in SCREENS, so a screen that several cells share is visible as one
+thing. A screen named differently in two cells gets drawn twice.
 
 If FOUNDATIONS is empty, print the heading and "none".
 

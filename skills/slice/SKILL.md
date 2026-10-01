@@ -205,7 +205,7 @@ produce its report. Do this in your own context: it needs codebase searches and 
 
 ## Step 3: Confirm
 
-Show the user the PROPOSED SLICE, ALREADY DONE, DEFERRED, FOUNDATIONS, SURFACES, BUILD ORDER,
+Show the user the PROPOSED SLICE, ALREADY DONE, DEFERRED, FOUNDATIONS, SCREENS, BUILD ORDER,
 and RATIONALE sections in full.
 
 A foundation is work every cell needs and no cell owns: the theme, a network client, a local
@@ -378,23 +378,22 @@ spec, using ONLY this cell's depth:
 - `${JOB_TO_BE_DONE}` from the activity spec
 - `${CHANGE_ID}` the cell id, so the handoff steps name the real path
 
-The five slots below are what stop every prompt coming out the same. Without them the
-designer decides where the activity lives, and eight activities on one surface get eight
-drawings of that surface.
+The three slots below are what stop every prompt coming out the same. Without them the
+designer decides which screen the activity lives on, and eight activities on one screen get
+eight drawings of that screen.
 
-- `${SURFACE}`: from the SURFACES section of the slice report. Several cells share one
-  surface, and each must get that surface's name exactly as SURFACES wrote it.
-- `${SURFACE_CONTEXT}`: two or three sentences on what else that surface holds and what a
-  person does there. Take it from the other activity specs that name the same surface.
-- `${ALREADY_DRAWN}`: the changes earlier in BUILD ORDER that share this surface, each with
-  the path to its designs, so the designer extends them rather than starting again. Write
-  "Nothing yet. This is the first change to draw this surface." when none.
-- `${IN_CODE_TODAY}`: what the Step 2 gap analysis found on this surface already, in plain
-  words. "The list and its rows exist. Nothing adds to it yet." Write "Nothing yet." for a
-  greenfield surface. Do not list file paths: the designer cannot read them.
-- `${NOT_THIS_CHANGE}`: the activities that share this surface and belong to other changes,
-  named in plain words. "Promoting to focus, and reordering the backlog." This is what stops
-  one designer drawing the whole product.
+- `${SCREEN_NAME}`: the screen a person is on while doing this activity. Name it the way a
+  person would: "the focus list", "a space's backlog", "settings". Take it from the SCREENS
+  section of the slice report, exactly as written there.
+- `${SCREEN_DESCRIPTION}`: two or three sentences on what that screen is for and what it
+  shows. Take it from the activity specs that name the same screen.
+- `${OTHER_ACTIVITIES}`: the activities on that screen belonging to other changes, in plain
+  words. "Promoting a todo to focus, and reordering the backlog."
+
+**These describe the product, not the build.** Do not write what exists in code, or which
+changes are already done. The prompt is written now and pasted weeks later, so anything about
+build state is wrong by then. Each prompt stands alone and carries only what that one cell
+needs.
 
 Fill these before writing the file. A prompt whose only difference from its neighbour is the
 activity name has not been filled in.
