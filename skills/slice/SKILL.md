@@ -1,7 +1,7 @@
 ---
 name: slice
 description: Turn the next SLC release slice into OpenSpec changes
-argument-hint: "[--status] [--add-theme] [--add-design-tasks]"
+argument-hint: "[--status] [--add-theme] [--add-design-tasks] [--refresh-prompts]"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
@@ -14,11 +14,15 @@ Run each step in order. Tell the user which step you are on.
 ## Arguments
 
 ```
-/ralph-loop:slice [--status] [--add-theme]
+/ralph-loop:slice [--status] [--add-theme] [--add-design-tasks] [--refresh-prompts]
 ```
 
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
+
+`--refresh-prompts` rewrites `design/SCREEN_PROMPT.md` for every change that has one, using
+the current template. It creates nothing and touches no other file. If the user passed it, run
+Step 1, then skip to Step 1d.
 
 `--add-design-tasks` sweeps every change in the project and adds the screen tasks any of
 them is missing. It builds nothing and slices nothing. If the user passed it, run Step 1,
@@ -192,6 +196,61 @@ Show the proposed group for the first change and confirm it before writing. Once
 approves the shape, apply the rest without asking again, and report each as you go.
 
 Then run `/ralph-loop:status` and stop. Do not slice a new release in the same run.
+
+---
+
+## Step 1d: Rewrite the screen prompts
+
+Reached by `--refresh-prompts`. A change created by an older plugin version has a prompt
+written from an older template. This rewrites them in place.
+
+```bash
+for CH in openspec/changes/*/; do
+  ID=$(basename "$CH")
+  [[ "$ID" == "archive" ]] && continue
+  [[ -f "$CH/design/SCREEN_PROMPT.md" ]] && echo "$ID"
+done
+```
+
+Nothing listed: say "No change has a screen prompt." and stop.
+
+**Refuse a change whose designs have arrived.** A prompt that was already pasted and drawn
+from is a record of what was asked for. Rewriting it makes the drawings answer a question
+nobody asked.
+
+```bash
+[[ -d "$CH/assets/design" ]] && echo "$ID has designs already"
+```
+
+List those separately and leave them alone.
+
+For the rest, derive the screen fields exactly as Step 5h does: read every activity spec,
+group the activities by the screen a person is on, and name each screen the way a person
+would. Then show the user the grouping and ask them to confirm or correct it:
+
+```
+Screens, and the changes on each:
+
+  A space's backlog       capture-todo-basic, organise-backlog-basic, advance-status-basic
+  The focus list          shape-focus-basic, promote-to-focus-basic, set-focus-cap-basic
+  ...
+
+Rewrite <N> prompts with these? <M> changes already have designs and are left alone.
+```
+
+On anything but yes, stop. On yes, rewrite each prompt from
+`$RALPH_PLUGIN_DIR/prompts/SCREEN_PROMPT_TEMPLATE.md`, filling every slot as Step 5h
+describes, and commit once:
+
+```bash
+git add openspec/changes/*/design/SCREEN_PROMPT.md
+```
+```bash
+git -c commit.gpgsign=false commit -m "ralph: rewrite screen prompts from the current template"
+```
+
+Report which prompts were rewritten and which were left alone, then stop. Do not slice a new
+release in the same run.
 
 ---
 

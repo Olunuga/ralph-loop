@@ -276,6 +276,12 @@ changes, which is what stops one designer drawing the whole product.
 grouping cells by it. A screen named differently in two cells is drawn twice, so the name has
 to be identical.
 
+`slice` Step 5a skips a change that already has commits, so re-running it never refreshes an
+existing prompt. `--refresh-prompts` rewrites every `design/SCREEN_PROMPT.md` from the current
+template and creates nothing. It refuses a change whose `assets/design/` exists: a prompt that
+was already drawn from is a record of what was asked for, and rewriting it makes the drawings
+answer a question nobody asked.
+
 The screen name and description are inferred, not stated. The activity specs describe
 activities; no artifact names the screen each one happens on. `slice` reads it out of them and
 must show the user what it derived, grouped by screen, before writing any prompt.
