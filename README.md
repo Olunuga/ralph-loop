@@ -22,7 +22,7 @@ runs on its own.
 | `/ralph-loop:spec` | Describe one feature, get a spec |
 | `/ralph-loop:req-prd` | One job to be done that spans several topics, one spec each |
 | `/ralph-loop:req-slc` | Map a whole product, then ship it in parts. See **[SLC releases](docs/slc.md)** |
-| `/ralph-loop:slice` | Turn the next part of the map into changes |
+| `/ralph-loop:slice` | Turn the next part of the map into changes, or repair ones already made |
 | `/ralph-loop:run` | Build a spec or a change |
 | `/ralph-loop:status` | What is done and what to do next, written to `ralph/NEXT.md` |
 | `/ralph-loop:cleanup` | File a change or spec away once its pull request merges |

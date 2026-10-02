@@ -103,6 +103,11 @@ Each change gets four documents:
 `slice` writes a prompt per change. You paste it into Claude Design, ask in the chat for a
 handoff bundle, and commit what comes back. See [Design](design.md) for how.
 
+Each prompt names the screen the activity happens on, what else that screen does, and which
+of those belong to other changes. Without that the designer picks a screen, and several
+changes that share one screen each get their own version of it. The screen name is read out
+of your activity specs, so `slice` shows you the grouping and asks before writing.
+
 Three things follow, and the pipeline handles each:
 
 - **A task written first says what happens, not what it looks like.** "An empty name is
@@ -159,6 +164,31 @@ built but never filed reads as unfinished, and the release never completes.
 
 It calls a release done only when every change in it is filed. Then tag it and slice the
 next one.
+
+---
+
+## Repairing a release
+
+These rewrite or add to changes already sliced. None of them builds anything, and none
+creates a release.
+
+| Command | What it does |
+|---|---|
+| `/ralph-loop:slice` | With no flag, offers any shared groundwork the release is missing |
+| `/ralph-loop:slice --add-design-tasks` | Compares the drawn screens against the tasks and adds what is missing |
+| `/ralph-loop:slice --refresh-prompts` | Rewrites the screen prompts from the current template |
+| `/ralph-loop:slice --add-theme` | Adds the colours and type alone, for an old release |
+| `/ralph-loop:slice --status` | Reports one release in detail |
+
+Run these after updating the plugin. A change created by an older version keeps the documents
+it was given, so an improvement to the pipeline does not reach it on its own.
+
+Two of them refuse rather than overwrite:
+
+- **`--add-design-tasks` only adds.** Every box already ticked stays ticked.
+- **`--refresh-prompts` skips a change whose screens are already drawn.** That prompt is a
+  record of what was asked for. Rewriting it would make the drawings answer a question
+  nobody asked.
 
 ---
 

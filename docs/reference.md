@@ -31,7 +31,7 @@ With OpenSpec wiring, a change also holds:
 | Path | Created by | Purpose |
 |---|---|---|
 | `openspec/changes/<change>/` | `/ralph-loop:slice` | proposal, specs, design, tasks |
-| `openspec/changes/<change>/design/SCREEN_PROMPT.md` | `/ralph-loop:slice` | The prompt you paste in for that change's screens |
+| `openspec/changes/<change>/design/SCREEN_PROMPT.md` | `/ralph-loop:slice` | The prompt you paste in for that change's screens. `--refresh-prompts` rewrites it |
 | `openspec/changes/<change>/assets/design/` | You, from a Claude Design bundle | The drawn screens the build agent reads |
 | `openspec/changes/archive/<date>-<change>/` | `/ralph-loop:cleanup` | Filed away once merged. The date prefix is added for you |
 
