@@ -262,6 +262,43 @@ An observed system bundle holds `README.md` addressed to a coding agent, `tokens
 the machine-readable source of truth, the spec document as `.dc.html`, and the source
 system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
 
+### A screen prompt names the screen the activity happens on
+Eight cells in one release produced eight prompts that differed by twelve lines out of
+forty-three, all slot-filled. Each said "design the screens for this activity", so the
+designer decided which screen the activity lived on. Several cells share one screen, so one
+screen got drawn several ways.
+
+`SCREEN_PROMPT_TEMPLATE.md` now opens with `${SCREEN_NAME}`, `${SCREEN_DESCRIPTION}`, and
+`${OTHER_ACTIVITIES}`. The last names the activities on that screen belonging to other
+changes, which is what stops one designer drawing the whole product.
+
+`PROMPT_slice.md` STEP 2 names the screen per cell, and the report carries a SCREENS section
+grouping cells by it. A screen named differently in two cells is drawn twice, so the name has
+to be identical.
+
+`slice` Step 5a skips a change that already has commits, so re-running it never refreshes an
+existing prompt. `--refresh-prompts` rewrites every `design/SCREEN_PROMPT.md` from the current
+template and creates nothing. It refuses a change whose `assets/design/` exists: a prompt that
+was already drawn from is a record of what was asked for, and rewriting it makes the drawings
+answer a question nobody asked.
+
+The screen name and description are inferred, not stated. The activity specs describe
+activities; no artifact names the screen each one happens on. `slice` reads it out of them and
+must show the user what it derived, grouped by screen, before writing any prompt.
+
+The template does not assert that the activity has no screen of its own. Some do: capture may
+be a sheet. It asks for one to be drawn where the activity needs it, and only refuses a screen
+invented because the activity was described in isolation.
+
+**Every slot describes the product, never the build.** An earlier version carried what was
+already drawn and what was already in code. Both are wrong: the prompt is written at slice
+time and pasted weeks later, so build state is stale by then, and it made each prompt depend
+on the others. Each prompt stands alone and carries only what that one cell needs.
+
+The prompt also states that an engineer implements it without asking anything back, so every
+value needs its token named. A value with no token behind it is a decision that cannot reach
+the code.
+
 A screen bundle embeds a copy of the design system under `design_system/`, so the bundle is
 self-contained. The copy is byte-identical to what `ralph/design/system/` holds. Delete it
 before committing: a second copy of the tokens drifts, and the bundle README already cites
@@ -454,6 +491,46 @@ idle iterations out of 18 from this.
 It says there is no reader, no question will be answered, and inherited guidance about
 brevity or asking does not apply. It overrides nothing else, so project conventions still
 reach the agent.
+
+### The hooks resolve PROJECT_ROOT with --show-toplevel
+`hooks/pre-commit` and `hooks/pre-push` used `--git-common-dir`, which inside a worktree
+returns the main checkout. Every worktree therefore read the main checkout's
+`gate_context.md` and ignored its own calibration.
+
+The rule recorded elsewhere here, that `--show-toplevel` is wrong inside a worktree, is about
+building paths for worktree creation, where it produces `.worktrees/x/.worktrees/x`. For
+reading the worktree's own `ralph/`, `--show-toplevel` is the correct one.
+
+### An empty commit is not a failed fix attempt
+`run_gate_with_fix` counted a failed `git commit` as a spent attempt. An agent that committed
+its own fix left nothing staged, the commit failed, and both attempts went on an agent that
+had done the right thing. The gate re-check above the commit already decides success.
+
+### Three agent errors in a row stop the loop
+A spend-limit exhaustion or a network failure produced 17 consecutive iterations that looked
+identical to work in progress. The loop now exits 10 with `AGENT_ERRORS_REPEATED` after three
+consecutive agent failures and names the three causes to check.
+
+`CLAUDE_TIMEOUT_UI` (default 2400s) replaces `CLAUDE_TIMEOUT` for an iteration whose next
+task names a UI or snapshot test. An XCUITest run boots a simulator, installs the app and
+drives it, which does not fit in 600 seconds.
+
+### Nothing compares a rendered view with its design
+`SNAPSHOT_TEST_CMD` was written empty by `init` and never asked about, so the snapshot gate
+always skipped. Four visual defects reached a device with every gate green: a square border
+inside a rounded clip, a missing inner padding, default separators, and a CloudKit refusal.
+
+`init` now looks for a snapshot library and asks when it finds none. It does not add the
+dependency: that is a change to the project, not setup. When the command is empty and the
+change touched UI, the pull request body says so, because a reviewer reading "all gates
+passed" should know what was not checked.
+
+### Two LLM gates contradicted each other
+`architecture.md` requires protocols for dependency inversion; `code_quality.md` flagged any
+protocol with one conformer as speculative generality. A repository protocol has exactly one
+conformer by design, so one gate deleted what the other demanded. Both files now record that
+architecture wins on protocols, and code_quality flags one only when nothing depends on the
+abstraction.
 
 ### The loop bypasses the git hooks by design
 Every `git commit` and every `git push` in `loop.sh` passes `--no-verify`. The loop runs the
@@ -657,6 +734,15 @@ LLM gates that exhaust retries without a fix block the pipeline (exit code 7) an
 
 Based on Martin's coupling metrics, Google's LSC sharding practice, and Feathers' seam analysis.
 - `run_gate_with_fix` accepts an optional max-attempts parameter
+
+### color_only tested the file, not the line
+It flagged any file whose added lines held a colour modifier and an `if` anywhere, and
+counted `.tint()` as state colour. No accessibility fix cleared it: adding an icon removes
+neither the `if` nor the colour, so the gate stayed red whatever the agent did.
+
+The colour change and the condition must now be on the same added line, and `.tint()` is
+excluded, because it sets an accent on a control that already carries its own shape and
+label.
 
 ### Static gates must be diff-scoped
 Gates that scan the entire file (e.g. `missing_labels`, `color_only`) flag pre-existing violations unrelated to the feature. These gates must only check added lines from the branch diff, not the full file.

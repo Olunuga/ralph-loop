@@ -379,9 +379,27 @@ UI_TEST_CMD="xcodebuild \
   -derivedDataPath .build \
   -quiet"
 
+# Nothing else compares a rendered view with its design. With this empty, a wrong corner
+# radius, a missing inset or a stray separator reaches the device with every check green.
 SNAPSHOT_TEST_CMD=""
 LINT_CMD=""
 ```
+
+Ask about the snapshot command rather than leaving it empty:
+
+```bash
+grep -rl "swift-snapshot-testing\|assertSnapshot\|SnapshotTesting" "$SRC" "$TEST_DIR" 2>/dev/null | head -3
+```
+
+Found: derive the command from the unit test command, filtered to that target, and set
+`SNAPSHOT_TEST_CMD`.
+
+Not found: use AskUserQuestion. "This project has no snapshot tests. They are the only check
+that compares a rendered view with its design. Without them a wrong corner radius, a missing
+inset or a stray separator passes every gate and reaches the device. Add them now, or leave
+it empty?" Offer **Leave it empty for now** and **Tell me how to add them**. On the second,
+name `swift-snapshot-testing` and say the command goes in `SNAPSHOT_TEST_CMD`. Do not add the
+dependency yourself: that is a change to their project, not setup.
 
 ---
 

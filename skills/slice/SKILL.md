@@ -1,7 +1,7 @@
 ---
 name: slice
 description: Turn the next SLC release slice into OpenSpec changes
-argument-hint: "[--status] [--add-theme] [--add-design-tasks]"
+argument-hint: "[--status] [--add-theme] [--add-design-tasks] [--refresh-prompts]"
 allowed-tools: Bash Read Write AskUserQuestion
 disable-model-invocation: true
 ---
@@ -14,11 +14,15 @@ Run each step in order. Tell the user which step you are on.
 ## Arguments
 
 ```
-/ralph-loop:slice [--status] [--add-theme]
+/ralph-loop:slice [--status] [--add-theme] [--add-design-tasks] [--refresh-prompts]
 ```
 
 `--status` reports where the current release stands and creates nothing. If the user passed
 it, skip to Step 6.
+
+`--refresh-prompts` rewrites `design/SCREEN_PROMPT.md` for every change that has one, using
+the current template. It creates nothing and touches no other file. If the user passed it, run
+Step 1, then skip to Step 1d.
 
 `--add-design-tasks` sweeps every change in the project and adds the screen tasks any of
 them is missing. It builds nothing and slices nothing. If the user passed it, run Step 1,
@@ -195,6 +199,61 @@ Then run `/ralph-loop:status` and stop. Do not slice a new release in the same r
 
 ---
 
+## Step 1d: Rewrite the screen prompts
+
+Reached by `--refresh-prompts`. A change created by an older plugin version has a prompt
+written from an older template. This rewrites them in place.
+
+```bash
+for CH in openspec/changes/*/; do
+  ID=$(basename "$CH")
+  [[ "$ID" == "archive" ]] && continue
+  [[ -f "$CH/design/SCREEN_PROMPT.md" ]] && echo "$ID"
+done
+```
+
+Nothing listed: say "No change has a screen prompt." and stop.
+
+**Refuse a change whose designs have arrived.** A prompt that was already pasted and drawn
+from is a record of what was asked for. Rewriting it makes the drawings answer a question
+nobody asked.
+
+```bash
+[[ -d "$CH/assets/design" ]] && echo "$ID has designs already"
+```
+
+List those separately and leave them alone.
+
+For the rest, derive the screen fields exactly as Step 5h does: read every activity spec,
+group the activities by the screen a person is on, and name each screen the way a person
+would. Then show the user the grouping and ask them to confirm or correct it:
+
+```
+Screens, and the changes on each:
+
+  A space's backlog       capture-todo-basic, organise-backlog-basic, advance-status-basic
+  The focus list          shape-focus-basic, promote-to-focus-basic, set-focus-cap-basic
+  ...
+
+Rewrite <N> prompts with these? <M> changes already have designs and are left alone.
+```
+
+On anything but yes, stop. On yes, rewrite each prompt from
+`$RALPH_PLUGIN_DIR/prompts/SCREEN_PROMPT_TEMPLATE.md`, filling every slot as Step 5h
+describes, and commit once:
+
+```bash
+git add openspec/changes/*/design/SCREEN_PROMPT.md
+```
+```bash
+git -c commit.gpgsign=false commit -m "ralph: rewrite screen prompts from the current template"
+```
+
+Report which prompts were rewritten and which were left alone, then stop. Do not slice a new
+release in the same run.
+
+---
+
 ## Step 2: Recommend a slice
 
 Read `ralph/AUDIENCE_JTBD.md`, every file in `ralph/specs/`, and any file in
@@ -205,8 +264,8 @@ produce its report. Do this in your own context: it needs codebase searches and 
 
 ## Step 3: Confirm
 
-Show the user the PROPOSED SLICE, ALREADY DONE, DEFERRED, FOUNDATIONS, BUILD ORDER, and
-RATIONALE sections in full.
+Show the user the PROPOSED SLICE, ALREADY DONE, DEFERRED, FOUNDATIONS, SCREENS, BUILD ORDER,
+and RATIONALE sections in full.
 
 A foundation is work every cell needs and no cell owns: the theme, a network client, a local
 store. Ask about them separately, because each is a change of its own and the user may
@@ -377,6 +436,32 @@ spec, using ONLY this cell's depth:
 - `${DEPTH_DESCRIPTION}` and `${SUCCESS_CRITERIA}` from that depth's section of the spec
 - `${JOB_TO_BE_DONE}` from the activity spec
 - `${CHANGE_ID}` the cell id, so the handoff steps name the real path
+
+The three slots below are what stop every prompt coming out the same. Without them the
+designer decides which screen the activity lives on, and eight activities on one screen get
+eight drawings of that screen.
+
+- `${SCREEN_NAME}`: the screen a person is on while doing this activity. Name it the way a
+  person would: "the focus list", "a space's backlog", "settings". Take it from the SCREENS
+  section of the slice report, exactly as written there.
+- `${SCREEN_DESCRIPTION}`: two or three sentences on what that screen is for and what it
+  shows. Take it from the activity specs that name the same screen.
+
+  **The specs describe activities, not screens, so both of these are read out of them rather
+  than stated anywhere.** Show the user the screen name and description you derived, grouped
+  by screen, and ask them to confirm or correct before you write any prompt. A wrong screen
+  name sends the designer to the wrong place, and the mistake is cheap to fix now and
+  expensive after the screens are drawn.
+- `${OTHER_ACTIVITIES}`: the activities on that screen belonging to other changes, in plain
+  words. "Promoting a todo to focus, and reordering the backlog."
+
+**These describe the product, not the build.** Do not write what exists in code, or which
+changes are already done. The prompt is written now and pasted weeks later, so anything about
+build state is wrong by then. Each prompt stands alone and carries only what that one cell
+needs.
+
+Fill these before writing the file. A prompt whose only difference from its neighbour is the
+activity name has not been filled in.
 
 For `${DESIGN_SYSTEM_CITATION}`, check whether the design system exists:
 ```bash

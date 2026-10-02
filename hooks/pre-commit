@@ -25,9 +25,9 @@ fi
 export RALPH_PLUGIN_DIR
 
 # ── Resolve the project ───────────────────────────────────────────────────────
-# --git-common-dir, not --show-toplevel: inside a worktree the latter returns the
-# worktree root and produces double-nested paths.
-PROJECT_ROOT=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')
+# --show-toplevel, not --git-common-dir: inside a worktree the common dir is the main
+# checkout, so the hook would read that worktree's calibration instead of its own.
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 PROJECT_ROOT="${PROJECT_ROOT:-$(pwd)}"
 export PROJECT_ROOT
 
