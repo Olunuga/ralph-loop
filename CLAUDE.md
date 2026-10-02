@@ -262,6 +262,43 @@ An observed system bundle holds `README.md` addressed to a coding agent, `tokens
 the machine-readable source of truth, the spec document as `.dc.html`, and the source
 system's stylesheet. `PROMPT_build.md` step 0d2 reads that README first.
 
+### A screen prompt names the screen the activity happens on
+Eight cells in one release produced eight prompts that differed by twelve lines out of
+forty-three, all slot-filled. Each said "design the screens for this activity", so the
+designer decided which screen the activity lived on. Several cells share one screen, so one
+screen got drawn several ways.
+
+`SCREEN_PROMPT_TEMPLATE.md` now opens with `${SCREEN_NAME}`, `${SCREEN_DESCRIPTION}`, and
+`${OTHER_ACTIVITIES}`. The last names the activities on that screen belonging to other
+changes, which is what stops one designer drawing the whole product.
+
+`PROMPT_slice.md` STEP 2 names the screen per cell, and the report carries a SCREENS section
+grouping cells by it. A screen named differently in two cells is drawn twice, so the name has
+to be identical.
+
+`slice` Step 5a skips a change that already has commits, so re-running it never refreshes an
+existing prompt. `--refresh-prompts` rewrites every `design/SCREEN_PROMPT.md` from the current
+template and creates nothing. It refuses a change whose `assets/design/` exists: a prompt that
+was already drawn from is a record of what was asked for, and rewriting it makes the drawings
+answer a question nobody asked.
+
+The screen name and description are inferred, not stated. The activity specs describe
+activities; no artifact names the screen each one happens on. `slice` reads it out of them and
+must show the user what it derived, grouped by screen, before writing any prompt.
+
+The template does not assert that the activity has no screen of its own. Some do: capture may
+be a sheet. It asks for one to be drawn where the activity needs it, and only refuses a screen
+invented because the activity was described in isolation.
+
+**Every slot describes the product, never the build.** An earlier version carried what was
+already drawn and what was already in code. Both are wrong: the prompt is written at slice
+time and pasted weeks later, so build state is stale by then, and it made each prompt depend
+on the others. Each prompt stands alone and carries only what that one cell needs.
+
+The prompt also states that an engineer implements it without asking anything back, so every
+value needs its token named. A value with no token behind it is a decision that cannot reach
+the code.
+
 A screen bundle embeds a copy of the design system under `design_system/`, so the bundle is
 self-contained. The copy is byte-identical to what `ralph/design/system/` holds. Delete it
 before committing: a second copy of the tokens drifts, and the bundle README already cites

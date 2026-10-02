@@ -5,9 +5,27 @@ the second line are for you, not for Claude Design.
 
 ${DESIGN_SYSTEM_CITATION}
 
-## What to design
+## The screen this happens on
 
-Design the screens for one activity at one capability depth. Nothing else.
+**${SCREEN_NAME}**
+
+${SCREEN_DESCRIPTION}
+
+Draw that screen, with this activity working on it.
+
+If this activity needs its own screen, a sheet, or a field opening in place, draw that and
+say how it is reached from the screen above. What I do not want is a screen invented because
+the activity was described on its own: several activities share this screen, and each one
+redrawing it from scratch gives me several versions of the same thing.
+
+### What else this screen does
+
+${OTHER_ACTIVITIES}
+
+Those belong to other work. Draw them only as far as the screen needs to read correctly, and
+mark anything you drew for context so it is not mistaken for this job.
+
+## What this change adds
 
 Activity: ${ACTIVITY}
 Depth: ${DEPTH}
@@ -24,9 +42,13 @@ ${SUCCESS_CRITERIA}
 
 ## What I need back
 
-Every screen this activity needs at this depth, and every state each screen has. Empty,
-loading, error and the normal case are a floor, not the list: add every state this activity
-actually has, including ones I did not think to ask for, and say which ones you added.
+Start from the screen above, and every state it enters while doing this. Where the activity
+needs a second screen, a sheet or a field opening in place, draw that too and say how it is
+reached.
+
+Empty, loading, error and the normal case are a floor, not the list: add every state this
+activity actually has, including ones I did not think to ask for, and say which ones you
+added.
 
 Show the path a user takes through them.
 
@@ -43,6 +65,12 @@ out. It belongs to a later release.
 
 Use the design system exactly. If it cannot express something this activity needs, tell me
 what is missing rather than inventing a one-off.
+
+**An engineer implements this without asking you anything.** For every element you draw or
+change, name the token for each value: colour, type step, spacing, radius, duration. Give
+geometry in points. Where an element is a component the system already defines, name the
+component and the state rather than redrawing it. A value with no token behind it is a
+decision I cannot carry into code.
 
 ## How I will take this away
 
